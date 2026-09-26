@@ -62,6 +62,7 @@ it('stopping prevents a delayed cloud response from playing', async () => {
 });
 
 it('keeps one active and one prioritized pending cue with newest winning equal priority', async () => {
+  vi.spyOn(api, 'speech').mockRejectedValue(new Error('Unavailable'));
   const { speak, utterances } = stubBrowserSpeech();
   const coach = new VoiceCoach();
   const active = coach.speak('setup', false, { priority: 20 });
@@ -71,6 +72,7 @@ it('keeps one active and one prioritized pending cue with newest winning equal p
 
   await dropped;
   await replaced;
+  await vi.waitFor(() => expect(utterances).toHaveLength(1));
   expect(speak).toHaveBeenCalledTimes(1);
   expect(utterances[0].text).toBe('setup');
 

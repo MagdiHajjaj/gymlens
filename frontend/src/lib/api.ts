@@ -27,13 +27,22 @@ export function setTokenProvider(provider?: () => Promise<string>) {
   getToken = provider;
 }
 const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-async function request<T>(path: string, options: RequestInit = {}, blob = false): Promise<T> {
-  if (!getToken) throw new Error('Sign in to connect your workout history.');
-  const token = await getToken();
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  blob = false,
+  authentication: 'required' | 'optional' = 'required',
+): Promise<T> {
+  if (!getToken && authentication === 'required') throw new Error('Sign in to connect your workout history.');
+  const token = getToken ? await getToken() : undefined;
   const response = await fetch(`${base}${path}`, {
     ...options,
     signal: AbortSignal.timeout(30000),
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -78,7 +87,7 @@ export const api = {
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
   speech: (text: string) =>
-    request<Blob>('/api/coaching/speech', { method: 'POST', body: JSON.stringify({ text }) }, true),
+    request<Blob>('/api/coaching/speech', { method: 'POST', body: JSON.stringify({ text }) }, true, 'optional'),
   async save(session: WorkoutSession) {
     const created = await request<WorkoutSession>('/api/workouts', {
       method: 'POST',

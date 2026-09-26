@@ -41,3 +41,9 @@ def current_subject(credentials: HTTPAuthorizationCredentials | None = Depends(b
         raise HTTPException(
             401, "Invalid or expired access token", headers={"WWW-Authenticate": "Bearer"}
         ) from None
+
+
+def optional_subject(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> str | None:
+    if not credentials:
+        return None
+    return current_subject(credentials)

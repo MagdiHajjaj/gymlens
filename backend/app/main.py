@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 from app import services
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
-from app.core.security import current_subject
+from app.core.security import current_subject, optional_subject
 from app.models import MovementMetric, RepEvent, SessionInsight, User, Workout
 from app.schemas import (
     MetricBatch,
@@ -357,12 +357,18 @@ def finish(
 
 
 @app.post("/api/coaching/speech")
-def coaching(payload: SpeechRequest, user: User = Depends(current_user)):
-    services.rate_limit(user.id, "speech-request", 60)
+def coaching(payload: SpeechRequest, request: Request, subject: str | None = Depends(optional_subject)):
+    remote = request.client.host if request.client else "unknown"
+    rate_key = subject or f"guest:{remote}"
+    services.rate_limit(rate_key, "speech-request", 60 if subject else 30)
+
+    def provider_limit():
+        services.rate_limit(rate_key, "speech-provider", 12 if subject else 6)
+        if not subject:
+            services.rate_limit("all-guests", "speech-provider", 12)
+
     return Response(
-        services.speech(
-            payload.text, before_provider=lambda: services.rate_limit(user.id, "speech-provider", 12)
-        ),
+        services.speech(payload.text, before_provider=provider_limit),
         media_type="audio/mpeg",
         headers={"Cache-Control": "private, max-age=86400"},
     )
