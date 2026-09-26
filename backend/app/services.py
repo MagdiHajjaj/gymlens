@@ -1,6 +1,8 @@
+import hashlib
 import json
 import time
 from collections import Counter, OrderedDict
+from pathlib import Path
 from threading import Lock
 
 import httpx
@@ -14,6 +16,11 @@ from app.schemas import Insight
 _lock = Lock()
 _requests: OrderedDict = OrderedDict()
 _audio: dict[str, bytes] = {}
+# ElevenLabs audio is also saved to disk, so each phrase is paid for once, not once per restart.
+VOICE_CACHE = Path(__file__).resolve().parent.parent / ".voice-cache"
+# After a provider failure (quota, rate limit, outage), stop calling it for a while.
+VOICE_BACKOFF_SECONDS = 120
+_voice_down_until = 0.0
 
 
 def rate_limit(subject: str, kind: str, maximum: int):
@@ -30,11 +37,26 @@ def rate_limit(subject: str, kind: str, maximum: int):
         recent.append(now)
 
 
+def _voice_file(text: str) -> Path:
+    key = hashlib.sha256(f"{settings.elevenlabs_voice_id}:{text}".encode()).hexdigest()
+    return VOICE_CACHE / f"{key}.mp3"
+
+
 def speech(text: str) -> bytes:
+    global _voice_down_until
     if text in _audio:
         return _audio[text]
     if not settings.elevenlabs_api_key or not settings.elevenlabs_voice_id:
         raise HTTPException(503, "Voice provider is unavailable; use browser speech")
+    cached = _voice_file(text)
+    try:
+        if cached.is_file():
+            _audio[text] = cached.read_bytes()
+            return _audio[text]
+    except OSError:
+        pass
+    if time.monotonic() < _voice_down_until:
+        raise HTTPException(503, "Voice provider is cooling down; browser speech is available")
     try:
         response = httpx.post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{settings.elevenlabs_voice_id}",
@@ -46,8 +68,14 @@ def speech(text: str) -> bytes:
         if not response.headers.get("content-type", "").startswith("audio/") or not response.content:
             raise ValueError("Invalid audio response")
         _audio[text] = response.content
+        try:
+            VOICE_CACHE.mkdir(exist_ok=True)
+            cached.write_bytes(response.content)
+        except OSError:
+            pass  # Read-only disk: the in-memory cache still applies.
         return response.content
     except (httpx.HTTPError, ValueError):
+        _voice_down_until = time.monotonic() + VOICE_BACKOFF_SECONDS
         raise HTTPException(503, "Voice provider unavailable; browser speech is available") from None
 
 

@@ -1,4 +1,18 @@
 import { api } from '../../lib/api';
+
+const VOICE_CACHE = 'gymlens-voice-v1';
+const CLOUD_BACKOFF_MS = 120_000;
+
+// Keeps ElevenLabs audio in the browser's Cache Storage, so a page reload never pays for it again.
+async function cachedSpeech(text: string): Promise<Blob> {
+  const key = `/voice-cache/${encodeURIComponent(text)}`;
+  const store = 'caches' in window ? await caches.open(VOICE_CACHE).catch(() => undefined) : undefined;
+  const hit = await store?.match(key);
+  if (hit) return hit.blob();
+  const blob = await api.speech(text);
+  void store?.put(key, new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })).catch(() => {});
+  return blob;
+}
 export class VoiceCoach {
   constructor(private report: (status: string) => void = () => {}) {}
   private busy = false;
@@ -6,6 +20,8 @@ export class VoiceCoach {
   private audio?: HTMLAudioElement;
   private cancelPlayback?: () => void;
   private cache = new Map<string, Blob>();
+  /** After ElevenLabs fails, use the browser voice until this time instead of retrying every cue. */
+  private cloudPausedUntil = 0;
   stop() {
     this.generation++;
     this.cancelPlayback?.();
@@ -21,10 +37,15 @@ export class VoiceCoach {
     this.report('Preparing voice…');
     const generation = this.generation;
     try {
-      if (authenticated) {
+      if (authenticated && Date.now() >= this.cloudPausedUntil) {
         let blob = this.cache.get(text);
         if (!blob) {
-          blob = await api.speech(text);
+          try {
+            blob = await cachedSpeech(text);
+          } catch (e) {
+            this.cloudPausedUntil = Date.now() + CLOUD_BACKOFF_MS;
+            throw e;
+          }
           this.cache.set(text, blob);
         }
         if (generation !== this.generation) return;

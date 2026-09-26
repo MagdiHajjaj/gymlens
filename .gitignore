@@ -27,6 +27,7 @@ dist-ssr
 # Python and local configuration
 .venv/
 __pycache__/
+backend/.voice-cache/
 .pytest_cache/
 .ruff_cache/
 *.db

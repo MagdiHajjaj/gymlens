@@ -10,7 +10,7 @@ from app import services
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     sessions = sessionmaker(engine, expire_on_commit=False)
@@ -23,6 +23,8 @@ def client():
     app.dependency_overrides[current_subject] = lambda: "auth0|alice"
     services._requests.clear()
     services._audio.clear()
+    services._voice_down_until = 0.0
+    services.VOICE_CACHE = tmp_path / "voice-cache"
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

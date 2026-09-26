@@ -131,3 +131,32 @@ def test_costly_endpoint_rate_limit(client, monkeypatch):
         ).status_code
         == 429
     )
+
+
+def test_voice_disk_cache_and_backoff(client, monkeypatch):
+    monkeypatch.setattr(settings, "elevenlabs_api_key", "test-key")
+    monkeypatch.setattr(settings, "elevenlabs_voice_id", "test-voice")
+    phrase = {"text": "Keep your chest a little more upright."}
+    calls = []
+
+    def ok(*args, **kwargs):
+        calls.append(1)
+        return httpx.Response(
+            200, content=b"disk-audio", headers={"content-type": "audio/mpeg"}, request=httpx.Request("POST", args[0])
+        )
+
+    monkeypatch.setattr(services.httpx, "post", ok)
+    assert client.post("/api/coaching/speech", json=phrase).content == b"disk-audio"
+    services._audio.clear()  # simulate a server restart: memory is gone, disk is not
+    assert client.post("/api/coaching/speech", json=phrase).content == b"disk-audio"
+    assert len(calls) == 1
+
+    def fail(*args, **kwargs):
+        calls.append(1)
+        raise httpx.ConnectError("quota")
+
+    monkeypatch.setattr(services.httpx, "post", fail)
+    other = {"text": "Keep your upper arm close to your side."}
+    assert client.post("/api/coaching/speech", json=other).status_code == 503
+    assert client.post("/api/coaching/speech", json=other).status_code == 503
+    assert len(calls) == 2  # the second failure did not call the provider again
