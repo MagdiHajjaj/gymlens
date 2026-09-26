@@ -175,7 +175,11 @@ export function SessionPage() {
       )}
       <div className="report-stats">
         <div className="panel">
-          <span className="eyebrow">COMPLETED REPS</span>
+          <span className="eyebrow">
+            {session.reps.some((r) => r.metrics_json.arm_side !== undefined)
+              ? 'COMPLETED ARM REPS'
+              : 'COMPLETED REPS'}
+          </span>
           <strong>
             {session.total_reps}
             <small> reps</small>

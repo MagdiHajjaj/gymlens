@@ -1,4 +1,5 @@
 import { MovementAnalyzer } from './ExerciseAnalyzer';
+import { CurlAnalyzer } from './CurlAnalyzer';
 import type { ExerciseId } from '../../types/workout';
 export const exercises = {
   squat: {
@@ -15,7 +16,8 @@ export const exercises = {
     category: 'UPPER BODY',
     subtitle: 'Make every curl count',
     muscles: 'Biceps · Forearms',
-    setup: 'Stand side-on with your shoulder, elbow, and wrist visible. Begin with your arm extended.',
+    setup:
+      'Face the camera with both shoulders, elbows, and wrists in view. Begin with your arms comfortably straight. Curl together or alternate; each arm counts independently.',
     checks: 'Range & upper-arm position',
     color: 'peach',
   },
@@ -29,4 +31,5 @@ export const exercises = {
     color: 'lavender',
   },
 } as const;
-export const createAnalyzer = (id: ExerciseId) => new MovementAnalyzer(id);
+export const createAnalyzer = (id: ExerciseId) =>
+  id === 'curl' ? new CurlAnalyzer() : new MovementAnalyzer(id);

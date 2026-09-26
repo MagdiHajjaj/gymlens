@@ -1048,6 +1048,113 @@ nav a.active:after {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.8px;
 }
+.voice-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #607063;
+}
+.muscle-panel {
+  padding: 22px;
+}
+.arm-tracking {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+}
+.arm-tracking > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 4px;
+  border-radius: 8px;
+  background: #f0f3eb;
+}
+.arm-tracking span {
+  font-size: 11px;
+  color: #64725d;
+}
+.arm-tracking strong {
+  font-size: 16px;
+}
+.arm-tracking small {
+  font-size: 10px;
+  color: #64725d;
+}
+.muscle-panel h3 {
+  margin: 10px 0 8px;
+  font-size: 17px;
+}
+.muscle-diagram {
+  width: 100%;
+  max-height: 300px;
+  display: block;
+  margin: 12px auto;
+}
+.body-outline {
+  fill: #eff1e9;
+  stroke: #bdc7b7;
+  stroke-width: 1.2;
+}
+.body-detail {
+  fill: none;
+  stroke: #c6cebf;
+  stroke-width: 1;
+}
+.muscle-region {
+  fill: #d8dfd0;
+  stroke: #f6f8f1;
+  stroke-width: 1;
+  transition: fill 220ms ease;
+}
+.primary-muscle {
+  fill: var(--muscle-color);
+}
+.secondary-muscle {
+  fill: #e9c294;
+}
+.muscle-diagram text {
+  font-size: 8px;
+  letter-spacing: 2px;
+  fill: #6e7b68;
+}
+.muscle-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 11px;
+  color: #64725d;
+}
+.muscle-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.muscle-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muscle-color);
+}
+.muscle-legend span + span i {
+  background: #e9c294;
+}
+.muscle-status {
+  text-align: center;
+  font-size: 12px;
+  color: #506546;
+  margin: 14px 0 4px;
+}
+.muscle-panel .small-muted {
+  text-align: center;
+  font-size: 10px;
+  margin-bottom: 0;
+}
 .workout-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;

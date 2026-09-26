@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, LoaderCircle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { createPoseEngine } from '../pose/PoseEngine';
+import { PoseStabilizer } from '../pose/PoseStabilizer';
 import { createAnalyzer } from '../exercises/ExerciseRegistry';
 import { drawSkeleton } from './SkeletonOverlay';
 import { FeedbackEngine } from '../coaching/FeedbackEngine';
@@ -8,7 +9,7 @@ import { VoiceCoach } from '../coaching/VoiceCoach';
 import { useWorkout } from '../workout/workoutStore';
 import { useIdentity } from '../auth/AuthProvider';
 import { Button } from '../../components/ui/button';
-import type { PoseFrame } from '../../types/workout';
+import type { ExerciseResult, PoseFrame } from '../../types/workout';
 
 const cameraErrors: Record<string, string> = {
   NotAllowedError:
@@ -17,7 +18,7 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'Your camera is busy or unavailable. Close other apps using it, then try again.',
   OverconstrainedError: 'Your camera does not support this configuration. Try another camera or the demo.',
 };
-export function CameraView({ onDemo }: { onDemo: () => void }) {
+export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCoach: VoiceCoach }) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const session = useWorkout((s) => s.session)!;
@@ -36,9 +37,12 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
       lastUi = -1,
       wasPaused = false;
     const analyzer = createAnalyzer(session.exercise),
+      stabilizer = new PoseStabilizer(),
       feedback = new FeedbackEngine(),
-      voice = new VoiceCoach();
+      voice = voiceCoach;
     const demo = session.source === 'demo';
+    let displayResult: ExerciseResult | undefined;
+    let demoLandmarks: PoseFrame['landmarks'] = [];
     async function start() {
       setError('');
       setStatus(demo ? 'Loading landmark replay…' : 'Requesting camera access…');
@@ -81,11 +85,14 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
         function tick(now: number) {
           if (disposed) return;
           const state = useWorkout.getState();
-          const dt = now - previousTick;
+          // The first RAF timestamp can predate setup within the same browser frame.
+          const dt = Math.max(0, now - previousTick);
           previousTick = now;
           if (state.paused) {
             if (!wasPaused) {
               analyzer.reset();
+              stabilizer.reset();
+              displayResult = undefined;
               feedback.reset();
               voice.stop();
             }
@@ -103,8 +110,8 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
               const sequenceTime = demoTime % (frames[frames.length - 1].timestampMs + 50);
               const index = Math.min(frames.length - 1, Math.floor(sequenceTime / 50));
               frame = { ...frames[index], timestampMs: now };
-              canvas.current!.width = 720;
-              canvas.current!.height = 720;
+              if (canvas.current!.width !== 720) canvas.current!.width = 720;
+              if (canvas.current!.height !== 720) canvas.current!.height = 720;
             } else if (
               video.current &&
               video.current.readyState >= 2 &&
@@ -115,22 +122,38 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
               frame = {
                 timestampMs: now,
                 landmarks: detected.landmarks[0] || [],
+                worldLandmarks: detected.worldLandmarks[0] || [],
                 aspectRatio: video.current.videoWidth / video.current.videoHeight,
               };
-              canvas.current!.width = video.current.videoWidth;
-              canvas.current!.height = video.current.videoHeight;
+              if (canvas.current!.width !== video.current.videoWidth)
+                canvas.current!.width = video.current.videoWidth;
+              if (canvas.current!.height !== video.current.videoHeight)
+                canvas.current!.height = video.current.videoHeight;
             }
             if (frame) {
-              const result = analyzer.analyze(frame);
-              drawSkeleton(canvas.current!, frame.landmarks, demo, result.trackingValid);
+              const measured = demo ? frame : stabilizer.update(frame);
+              const result = analyzer.analyze(measured);
+              displayResult = { ...result, trackedSide: result.trackedSide ?? displayResult?.trackedSide };
+              if (demo) demoLandmarks = frame.landmarks;
               if (result.repCompleted || now - lastUi >= 100) {
                 state.ingest(result, now);
                 lastUi = now;
               }
-              const message = feedback.next(result, now);
-              if (message && state.voice) void voice.speak(message, authenticated);
+              if (state.voice) {
+                const message = feedback.next(result, now);
+                if (message)
+                  void voice.speak(message, authenticated && result.trackingValid && result.calibrated);
+              } else feedback.reset();
             }
           }
+          drawSkeleton(
+            canvas.current!,
+            demo ? demoLandmarks : stabilizer.render(now),
+            demo,
+            displayResult?.trackingValid ?? false,
+            session.exercise,
+            displayResult,
+          );
           raf = requestAnimationFrame(safeTick);
         }
         const safeTick = (now: number) => {
@@ -158,7 +181,7 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
       engine?.close();
       voice.stop();
     };
-  }, [session.id, session.exercise, session.source, authenticated, attempt]);
+  }, [session.id, session.exercise, session.source, authenticated, attempt, voiceCoach]);
   return (
     <div
       className={`camera-stage ${session.source === 'demo' ? 'is-demo' : ''}`}
@@ -207,7 +230,9 @@ export function CameraView({ onDemo }: { onDemo: () => void }) {
         <span>
           {session.source === 'demo'
             ? 'Synthetic movement · no camera required'
-            : 'Side view · keep your full movement in frame'}
+            : session.exercise === 'curl'
+              ? 'Keep shoulder, elbow, and wrist in view'
+              : 'Side view · keep your full movement in frame'}
         </span>
         <span>GYM LENS</span>
       </div>

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { MovementAnalyzer } from '../src/features/exercises/ExerciseAnalyzer';
 import { jointAngle } from '../src/lib/biomechanics/angles';
 import { FeedbackEngine } from '../src/features/coaching/FeedbackEngine';
+import { PoseStabilizer } from '../src/features/pose/PoseStabilizer';
 import type { ExerciseId, ExerciseResult, PoseFrame } from '../src/types/workout';
 const fixture = (id: ExerciseId): PoseFrame[] =>
   JSON.parse(readFileSync(new URL(`../public/exercises/${id}.json`, import.meta.url), 'utf-8'));
@@ -18,6 +19,12 @@ describe('joint geometry', () => {
   });
 });
 describe.each<ExerciseId>(['squat', 'curl', 'pushup'])('%s recorded synthetic movement', (id) => {
+  it('preserves full-cycle counts through camera position smoothing', () => {
+    const analyzer = new MovementAnalyzer(id);
+    const tracker = new PoseStabilizer();
+    const results = fixture(id).map((frame) => analyzer.analyze(tracker.update(frame)));
+    expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
+  });
   it('counts exactly three full cycles, including the shallow cycle with a cue', () => {
     const analyzer = new MovementAnalyzer(id);
     const reps = fixture(id)
@@ -72,6 +79,52 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup'])('%s recorded synthetic mo
     }
   });
 });
+it('tracks curl cycles with cropped hips and a wider shoulder view', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const results = fixture('curl').map((original) => {
+    const frame = structuredClone(original);
+    frame.landmarks[23].visibility = 0;
+    frame.landmarks[24].visibility = 0;
+    frame.landmarks[12].x += 0.2;
+    frame.landmarks[14].visibility = 0;
+    return analyzer.analyze(frame);
+  });
+  expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
+  expect(results.every((r) => r.jointAngles.upper_arm_angle === undefined)).toBe(true);
+});
+
+it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const results = fixture('curl').map((original) => {
+    const frame = structuredClone(original);
+    for (const side of [0, 1]) {
+      const shoulder = frame.landmarks[11 + side];
+      const elbow = frame.landmarks[13 + side];
+      const wrist = frame.landmarks[15 + side];
+      if (jointAngle(shoulder, elbow, wrist) > 155) {
+        const length = Math.hypot(wrist.x - elbow.x, wrist.y - elbow.y);
+        const angle = Math.atan2(shoulder.y - elbow.y, shoulder.x - elbow.x) + (155 * Math.PI) / 180;
+        wrist.x = elbow.x + Math.cos(angle) * length;
+        wrist.y = elbow.y + Math.sin(angle) * length;
+      }
+    }
+    return analyzer.analyze(frame);
+  });
+  expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
+});
+
+it('does not switch arms during a brief visibility dropout', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const first = fixture('curl')[0];
+  const initial = analyzer.analyze(first);
+  const side = initial.trackedSide!;
+  const missing = structuredClone(first);
+  missing.timestampMs += 50;
+  missing.landmarks[15 + side].visibility = 0;
+  expect(analyzer.analyze(missing).trackingValid).toBe(false);
+  expect(analyzer.analyze({ ...first, timestampMs: 100 }).trackedSide).toBe(side);
+});
+
 it('rejects a front-facing squat during calibration', () => {
   const analyzer = new MovementAnalyzer('squat');
   const frame = structuredClone(fixture('squat')[0]);

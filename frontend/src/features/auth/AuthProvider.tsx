@@ -1,6 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import { setTokenProvider } from '../../lib/api';
+import { safeReturnTo } from './redirect';
 const domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
 const audience = import.meta.env.VITE_AUTH0_AUDIENCE;
@@ -12,6 +13,7 @@ interface Auth {
   name: string;
   error?: string;
   login: () => void;
+  signup: () => void;
   logout: () => void;
 }
 const guest: Auth = {
@@ -20,6 +22,7 @@ const guest: Auth = {
   owner: 'guest',
   name: 'Local athlete',
   login: () => {},
+  signup: () => {},
   logout: () => {},
 };
 const Context = createContext<Auth>(guest);
@@ -40,19 +43,35 @@ function Connected({ children }: { children: ReactNode }) {
     );
     return () => setTokenProvider();
   }, [isAuthenticated, getAccessTokenSilently]);
+  function signIn(signup = false) {
+    setLoginError('');
+    void loginWithRedirect({
+      appState: { returnTo: window.location.pathname + window.location.search + window.location.hash },
+      authorizationParams: signup ? { screen_hint: 'signup' } : {},
+    }).catch((e: unknown) => setLoginError(e instanceof Error ? e.message : 'Unable to sign in. Try again.'));
+  }
+  if (isLoading) {
+    return (
+      <div className="page loading-text" role="status">
+        Connecting your account…
+      </div>
+    );
+  }
   return (
     <Context.Provider
       value={{
         authenticated: isAuthenticated,
         loading: isLoading,
-        owner: user?.sub || 'guest',
-        name: user?.given_name || user?.name || 'Athlete',
+        owner: isAuthenticated ? user?.sub || 'guest' : 'guest',
+        name: isAuthenticated ? user?.given_name || user?.name || 'Athlete' : 'Local athlete',
         error: error?.message || loginError,
-        login: () => {
-          void loginWithRedirect().catch((e) => setLoginError(String(e)));
-        },
+        login: () => signIn(),
+        signup: () => signIn(true),
         logout: () => {
-          void logout({ logoutParams: { returnTo: window.location.origin } });
+          setLoginError('');
+          void logout({ logoutParams: { returnTo: window.location.origin } }).catch(() =>
+            setLoginError('Unable to sign out. Please try again.'),
+          );
         },
       }}
     >
@@ -66,7 +85,10 @@ export function IdentityProvider({ children }: { children: ReactNode }) {
     <Auth0Provider
       domain={domain}
       clientId={clientId}
-      authorizationParams={{ redirect_uri: window.location.origin, audience }}
+      authorizationParams={{ redirect_uri: window.location.origin, audience, scope: 'openid profile email' }}
+      onRedirectCallback={(appState) => {
+        window.history.replaceState({}, '', safeReturnTo(appState?.returnTo, window.location.origin));
+      }}
     >
       <Connected>{children}</Connected>
     </Auth0Provider>

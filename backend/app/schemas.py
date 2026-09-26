@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 Exercise = Literal["squat", "curl", "pushup"]
-MetricName = Literal["knee_angle", "elbow_angle", "torso_lean", "hip_alignment", "upper_arm_angle"]
+MetricName = Literal["knee_angle", "elbow_angle", "left_elbow_angle", "right_elbow_angle", "torso_lean", "hip_alignment", "upper_arm_angle"]
 FaultCode = Literal[
     "insufficient_depth", "excessive_forward_lean", "upper_arm_movement", "hip_alignment", "limited_range"
 ]
@@ -40,8 +40,10 @@ class Rep(StrictModel):
     @field_validator("metrics_json")
     @classmethod
     def valid_metrics(cls, values):
-        bounds = {"min_angle": (0, 180), "duration_ms": (0, 60000), "max_torso_lean": (0, 180)}
+        bounds = {"min_angle": (0, 180), "duration_ms": (0, 60000), "max_torso_lean": (0, 180), "arm_side": (0, 1)}
         for key, value in values.items():
+            if key == "arm_side" and value not in (0, 1):
+                raise ValueError("Arm side must be left (0) or right (1)")
             if key not in bounds or not bounds[key][0] <= value <= bounds[key][1]:
                 raise ValueError("Unsupported metric or value")
         return values
@@ -62,6 +64,9 @@ class MetricBatch(StrictModel):
 
 
 PHRASES = {
+    "Voice coach is ready. Let's get moving.",
+    "Rep complete. Keep your movement controlled.",
+    "Ready. Move at a comfortable, controlled pace.",
     "Keep your chest a little more upright.",
     "Keep your upper arm close to your side.",
     "Keep your shoulders, hips, and ankles in line.",

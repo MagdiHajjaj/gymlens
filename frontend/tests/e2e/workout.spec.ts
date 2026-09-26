@@ -1,4 +1,38 @@
 import { test, expect } from '@playwright/test';
+
+test('curl heatmap responds to movement and voice can be enabled and tested', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {},
+        resume() {},
+        speak(utterance: SpeechSynthesisUtterance) {
+          utterance.dispatchEvent(new Event('start'));
+          setTimeout(() => utterance.dispatchEvent(new Event('end')), 30);
+        },
+      },
+    });
+  });
+  await page.goto('/workout?mode=demo');
+  await page.getByRole('button', { name: 'Bicep curl', exact: true }).click();
+  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Voice off', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Voice on', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.locator('.voice-check')).toContainText('Voice ready');
+  await expect(page.getByRole('img', { name: /Biceps.*front and back muscle diagrams/ })).toBeVisible();
+  await expect(page.locator('.muscle-panel')).not.toHaveAttribute('data-intensity', '0.00');
+  await page.screenshot({ path: 'test-results/curl-heatmap.png', fullPage: true });
+  await page.getByRole('button', { name: 'Test voice', exact: true }).click();
+  await expect(page.locator('.voice-check')).toContainText('Voice ready');
+  await expect(page.getByTestId('rep-count')).toHaveText('2', { timeout: 12000 });
+  await expect(page.locator('.arm-tracking > div').nth(0)).toContainText('1 rep');
+  await expect(page.locator('.arm-tracking > div').nth(1)).toContainText('1 rep');
+  await page.getByRole('button', { name: 'End session', exact: true }).click();
+});
 test('guest demo completes reps, pauses, saves a report and survives reload', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

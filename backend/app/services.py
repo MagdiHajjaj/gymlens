@@ -60,6 +60,9 @@ def generate_insight(workout) -> dict:
         "exercise": workout.exercise,
         "source": workout.source,
         "totalReps": len(workout.reps),
+        "repCountUnit": "individual arm repetitions" if any(
+            "arm_side" in rep.metrics_json for rep in workout.reps
+        ) else "movement cycles",
         "repsWithDetectedFaults": sum(bool(r.faults_json) for r in workout.reps),
         "commonFaults": dict(counts),
         "measuredMetrics": {
@@ -80,7 +83,7 @@ def generate_insight(workout) -> dict:
                     "If source is demo, explicitly describe simulated movement, not a real person's workout. "
                     "Give one practical next-session focus; keep each field concise.",
                     response_mime_type="application/json",
-                    response_schema=Insight,
+                    response_json_schema=Insight.model_json_schema(),
                 ),
             )
             result = Insight.model_validate_json(response.text or "")

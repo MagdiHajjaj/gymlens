@@ -1,4 +1,6 @@
-import type { Landmark } from '../../types/workout';
+import type { Landmark, ExerciseId, ExerciseResult } from '../../types/workout';
+import { drawMuscleHeatmap } from './MuscleHeatmap';
+import { drawPersonBox } from './PersonBox';
 const connections = [
   [11, 12],
   [11, 13],
@@ -20,6 +22,8 @@ export function drawSkeleton(
   landmarks: Landmark[],
   demo: boolean,
   valid: boolean,
+  exercise?: ExerciseId,
+  result?: ExerciseResult,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -46,12 +50,15 @@ export function drawSkeleton(
     ctx.lineTo(width * 0.85, height * 0.92);
     ctx.stroke();
   }
+  drawPersonBox(ctx, landmarks, width, height, !demo);
+  if (exercise && result) drawMuscleHeatmap(ctx, landmarks, exercise, result, width, height);
   ctx.strokeStyle = valid ? '#c5f277' : '#d8dacf';
   ctx.lineWidth = demo ? 8 : 3;
   ctx.lineCap = 'round';
-  const visible = (i: number) => landmarks[i] && (landmarks[i].visibility ?? 0) >= 0.6;
+  const visible = (i: number) => landmarks[i] && (landmarks[i].visibility ?? 0) > 0.05;
   for (const [a, b] of connections) {
     if (!visible(a) || !visible(b)) continue;
+    ctx.globalAlpha = Math.min(landmarks[a].visibility ?? 0, landmarks[b].visibility ?? 0);
     ctx.beginPath();
     ctx.moveTo(landmarks[a].x * width, landmarks[a].y * height);
     ctx.lineTo(landmarks[b].x * width, landmarks[b].y * height);
@@ -59,9 +66,11 @@ export function drawSkeleton(
   }
   landmarks.forEach((p, i) => {
     if (!visible(i) || i > 32 || (i < 11 && i !== 0)) return;
+    ctx.globalAlpha = p.visibility ?? 0;
     ctx.beginPath();
     ctx.arc(p.x * width, p.y * height, demo && i === 0 ? 22 : demo ? 6 : 4, 0, Math.PI * 2);
     ctx.fillStyle = i === 0 && demo ? '#c5f277' : '#f4ffde';
     ctx.fill();
   });
+  ctx.globalAlpha = 1;
 }

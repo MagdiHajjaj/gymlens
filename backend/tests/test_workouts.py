@@ -64,6 +64,25 @@ def test_every_session_route_enforces_ownership(client, switch_user):
     assert client.post("/api/workouts", json=workout).status_code == 409
 
 
+def test_both_arm_reps_and_angles_are_saved(client):
+    workout = create(client)
+    sid = workout["id"]
+    reps = [rep(1), rep(2)]
+    for side, item in enumerate(reps):
+        item["metrics_json"]["arm_side"] = side
+    response = client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": reps})
+    assert response.status_code == 200, response.text
+    assert response.json()["total_reps"] == 2
+    metrics = [{"recorded_at": reps[0]["completed_at"], "metric_name": name, "metric_value": 90}
+               for name in ["left_elbow_angle", "right_elbow_angle"]]
+    assert client.post(f"/api/workouts/{sid}/metrics/batch", json={"metrics": metrics}).status_code == 200
+    detail = client.get(f"/api/workouts/{sid}").json()
+    assert {r["metrics_json"]["arm_side"] for r in detail["reps"]} == {0, 1}
+    invalid = rep(3)
+    invalid["metrics_json"]["arm_side"] = 0.5
+    assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": [invalid]}).status_code == 422
+
+
 def test_conflicting_retries_and_rep_gaps_are_rejected(client):
     sid = create(client)["id"]
     data = rep(2)

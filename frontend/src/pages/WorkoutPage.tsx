@@ -17,6 +17,8 @@ import {
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { CameraView } from '../features/camera/CameraView';
+import { VoiceCoach } from '../features/coaching/VoiceCoach';
+import { MuscleDiagram } from '../components/MuscleDiagram';
 import { useWorkout } from '../features/workout/workoutStore';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import { useIdentity } from '../features/auth/AuthProvider';
@@ -35,6 +37,14 @@ export function WorkoutPage() {
   const [error, setError] = useState('');
   const [unsaved, setUnsaved] = useState<WorkoutSession | null>(null);
   const [cue, setCue] = useState('');
+  const [voiceStatus, setVoiceStatus] = useState('Tap Voice on to hear coaching.');
+  const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
+  function enableVoice() {
+    voiceCoach.stop();
+    toggleVoice();
+    if (!voice) void voiceCoach.speak("Voice coach is ready. Let's get moving.", false);
+    else setVoiceStatus('Voice is off.');
+  }
   useEffect(() => {
     if (!active) return;
     const checkpoint = setInterval(() => {
@@ -153,7 +163,7 @@ export function WorkoutPage() {
               <li>
                 <span>01</span>
                 <div>
-                  <h3>Find your side view</h3>
+                  <h3>{selected === 'curl' ? 'Keep both arms in view' : 'Find your side view'}</h3>
                   <p>Place your camera at a steady angle with good lighting and room to move.</p>
                 </div>
               </li>
@@ -215,12 +225,12 @@ export function WorkoutPage() {
       </div>
       <div className="workout-grid">
         <div>
-          <CameraView onDemo={() => start('demo')} />
+          <CameraView onDemo={() => start('demo')} voiceCoach={voiceCoach} />
           <div className="workout-controls">
             <Button variant="secondary" onClick={pause} disabled={saving || session?.status === 'completed'}>
               {paused ? <Play size={16} /> : <Pause size={16} />} {paused ? 'Resume' : 'Pause'}
             </Button>
-            <Button variant="ghost" onClick={toggleVoice}>
+            <Button variant="ghost" onClick={enableVoice} aria-pressed={voice}>
               {voice ? <Volume2 size={17} /> : <VolumeX size={17} />} Voice {voice ? 'on' : 'off'}
             </Button>
             <Button
@@ -231,6 +241,21 @@ export function WorkoutPage() {
               <Square size={14} fill="currentColor" /> {saving ? 'Saving session…' : 'End session'}
             </Button>
           </div>
+          <div className="voice-check" role="status">
+            <span>{voiceStatus}</span>
+            <Button
+              size="small"
+              variant="ghost"
+              disabled={paused}
+              onClick={() => {
+                voiceCoach.stop();
+                if (!voice) toggleVoice();
+                void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated);
+              }}
+            >
+              Test voice
+            </Button>
+          </div>
         </div>
         <aside className="live-sidebar">
           <section className="panel rep-panel">
@@ -238,7 +263,37 @@ export function WorkoutPage() {
             <strong className="rep-number" data-testid="rep-count">
               {session?.total_reps || 0}
             </strong>
-            <span className="rep-label">completed reps</span>
+            <span className="rep-label">{selected === 'curl' ? 'completed arm reps' : 'completed reps'}</span>
+            {selected === 'curl' && (
+              <div className="arm-tracking">
+                {[0, 1].map((side) => {
+                  const arm = result?.arms?.find((a) => a.side === side);
+                  const count = session?.reps.filter((r) => r.metrics_json.arm_side === side).length ?? 0;
+                  return (
+                    <div key={side}>
+                      <span>{side === 0 ? 'Left arm' : 'Right arm'}</span>
+                      <strong>
+                        {count} {count === 1 ? 'rep' : 'reps'}
+                      </strong>
+                      <small>
+                        {paused
+                          ? 'Paused'
+                          : !arm?.trackingValid
+                            ? 'Not in view'
+                            : !arm.calibrated
+                              ? 'Straighten to start'
+                              : arm.phase === 'ready'
+                                ? 'Ready'
+                                : arm.phase === 'eccentric'
+                                  ? 'Lifting'
+                                  : 'Lowering'}
+                      </small>
+                      <small>{arm?.trackingValid && arm.angle !== undefined ? `${arm.angle}°` : '—'}</small>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <div className="phase-label">
               <span />
               {paused
@@ -264,19 +319,19 @@ export function WorkoutPage() {
             </span>
             <h3>
               {paused
-                ? 'A moment to reset.'
+                ? 'Take a breath.'
                 : !result?.trackingValid || !result.calibrated
-                  ? 'Let’s find your position.'
+                  ? 'Get into frame.'
                   : cue
-                    ? 'One small adjustment.'
-                    : 'You set the pace.'}
+                    ? 'One small fix.'
+                    : 'You’ve got this.'}
             </h3>
             <p>
               {paused
-                ? 'Resume when you’re ready. Hold your starting position to recalibrate.'
+                ? 'Resume when you’re ready and settle back into the starting position.'
                 : result?.trackingValid && result.calibrated && cue
                   ? cue
-                  : result?.guidance || 'Keep your full movement visible and turn side-on to the camera.'}
+                  : result?.guidance || 'Keep your full movement in view and turn slightly to the side.'}
             </p>
             <span className="coach-footer">
               {voice
@@ -286,6 +341,7 @@ export function WorkoutPage() {
                 : 'Visual coaching · voice is off'}
             </span>
           </section>
+          <MuscleDiagram exercise={selected} result={result} paused={paused} />
           <section className="panel metrics-panel">
             <span className="eyebrow">LIVE MEASUREMENTS</span>
             {Object.entries(result?.jointAngles || {}).map(([key, value]) => (

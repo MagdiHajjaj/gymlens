@@ -10,6 +10,7 @@ export interface PoseFrame {
   timestampMs: number;
   landmarks: Landmark[];
   aspectRatio?: number;
+  worldLandmarks?: Landmark[];
 }
 export interface FormFault {
   code: string;
@@ -25,6 +26,15 @@ export interface ExerciseResult {
   faults: FormFault[];
   guidance: string;
   repMetrics?: Record<string, number>;
+  trackedSide?: number;
+  arms?: {
+    side: number;
+    angle?: number;
+    trackingValid: boolean;
+    calibrated: boolean;
+    phase: MovementPhase;
+  }[];
+  completedReps?: { metrics: Record<string, number>; faults: FormFault[] }[];
 }
 export interface RepEvent {
   rep_number: number;

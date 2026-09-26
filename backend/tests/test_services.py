@@ -83,6 +83,12 @@ def test_gemini_structured_validation_and_saved_result(client, monkeypatch):
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "gemini"
     assert '"totalReps": 1' in calls[0]["contents"]
+    config = calls[0]["config"]
+    assert config.response_schema is None
+    assert config.response_json_schema["additionalProperties"] is False
+    assert set(config.response_json_schema["required"]) == {
+        "recap", "strengths", "improvements", "next_focus"
+    }
     assert client.post(f"/api/workouts/{sid}/insights").json() == response.json()
     assert len(calls) == 1
     assert client.get(f"/api/workouts/{sid}").json()["insight"]["recap"] == valid["recap"]

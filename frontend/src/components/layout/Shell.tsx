@@ -109,6 +109,16 @@ export function Shell({ children }: { children: ReactNode }) {
                 Sign in <ArrowUpRight size={14} />
               </Button>
             )}
+            {authConfigured && !identity.authenticated && (
+              <Button size="small" onClick={identity.signup}>
+                Create account
+              </Button>
+            )}
+            {identity.authenticated && location.pathname !== '/workout' && (
+              <Button size="small" variant="secondary" onClick={identity.logout}>
+                Sign out
+              </Button>
+            )}
           </div>
         </header>
         {identity.error && (

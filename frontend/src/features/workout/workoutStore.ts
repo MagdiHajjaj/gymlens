@@ -44,17 +44,18 @@ export const useWorkout = create<Store>((set, get) => ({
       if (!state.session || state.paused || state.session.status !== 'active') return {};
       const session = state.session;
       const completed_at = new Date().toISOString();
-      const reps = result.repCompleted
-        ? [
-            ...session.reps,
-            {
-              rep_number: session.reps.length + 1,
-              completed_at,
-              metrics_json: result.repMetrics || {},
-              faults_json: result.faults,
-            },
-          ]
-        : session.reps;
+      const completed =
+        result.completedReps ??
+        (result.repCompleted ? [{ metrics: result.repMetrics || {}, faults: result.faults }] : []);
+      const reps = [
+        ...session.reps,
+        ...completed.map((rep, index) => ({
+          rep_number: session.reps.length + index + 1,
+          completed_at,
+          metrics_json: rep.metrics,
+          faults_json: rep.faults,
+        })),
+      ];
       let metrics = session.metrics;
       if (
         result.trackingValid &&

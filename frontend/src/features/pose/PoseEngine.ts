@@ -11,12 +11,12 @@ export async function createPoseEngine() {
   try {
     return await PoseLandmarker.createFromOptions(files, {
       ...base,
-      baseOptions: { modelAssetPath: '/models/pose_landmarker_lite.task', delegate: 'GPU' },
+      baseOptions: { modelAssetPath: '/models/pose_landmarker_full.task', delegate: 'GPU' },
     });
   } catch {
     return PoseLandmarker.createFromOptions(files, {
       ...base,
-      baseOptions: { modelAssetPath: '/models/pose_landmarker_lite.task', delegate: 'CPU' },
+      baseOptions: { modelAssetPath: '/models/pose_landmarker_full.task', delegate: 'CPU' },
     });
   }
 }

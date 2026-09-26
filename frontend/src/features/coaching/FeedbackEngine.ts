@@ -11,14 +11,23 @@ export class FeedbackEngine {
     this.lastAny = -Infinity;
   }
   next(result: ExerciseResult, time: number): string | null {
+    const announce = (key: string, message: string, cooldown: number) => {
+      if (!message || time - this.lastAny < 5000 || time - (this.last.get(key) ?? -Infinity) < cooldown)
+        return null;
+      this.last.set(key, time);
+      this.lastAny = time;
+      return message;
+    };
     if (!result.trackingValid || !result.calibrated) {
       this.current = '';
-      return null;
+      return announce(result.guidance, result.guidance, 15000);
     }
     const fault = result.faults[0];
     if (!fault) {
       this.current = '';
-      return null;
+      return result.repCompleted
+        ? announce('rep', 'Rep complete. Keep your movement controlled.', 5000)
+        : announce('ready', 'Ready. Move at a comfortable, controlled pace.', 30000);
     }
     if (this.current !== fault.code) {
       this.current = fault.code;

@@ -18,7 +18,7 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Choose **Try the demo**, then **Start landmark demo**. A complete local session works without an API, accounts, or provider keys. Enable the camera to use MediaPipe; turn on voice to use your browser's installed speech engine.
 
-`npm run setup` installs locked frontend dependencies, downloads the official Pose Landmarker Lite model, and copies matching WASM files into `frontend/public/`. Subsequent camera sessions load these assets from the app's own origin. Internet is needed for setup, not for local inference. If installing directly inside `frontend`, also run `npm run assets`.
+`npm run setup` installs locked frontend dependencies, downloads the official Pose Landmarker Full model, and copies matching WASM files into `frontend/public/`. Subsequent camera sessions load these assets from the app's own origin. Internet is needed for setup, not for local inference. If installing directly inside `frontend`, also run `npm run assets`.
 
 For the API, in another terminal:
 
@@ -34,6 +34,8 @@ SQLite is an optional local API database and initializes automatically on startu
 
 ## Connect cloud services
 
+For complete login, signup, password reset, and deployment configuration, follow the [Auth0 setup guide](docs/auth0-setup.md).
+
 Copy `frontend/.env.example` to `frontend/.env` and fill in your own account configuration. Restart the relevant server after environment changes.
 
 1. **Auth0:** create a Single Page Application and an API with RS256 tokens. Set allowed callback URLs, logout URLs, and web origins to `http://127.0.0.1:5173` (also add `http://localhost:5173` if used). Fill `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, and `VITE_AUTH0_AUDIENCE`. Set matching backend `AUTH0_DOMAIN` and `AUTH0_AUDIENCE`. Use the bare domain without `https://`. Use your deployed HTTPS origin in production.
@@ -45,7 +47,7 @@ Copy `frontend/.env.example` to `frontend/.env` and fill in your own account con
 
    The first migration creates the relational schema. The second enables TimescaleDB and converts metrics to a hypertable when the server offers the extension. On ordinary PostgreSQL, metrics remain a regular table. The database user needs permission to create the extension. Local SQLite auto-initialization is a separate convenience path; do not run initial migrations over already auto-created tables.
 3. **ElevenLabs:** set backend `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`. Only approved coaching phrases are sent. Audio is cached and browser speech is the fallback. Voice starts disabled until enabled by the athlete.
-4. **Gemini:** set backend `GEMINI_API_KEY` and optionally `GEMINI_MODEL` (default `gemini-2.5-flash`). Completed cloud reports request structured insights once and offer a retry on failure. Deterministic statistics remain available.
+4. **Gemini:** set backend `GEMINI_API_KEY` and optionally `GEMINI_MODEL` (default `gemini-3.8-flash`). Completed cloud reports request structured insights once and offer a retry on failure. Deterministic statistics remain available.
 5. Set `VITE_API_BASE_URL` to your API origin and backend `CORS_ORIGINS` to a JSON array of allowed frontend origins.
 
 Provider keys belong only in `backend/.env`. Never use a `VITE_` prefix for provider or database secrets. Auth0's SPA client ID and API audience are public configuration.
@@ -56,6 +58,8 @@ Provider keys belong only in `backend/.env`. Never use a `VITE_` prefix for prov
 - Squat, curl, and push-up analyzers with side-view calibration, visibility gates, smoothing, hysteresis, minimum duration, and complete-cycle counting.
 - Local camera model, canvas skeleton, distinct camera error states, pause/resume recalibration, timer, optional spoken coaching, and replay fallback.
 - Squat depth/torso cues, curl range/upper-arm cues, and push-up range/hip cues. No side-view knee-valgus claim.
+- Independent left/right curl tracking with per-arm counts and a comfortable return threshold, plus an angle-driven muscle heatmap. Color represents joint bend, not measured muscle activation.
+- Voice setup guidance and rep feedback, with a Test voice button and visible playback status. Enable voice in the training studio; account users receive ElevenLabs cues with browser fallback.
 - Local reports and 50 recent browser sessions, separated by guest/account identity. Demo sessions are labeled and excluded from totals. JSON export is available.
 - Protected FastAPI persistence, retry-safe uploads, account history, angle charts, and validated Gemini insights.
 - Local backup before cloud upload, visible pending-save status, and retry. Navigating away from an active studio finishes it locally; explicitly ending a session also attempts cloud saving.

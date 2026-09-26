@@ -27,7 +27,11 @@ Client-generated UUIDs make retried session creation safe. Rep numbers are uniqu
 
 Each completed session gets a browser backup before upload. Local storage is scoped to the guest or signed-in subject, retains 50 sessions, and supports JSON export. It is standard same-origin storage, not encrypted. Guest sessions are not silently imported into an account.
 
-ElevenLabs receives five approved phrases; generated audio is cached in process and in the live coach. Gemini receives computed statistics from persisted reps, with instructions against invented metrics and medical claims. Pydantic validates its structure. Provider failures leave the workout and deterministic report intact.
+ElevenLabs receives eight approved phrases; generated audio is cached in process and in the live coach. Setup guidance uses browser speech, and a voice test exposes playback status. Gemini receives computed statistics from persisted reps, with instructions against invented metrics and medical claims. Pydantic validates its structure. Provider failures leave the workout and deterministic report intact.
+
+Curls require visible shoulder, elbow, and wrist landmarks; hip visibility enables the optional upper-arm cue. Returning to 150 degrees completes a sufficiently deep, timed curl cycle. Camera positions are smoothed, large transient jumps rejected, and confident bilateral label swaps corrected by spatial continuity. Rendering runs independently at animation-frame cadence; missing joints fade over at most 240 ms, and these held positions never enter rep analysis. A short side-selection hold prevents switching arms immediately on confidence loss. The full visible skeleton and a pose-derived person bounding box are rendered. Curls calibrate and count each arm independently: alternating curls add one arm rep, simultaneous curls add two. Per-arm rep metadata and elbow angles persist in the API. Brief arm dropouts up to 200 ms pause analysis without counting stale positions; longer loss resets that arm. The Full pose model supplies world landmarks for 3D curl angles, with screen-space geometry retained for synthetic fixtures.
+
+The muscle overlay maps the tracked joint angle to a yellow-to-red gradient on the tracked upper arm or thigh. A front/back human muscle diagram highlights the selected exercise's primary and supporting muscles. These visuals represent joint bend, not physiological muscle activation or a form score.
 
 ## Implementation references
 
