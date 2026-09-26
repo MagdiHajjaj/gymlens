@@ -533,9 +533,9 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
 
 function recap(session: WorkoutSession, stats: InsightStats) {
   const exercise = exercises[session.exercise].name.toLowerCase();
-  const simulated = session.source === 'demo' ? 'Simulated demo movement: ' : '';
+  const demoPrefix = session.source === 'demo' ? 'Demo video: ' : '';
   if (stats.totalReps === 0)
-    return `${simulated}No completed ${exercise} reps were recorded, so rep-level range, tempo, and cue measurements are unavailable.`;
+    return `${demoPrefix}No completed ${exercise} reps were recorded, so rep-level range, tempo, and cue measurements are unavailable.`;
 
   const faultCount = stats.faultFrequencies.reduce((sum, fault) => sum + fault.count, 0);
   const angleText = stats.measuredReps
@@ -545,7 +545,7 @@ function recap(session: WorkoutSession, stats: InsightStats) {
   const cueText = topFault
     ? `The most common cue was ${topFault.label} on ${topFault.count} rep${topFault.count === 1 ? '' : 's'} (${topFault.percent}%).`
     : 'No supported technique cues were detected; that is not proof of perfect form.';
-  return `${simulated}${stats.totalReps} ${exercise} reps recorded; ${stats.cleanReps} were clean by supported cues and ${faultCount} cue events were observed. ${angleText}. ${cueText}`;
+  return `${demoPrefix}${stats.totalReps} ${exercise} reps recorded; ${stats.cleanReps} were clean by supported cues and ${faultCount} cue events were observed. ${angleText}. ${cueText}`;
 }
 
 export function generateStatisticsInsight(

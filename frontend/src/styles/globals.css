@@ -1495,9 +1495,6 @@ img.exercise-art {
 .camera-stage:not(.is-demo) canvas {
   transform: scaleX(-1);
 }
-.is-demo video {
-  display: none;
-}
 .camera-top {
   position: absolute;
   top: 19px;

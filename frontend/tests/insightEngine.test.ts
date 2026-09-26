@@ -182,7 +182,7 @@ describe('generateStatisticsInsight', () => {
     (id) => {
       const insight = generateStatisticsInsight(sessionFromFixture(id));
 
-      expect(insight.recap).toMatch(/^Simulated demo movement:/);
+      expect(insight.recap).toMatch(/^Demo video:/);
       const expectedReps = 3;
       expect(insight.stats.totalReps).toBe(expectedReps);
       expect(insight.stats.measuredReps).toBe(expectedReps);

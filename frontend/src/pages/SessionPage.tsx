@@ -179,8 +179,8 @@ export function SessionPage() {
         <div className="notice">
           <Info size={18} />
           <span>
-            This report uses synthetic landmark data. It demonstrates the report; it does not assess your
-            movement and is excluded from training totals.
+            This report was made from sample footage to demonstrate the app. It is not your workout and
+            is excluded from training totals.
           </span>
         </div>
       )}

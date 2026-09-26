@@ -30,7 +30,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
   },
 );
 describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
-  '%s recorded synthetic movement',
+  '%s recorded sample movement',
   (id) => {
     const depthFault: Record<ExerciseId, string> = {
       squat: 'insufficient_depth',

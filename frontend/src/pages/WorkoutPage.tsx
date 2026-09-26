@@ -322,7 +322,7 @@ export function WorkoutPage() {
         <div>
           <span className="eyebrow">
             {session?.source === 'demo'
-              ? 'SYNTHETIC LANDMARK DEMO'
+              ? 'VIDEO DEMO'
               : session?.source === 'upload'
                 ? 'VIDEO ANALYSIS'
                 : 'WORKOUT IN PROGRESS'}
@@ -580,7 +580,7 @@ export function WorkoutPage() {
       )}
       <p className="disclaimer">
         <Info size={14} /> Technique cues are approximate, not medical assessments.{' '}
-        {session?.source === 'demo' && 'This is synthetic movement data, not a measured workout.'} Video stays
+        {session?.source === 'demo' && 'This is sample footage, not your workout.'} Video stays
         on your device.
       </p>
     </div>

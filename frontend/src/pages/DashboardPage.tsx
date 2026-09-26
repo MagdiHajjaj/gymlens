@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
   ArrowRight,
@@ -25,6 +25,9 @@ import { duration } from '../lib/sessionBuffer';
 import type { ExerciseId } from '../types/workout';
 export function DashboardPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Keep the deterministic e2e demo flag when entering demo mode from here.
+  const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
   const selected = useWorkout((s) => s.selected);
   const select = useWorkout((s) => s.select);
   const { sessions, error } = useSessions();
@@ -63,7 +66,7 @@ export function DashboardPage() {
             <Button className="button-lime" onClick={() => navigate('/workout')}>
               Start a workout <ArrowUpRight size={18} />
             </Button>
-            <button className="hero-demo" onClick={() => navigate('/workout?mode=demo')}>
+            <button className="hero-demo" onClick={() => navigate(`/workout?mode=demo${synthetic}`)}>
               <span>
                 <Play size={12} fill="currentColor" />
               </span>
