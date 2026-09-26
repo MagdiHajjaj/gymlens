@@ -1,8 +1,9 @@
 import type { Insight, WorkoutSession, WorkoutHistoryEntry } from '../types/workout';
+import type { BackendGoalId } from '../features/goals/goals';
 export interface AthleteProfile {
   id: string;
   display_name: string;
-  fitness_goal: 'strength' | 'muscle' | 'mobility' | 'general_fitness' | null;
+  fitness_goal: BackendGoalId | null;
   experience_level: 'beginner' | 'intermediate' | 'advanced' | null;
   preferred_units: 'metric' | 'imperial';
   height_cm: number | null;

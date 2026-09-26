@@ -2799,8 +2799,60 @@ td strong {
     max-height: none;
   }
 }
-.goal-panel {
+@media (hover: none) {
+  .goal-option:active,
+  .goal-chip:active,
+  a.stat-card:active {
+    transform: scale(0.985);
+  }
+}
+
+.goal-strip {
   margin: 23px 0;
+}
+.goal-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: #fdfefa;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 13px;
+  color: #40533b;
+}
+.goal-chip > svg:first-child {
+  color: #6d855d;
+  flex-shrink: 0;
+}
+.goal-chip strong {
+  font-weight: 650;
+  color: #234e38;
+}
+.goal-chip > svg:last-child {
+  margin-left: auto;
+  color: #a4ad9c;
+  flex-shrink: 0;
+}
+.goal-chip:hover {
+  border-color: #527744;
+}
+.setup-goal {
+  margin-bottom: 24px;
+}
+.setup-goal .eyebrow {
+  margin-bottom: 10px;
+}
+.setup-goal .small-muted {
+  display: block;
+  margin-top: 8px;
+}
+a.stat-card {
+  cursor: pointer;
+}
+a.stat-card:hover {
+  border-color: #9db88c;
 }
 .goal-grid {
   display: grid;

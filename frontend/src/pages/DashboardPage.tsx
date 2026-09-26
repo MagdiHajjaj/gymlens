@@ -14,21 +14,21 @@ import {
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { exercises } from '../features/exercises/ExerciseRegistry';
-
-export function badgeNumber(index: number): string {
-  return String(index + 1).padStart(2, '0');
-}
-import { GOALS, useFitnessGoal } from '../features/goals/goals';
+import { GoalChip } from '../features/goals/GoalChip';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
 import type { ExerciseId } from '../types/workout';
+
+export function badgeNumber(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const selected = useWorkout((s) => s.selected);
   const select = useWorkout((s) => s.select);
   const { sessions, error } = useSessions();
-  const { goalId, goal, setGoalId } = useFitnessGoal();
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
   return (
@@ -100,7 +100,7 @@ export function DashboardPage() {
         </div>
       </section>
       <section className="stat-grid" aria-label="Your workout statistics">
-        <div className="stat-card">
+        <Link className="stat-card" to="/history" aria-label="Completed workouts. View history.">
           <span className="stat-icon">
             <Activity size={20} />
           </span>
@@ -111,9 +111,9 @@ export function DashboardPage() {
               <small> sessions</small>
             </strong>
           </div>
-          <MoveUpRight size={15} />
-        </div>
-        <div className="stat-card">
+          <MoveUpRight size={15} aria-hidden />
+        </Link>
+        <Link className="stat-card" to="/history" aria-label="Reps that count. View history.">
           <span className="stat-icon">
             <Target size={20} />
           </span>
@@ -124,9 +124,9 @@ export function DashboardPage() {
               <small> reps</small>
             </strong>
           </div>
-          <MoveUpRight size={15} />
-        </div>
-        <div className="stat-card">
+          <MoveUpRight size={15} aria-hidden />
+        </Link>
+        <Link className="stat-card" to="/history" aria-label="Time for yourself. View history.">
           <span className="stat-icon">
             <Timer size={20} />
           </span>
@@ -137,31 +137,11 @@ export function DashboardPage() {
               <small> minutes</small>
             </strong>
           </div>
-          <MoveUpRight size={15} />
-        </div>
+          <MoveUpRight size={15} aria-hidden />
+        </Link>
       </section>
-      <section className="panel goal-panel">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">TRAIN WITH INTENT</span>
-            <h2>Your training goal</h2>
-            <p>Session insights adapt to what you are working toward.</p>
-          </div>
-          {goal && <span className="tag green">{goal.name}</span>}
-        </div>
-        <div className="goal-grid">
-          {GOALS.map((option) => (
-            <button
-              key={option.id}
-              className={`goal-option ${goalId === option.id ? 'selected' : ''}`}
-              onClick={() => setGoalId(goalId === option.id ? null : option.id)}
-              aria-pressed={goalId === option.id}
-            >
-              <strong>{option.name}</strong>
-              <span className="small-muted">{option.description}</span>
-            </button>
-          ))}
-        </div>
+      <section className="goal-strip" aria-label="Training goal">
+        <GoalChip />
       </section>
       <section>
         <div className="section-heading">
@@ -196,7 +176,6 @@ export function DashboardPage() {
                     <h3>{exercise.name}</h3>
                     <p>{exercise.muscles}</p>
                   </div>
-                  <ArrowUpRight size={20} />
                 </div>
                 <div className="exercise-checks">
                   <span /> {exercise.checks}
