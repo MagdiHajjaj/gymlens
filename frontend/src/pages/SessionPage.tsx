@@ -168,7 +168,7 @@ export function SessionPage() {
         </Button>
       </div>
       {session.source === 'demo' && (
-        <div className="notice">
+        <div className="notice info">
           <Info size={17} />
           <span>
             This report uses synthetic landmark data to demonstrate the app. It is not a measured workout.
@@ -272,7 +272,7 @@ export function SessionPage() {
           {goal && <span className="tag green">Training for: {goal.name}</span>}
           <h2>A moment to reflect.</h2>
           <p>{session.insight?.recap || observedInsight.recap}</p>
-          <h3>What went well</h3>
+          <h3 className="reflect-pos">What went well</h3>
           <ul>
             {(session.insight?.strengths || observedInsight.strengths).map((text, i) => (
               <li key={i}>
@@ -283,7 +283,7 @@ export function SessionPage() {
               </li>
             ))}
           </ul>
-          <h3>Room to grow</h3>
+          <h3 className="reflect-neg">Room to grow</h3>
           <ul>
             {(session.insight?.improvements || observedInsight.improvements).map((text, i) => (
               <li key={i}>
@@ -329,9 +329,19 @@ export function SessionPage() {
                 <BarChart data={faultTimeline} margin={{ top: 12, right: 10, bottom: 8, left: -20 }}>
                   <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="#e7ebe4" />
                   <XAxis dataKey="rep" tickFormatter={(v) => `Rep ${v}`} tickLine={false} axisLine={false} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <YAxis
+                    domain={[0, (dataMax: number) => Math.max(1, Math.ceil(dataMax))]}
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                  />
                   <Tooltip labelFormatter={(v) => `Rep ${v}`} />
-                  <Legend formatter={(value) => String(value).replaceAll('_', ' ')} />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    formatter={(value) => String(value).replaceAll('_', ' ')}
+                    wrapperStyle={{ fontSize: 11, paddingBottom: 8 }}
+                  />
                   {faultCodes.map((code, index) => (
                     <Bar
                       key={code}

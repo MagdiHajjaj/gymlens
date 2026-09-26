@@ -135,6 +135,20 @@ describe('generateStatisticsInsight', () => {
     expect(insight.evidence.improvements.every((item) => item.why.match(/\d/))).toBe(true);
   });
 
+  it('pluralizes the most-common-cue rep count ("1 rep" vs "N reps")', () => {
+    const singleFault = baseSession({
+      reps: baseSession().reps.map((rep) =>
+        rep.rep_number === 3 ? rep : { ...rep, faults_json: [] },
+      ),
+    });
+    const oneRep = generateStatisticsInsight(singleFault);
+    expect(oneRep.recap).toContain('on 1 rep (');
+    expect(oneRep.recap).not.toContain('1 reps');
+
+    const manyFaults = generateStatisticsInsight(baseSession());
+    expect(manyFaults.recap).toContain('on 3 reps (');
+  });
+
   it('uses depth decay as the next focus when cues are clean but range fades', () => {
     const cleanDecay = baseSession({
       reps: baseSession().reps.map((rep) => ({ ...rep, faults_json: [] })),
