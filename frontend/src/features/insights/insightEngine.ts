@@ -99,6 +99,30 @@ const faultDrills: Record<ExerciseId, Record<string, string>> = {
     limited_range:
       'Press through a full comfortable overhead path and control the lowering phase of each rep.',
   },
+  glute_bridge: {
+    incomplete_extension:
+      'Drive your hips all the way up until your body forms a straight line from shoulders to knees, squeezing your glutes at the top.',
+    excessive_back_arch:
+      'Keep your upper back planted and ribs down; lift with your glutes, not by arching your lower back.',
+  },
+  row: {
+    incomplete_pull:
+      'Drive your elbow back until the weight reaches your torso, squeezing your shoulder blade at the top of each rep.',
+    torso_rising:
+      'Stay hinged at the hips with a flat back; choose a load you can lift without standing up to cheat the rep.',
+  },
+  dips: {
+    insufficient_depth:
+      'Lower until your upper arms approach parallel with the floor, keeping the motion controlled.',
+    excessive_forward_lean:
+      'Stay upright through the torso and keep your hips close to the bench to load the triceps.',
+  },
+  pullup: {
+    incomplete_pull:
+      'Pull until your chin clears the bar from a full dead hang, controlling the lowering phase.',
+    excessive_swing:
+      'Keep your body still and avoid kipping; engage your core and pull strictly with your back and arms.',
+  },
 };
 
 const round = (value: number, places = 0) => {

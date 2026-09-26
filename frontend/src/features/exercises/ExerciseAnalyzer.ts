@@ -120,6 +120,83 @@ const defaults: Record<ExerciseId, Thresholds> = {
     maximumArmSwing: 25,
     minimumHipAlignment: 155,
   },
+  // Glute bridge: primary joint is the hip, calibrated holding the top bridged
+  // position (hip ~170+). The bottom rests near ~110. depth 125 flags a shallow
+  // lower (minimum > 125); the rep counts while minimum <= exit - minimumRange
+  // (140). minimumHipAlignment is reused here as a torso-inclination floor: a
+  // braced bridge keeps the torso at ~35 degrees at the top, so inclination
+  // dropping below 30 suggests the shoulders dragging toward the hips and the
+  // low back overarching (approximate proxy, documented).
+  glute_bridge: {
+    visibility: 0.6,
+    enter: 150,
+    exit: 165,
+    depth: 125,
+    minimumRange: 25,
+    reversal: 8,
+    minimumMs: 900,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 45,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 30,
+  },
+  // Bent-over row: primary joint is the elbow. Calibration is arms hanging
+  // extended (~170+) from a ~45-degree hinge. A full pull reaches ~65; depth 100
+  // flags a short pull. minimumHipAlignment is reused as a torso-inclination
+  // floor: the hinge holds ~45 degrees, so inclination dropping below 30 means
+  // the lifter is standing up to muscle the weight (approximate momentum proxy).
+  row: {
+    visibility: 0.6,
+    enter: 140,
+    exit: 160,
+    depth: 100,
+    minimumRange: 45,
+    reversal: 8,
+    minimumMs: 800,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 45,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 30,
+  },
+  // Tricep dips: primary joint is the elbow, calibrated in the top support
+  // position (~168). A full dip reaches ~80; depth 100 flags a shallow dip.
+  // maximumLean is a proxy for pitching forward: the torso hangs near vertical
+  // (~8 degrees), so inclination past 35 suggests leaning over the hands.
+  dips: {
+    visibility: 0.6,
+    enter: 145,
+    exit: 160,
+    depth: 100,
+    minimumRange: 35,
+    reversal: 8,
+    minimumMs: 800,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 35,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 155,
+  },
+  // Pull-up: primary joint is the elbow, calibrated in a dead hang (~180). A
+  // full pull reaches ~60; depth 70 flags chin-not-over-bar. maximumLean is a
+  // proxy for swinging: a still hang keeps the torso near vertical (~2 degrees),
+  // so inclination past 25 suggests kipping/swinging (approximate proxy --
+  // true oscillation would need time-series analysis).
+  pullup: {
+    visibility: 0.6,
+    enter: 140,
+    exit: 160,
+    depth: 70,
+    minimumRange: 60,
+    reversal: 8,
+    minimumMs: 800,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 25,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 155,
+  },
 };
 export type CycleFaultCheck =
   // smoothed alignment value exceeds maximumLean
@@ -266,6 +343,86 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
     depthFault: {
       code: 'limited_range',
       message: 'Try a fuller range of motion at a comfortable pace.',
+    },
+    trackMaxLean: false,
+  },
+  glute_bridge: {
+    landmarks: [11, 23, 25, 27],
+    primaryJoints: [11, 23, 25],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'hip_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Lie on your back and hold the top of your bridge.',
+    cycleFaults: [
+      {
+        kind: 'alignmentBelow',
+        code: 'excessive_back_arch',
+        message: 'Keep your ribs down — squeeze your glutes, not your low back.',
+      },
+    ],
+    depthFault: {
+      code: 'incomplete_extension',
+      message: 'Lower your hips all the way down, then drive up to a full bridge.',
+    },
+    trackMaxLean: true,
+  },
+  row: {
+    landmarks: [11, 13, 15, 23],
+    primaryJoints: [11, 13, 15],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Hinge at the hips and let your arms hang. Hold still to calibrate.',
+    cycleFaults: [
+      {
+        kind: 'alignmentBelow',
+        code: 'torso_rising',
+        message: "Keep your torso still — don't stand up to pull the weight.",
+      },
+    ],
+    depthFault: {
+      code: 'incomplete_pull',
+      message: 'Pull your elbow all the way up toward your hip.',
+    },
+    trackMaxLean: false,
+  },
+  dips: {
+    landmarks: [11, 13, 15, 23],
+    primaryJoints: [11, 13, 15],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Press up into support with arms extended. Hold still to calibrate.',
+    cycleFaults: [
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_forward_lean',
+        message: "Keep your torso upright — don't pitch forward over your hands.",
+      },
+    ],
+    depthFault: {
+      code: 'insufficient_depth',
+      message: 'Lower a little deeper within your comfortable range.',
+    },
+    trackMaxLean: false,
+  },
+  pullup: {
+    landmarks: [11, 13, 15, 23],
+    primaryJoints: [11, 13, 15],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Hang from the bar with arms fully extended.',
+    cycleFaults: [
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_swing',
+        message: "Keep your body still — don't swing or kip.",
+      },
+    ],
+    depthFault: {
+      code: 'incomplete_pull',
+      message: 'Pull all the way up — chin over the bar.',
     },
     trackMaxLean: false,
   },

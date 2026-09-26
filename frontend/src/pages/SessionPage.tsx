@@ -129,6 +129,7 @@ export function SessionPage() {
     squat: 'knee_angle',
     lunge: 'knee_angle',
     deadlift: 'hip_angle',
+    glute_bridge: 'hip_angle',
   };
   const primary = primaryMetrics[session.exercise] ?? 'elbow_angle';
   const chart = session.metrics

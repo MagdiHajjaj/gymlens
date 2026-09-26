@@ -17,6 +17,10 @@ const LABELS: Record<string, string> = {
   deadlift: 'Romanian deadlift',
   lunge: 'Lunge',
   press: 'Overhead press',
+  glute_bridge: 'Glute bridge',
+  row: 'Bent-over row',
+  dips: 'Tricep dips',
+  pullup: 'Pull-up',
 };
 
 export function ExerciseArt({ exercise, large = false }: { exercise: ExerciseId; large?: boolean }) {
