@@ -64,6 +64,8 @@ export interface WorkoutSetRange {
 }
 export interface WorkoutSession {
   id: string;
+  /** Shared by every exercise performed as part of the same workout plan. */
+  workout_id?: string;
   exercise: ExerciseId;
   started_at: string;
   ended_at?: string;

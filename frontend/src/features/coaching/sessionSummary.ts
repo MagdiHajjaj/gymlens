@@ -1,4 +1,5 @@
 import type { FormFault, RepEvent, WorkoutSession, WorkoutSetRange } from '../../types/workout';
+import { exercises } from '../exercises/ExerciseRegistry';
 
 const SET_FOCUS: Record<string, string> = {
   insufficient_depth: 'Sit a little deeper next set.',
@@ -68,6 +69,8 @@ export const summarizeSet = (session: WorkoutSession, range: WorkoutSetRange): s
 };
 
 export const summarizeSession = (session: WorkoutSession): string => {
+  if (session.reps.length === 0)
+    return `Session complete. No ${exercises[session.exercise].name.toLowerCase()} reps were recorded.`;
   const setCount = session.set_ranges?.length ?? (session.reps.length > 0 ? 1 : 0);
   return `Session complete. ${repLabel(session, session.reps.length)} across ${setCount} ${setCount === 1 ? 'set' : 'sets'}. ${techniqueText(session.reps, SESSION_FOCUS)}`;
 };

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import type { ExerciseId, ExerciseResult, WorkoutSession, WorkoutSetRange } from '../../types/workout';
-import { exercisesForMovement, type ExerciseMovement } from '../exercises/ExerciseRegistry';
 import { usePlan } from './planStore';
 
 type RestPreset = 30 | 60 | 90;
@@ -22,7 +21,6 @@ interface Store {
   currentSetStartRep: number;
   select: (id: ExerciseId) => void;
   toggleExercise: (id: ExerciseId) => void;
-  selectMovement: (movement: ExerciseMovement | null) => void;
   begin: (source: 'camera' | 'demo' | 'upload') => void;
   ingest: (result: ExerciseResult, timestamp: number) => void;
   pause: () => void;
@@ -78,20 +76,16 @@ export const useWorkout = create<Store>((set, get) => ({
       if (selectedIds.length === 0) return {};
       return { selectedIds, selected: selectedIds[0] };
     }),
-  selectMovement: (movement) => {
-    // null only clears the dashboard filter; the current selection is kept.
-    if (!movement) return;
-    const selectedIds = exercisesForMovement(movement);
-    set({ selectedIds, selected: selectedIds[0] });
-  },
   begin: (source) => {
     lastMetric = 0;
     const selectedId = get().selected;
     // A planned exercise brings its own rep target; otherwise the global target stands.
     const planItem = usePlan.getState().plan.find((item) => item.exerciseId === selectedId);
+    const sessionId = crypto.randomUUID();
     set({
       session: {
-        id: crypto.randomUUID(),
+        id: sessionId,
+        workout_id: usePlan.getState().workoutId ?? sessionId,
         exercise: selectedId,
         source,
         started_at: new Date().toISOString(),
@@ -170,7 +164,8 @@ export const useWorkout = create<Store>((set, get) => ({
     set({ session, paused: true, rest: null, currentSetStartRep: session.reps.length + 1 });
     // A finished real session completes the exercise on the plan; sample-footage
     // demos are not the user's workout, so they never earn a checkmark.
-    if (session.source !== 'demo') usePlan.getState().completeExercise(session.exercise);
+    if (session.source !== 'demo' && session.total_reps > 0)
+      usePlan.getState().completeExercise(session.exercise);
     return session;
   },
 }));

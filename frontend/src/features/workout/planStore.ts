@@ -40,6 +40,7 @@ export const defaultWeightFor = (exerciseId: ExerciseId): number => DEFAULT_WEIG
 
 interface PlanStore {
   plan: PlanItem[];
+  workoutId: string | null;
   /** Exercises marked finished in the current plan, in completion order. */
   completedExerciseIds: ExerciseId[];
   /** (Re)builds the plan for the given exercises, keeping any edits already made.
@@ -59,6 +60,7 @@ interface PlanStore {
 
 export const usePlan = create<PlanStore>((set, get) => ({
   plan: [],
+  workoutId: null,
   completedExerciseIds: [],
   setPlan: (exerciseIds) =>
     set((state) => {
@@ -79,7 +81,7 @@ export const usePlan = create<PlanStore>((set, get) => ({
             existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS, reps: DEFAULT_REPS }
           );
         }),
-        ...(sameExercises ? {} : { completedExerciseIds: [] }),
+        ...(sameExercises ? {} : { completedExerciseIds: [], workoutId: crypto.randomUUID() }),
       };
     }),
   updatePlanItem: (exerciseId, patch) =>
@@ -110,7 +112,7 @@ export const usePlan = create<PlanStore>((set, get) => ({
       [plan[index], plan[target]] = [plan[target], plan[index]];
       return { plan };
     }),
-  clearPlan: () => set({ plan: [], completedExerciseIds: [] }),
+  clearPlan: () => set({ plan: [], completedExerciseIds: [], workoutId: null }),
   completeExercise: (exerciseId) =>
     set((state) =>
       state.completedExerciseIds.includes(exerciseId)

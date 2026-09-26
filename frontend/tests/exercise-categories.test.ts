@@ -78,24 +78,10 @@ describe('workoutStore multi-select', () => {
     expect(useWorkout.getState().selected).toBe('squat');
   });
 
-  it('selectMovement picks every exercise in the movement in registry order', () => {
-    useWorkout.getState().selectMovement('push');
-    expect(useWorkout.getState().selectedIds).toEqual(['pushup', 'press', 'dips']);
-    expect(useWorkout.getState().selected).toBe('pushup');
-    useWorkout.getState().selectMovement('legs');
-    expect(useWorkout.getState().selectedIds).toEqual([
-      'squat',
-      'deadlift',
-      'lunge',
-      'glute_bridge',
-    ]);
-    expect(useWorkout.getState().selected).toBe('squat');
-  });
-
-  it('selectMovement(null) keeps the current selection', () => {
-    useWorkout.getState().selectMovement('pull');
-    useWorkout.getState().selectMovement(null);
-    expect(useWorkout.getState().selectedIds).toEqual(['curl', 'row', 'pullup']);
-    expect(useWorkout.getState().selected).toBe('curl');
+  it('only selects exercise cards the athlete explicitly chooses', () => {
+    useWorkout.getState().toggleExercise('curl');
+    useWorkout.getState().toggleExercise('row');
+    expect(useWorkout.getState().selectedIds).toEqual(['squat', 'curl', 'row']);
+    expect(useWorkout.getState().selectedIds).not.toContain('pullup');
   });
 });

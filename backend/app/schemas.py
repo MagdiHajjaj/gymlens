@@ -38,6 +38,7 @@ class ProfileUpdate(StrictModel):
 
 class WorkoutCreate(StrictModel):
     id: UUID
+    workout_id: UUID
     exercise: Exercise
     source: Literal["camera", "upload"]
     started_at: AwareDatetime
@@ -197,6 +198,9 @@ SESSION_SUMMARY = re.compile(
     r"Session complete\. (?P<reps>[0-9]{1,4}) (?P<unit>rep|reps|arm rep|arm reps) across "
     r"(?P<sets>[0-9]{1,2}) (?P<set_unit>set|sets)\. (?P<detail>.+)"
 )
+EMPTY_SESSION_SUMMARY = re.compile(
+    r"Session complete\. No (?:squat|bicep curl|push-up|romanian deadlift|lunge|overhead press|glute bridge|bent-over row|tricep dips|pull-up) reps were recorded\."
+)
 TECHNIQUE_DETAIL = re.compile(
     r"(?P<count>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) "
     r"technique (?P<unit>cue|cues)\. (?P<focus>.+)"
@@ -265,6 +269,7 @@ def approved_speech(value: str) -> bool:
         or bool(SET_GO_PHRASE.fullmatch(value))
         or bool(REP_COMPLETE_PHRASE.fullmatch(value))
         or ready_valid
+        or bool(EMPTY_SESSION_SUMMARY.fullmatch(value))
         or _summary(value)
     )
 

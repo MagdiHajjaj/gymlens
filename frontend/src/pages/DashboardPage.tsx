@@ -24,6 +24,7 @@ import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
 import type { ExerciseId } from '../types/workout';
+import { groupWorkouts } from '../lib/workoutGroups';
 
 export function badgeNumber(index: number): string {
   return String(index + 1).padStart(2, '0');
@@ -55,6 +56,7 @@ export function DashboardPage() {
         ? `${workoutSplits[movementFilter]} day`
         : `${selectedIds.length} selected`;
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
+  const completedWorkouts = groupWorkouts(completed);
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
   return (
     <div className="page dashboard-page">
@@ -132,8 +134,8 @@ export function DashboardPage() {
           <div>
             <span>Completed workouts</span>
             <strong>
-              {completed.length}
-              <small> sessions</small>
+              {completedWorkouts.length}
+              <small> workouts</small>
             </strong>
           </div>
           <MoveUpRight size={15} aria-hidden />

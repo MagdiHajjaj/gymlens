@@ -308,6 +308,16 @@ export function WorkoutPage() {
     navigate(hasPlan ? '/workout?plan=review' : `/session/${completed.id}`);
   }
   const exercise = exercises[selected];
+  if (saving)
+    return (
+      <div className="page workout-page">
+        <section className="panel workout-finishing" role="status" aria-live="polite">
+          <span className="eyebrow">WORKOUT COMPLETE</span>
+          <h1>Saving your workout…</h1>
+          <p>Keeping your exercises together in one workout history entry.</p>
+        </section>
+      </div>
+    );
   if (!active)
     return (
       <WorkoutSetup

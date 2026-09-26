@@ -33,6 +33,7 @@ class User(Base):
 class Workout(Base):
     __tablename__ = "workout_sessions"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    workout_id: Mapped[str] = mapped_column(String(36), index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     exercise: Mapped[str] = mapped_column(String(20))
     source: Mapped[str] = mapped_column(String(20), default="camera")

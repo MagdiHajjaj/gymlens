@@ -54,7 +54,7 @@ it('uses the exact top-fault focus mapping for set and session summaries', () =>
 
 it('handles zero reps and curl arm-rep grammar without inventing cues', () => {
   expect(summarizeSession(session())).toBe(
-    'Session complete. 0 reps across 0 sets. No technique cues detected.',
+    'Session complete. No squat reps were recorded.',
   );
 
   const workout = session({

@@ -19,7 +19,7 @@ export function localSessions(owner: string): WorkoutSession[] {
     if (Array.isArray(value) && sessions.length !== value.length) {
       localStorage.setItem(prefix + owner, JSON.stringify(sessions));
     }
-    return sessions;
+    return sessions.map((session) => ({ ...session, workout_id: session.workout_id ?? session.id }));
   } catch {
     return [];
   }

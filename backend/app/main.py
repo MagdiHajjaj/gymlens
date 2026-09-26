@@ -102,6 +102,7 @@ def owned(session_id: UUID, db: Session, user: User):
 def serialize(workout, detail=True):
     result = {
         "id": workout.id,
+        "workout_id": workout.workout_id,
         "exercise": workout.exercise,
         "source": workout.source,
         "started_at": utc(workout.started_at),
@@ -206,6 +207,7 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
             raise HTTPException(409, "Session identifier unavailable")
         if (
             existing.exercise != payload.exercise
+            or existing.workout_id != str(payload.workout_id)
             or existing.source != payload.source
             or utc(existing.started_at) != payload.started_at
         ):
@@ -215,6 +217,7 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
         raise HTTPException(422, "Session cannot start in the future")
     workout = Workout(
         id=str(payload.id),
+        workout_id=str(payload.workout_id),
         user_id=user.id,
         exercise=payload.exercise,
         source=payload.source,
