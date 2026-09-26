@@ -27,6 +27,8 @@ export class VoiceCoach {
   private pending?: SpeechRequest;
   private audio?: HTMLAudioElement;
   private unlockedAudio?: HTMLAudioElement;
+  private audioContext?: AudioContext;
+  private audioSource?: AudioBufferSourceNode;
   private cancelPlayback?: () => void;
   private cache = new Map<string, Blob>();
   private cloudInflight = new Map<string, Promise<Blob>>();
@@ -34,8 +36,18 @@ export class VoiceCoach {
   private cloudCooldownUntil = 0;
   private voiceMode?: 'cloud' | 'browser';
 
-  /** Unlock one reusable media element while a mobile tap still owns user activation. */
+  /** Resume Web Audio while a mobile tap still owns user activation. */
   unlock() {
+    const AudioContextClass =
+      typeof window === 'undefined'
+        ? undefined
+        : window.AudioContext ??
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (AudioContextClass) {
+      if (!this.audioContext) this.audioContext = new AudioContextClass();
+      void this.audioContext.resume().catch(() => {});
+      return;
+    }
     if (this.unlockedAudio || typeof Audio === 'undefined') return;
     const audio = new Audio(SILENT_WAV);
     audio.volume = 0;
@@ -58,6 +70,12 @@ export class VoiceCoach {
     this.pending = undefined;
     this.cancelPlayback?.();
     this.cancelPlayback = undefined;
+    try {
+      this.audioSource?.stop();
+    } catch {
+      // A source that already ended cannot be stopped again.
+    }
+    this.audioSource = undefined;
     this.audio?.pause();
     this.audio = undefined;
     window.speechSynthesis?.cancel();
@@ -128,6 +146,43 @@ export class VoiceCoach {
     try {
       const blob = await this.fetchCloud(request.text);
       if (!this.isCurrent(request)) return;
+      if (this.audioContext) {
+        if (this.audioContext.state === 'suspended') await this.audioContext.resume();
+        const buffer = await this.audioContext.decodeAudioData(await blob.arrayBuffer());
+        if (!this.isCurrent(request)) return;
+        const source = this.audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.audioContext.destination);
+        this.audioSource = source;
+        this.voiceMode = 'cloud';
+        this.report('Speaking · ElevenLabs');
+        await new Promise<void>((resolve, reject) => {
+          let finished = false;
+          const finish = (error?: Error) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            source.onended = null;
+            this.cancelPlayback = undefined;
+            if (this.audioSource === source) this.audioSource = undefined;
+            if (error) reject(error);
+            else resolve();
+          };
+          const timer = setTimeout(() => finish(new Error('Playback timed out')), 15000);
+          this.cancelPlayback = () => {
+            try {
+              source.stop();
+            } catch {
+              // The source may have already ended.
+            }
+            finish();
+          };
+          source.onended = () => finish();
+          source.start();
+        });
+        if (this.isCurrent(request)) this.report('Voice ready · ElevenLabs');
+        return;
+      }
       const url = URL.createObjectURL(blob);
       try {
         const audio = this.unlockedAudio ?? new Audio();
