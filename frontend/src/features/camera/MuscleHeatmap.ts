@@ -3,7 +3,7 @@ import type { ExerciseId, ExerciseResult, Landmark } from '../../types/workout';
 export function muscleIntensity(exercise: ExerciseId, result: ExerciseResult | null): number {
   if (!result?.trackingValid) return 0;
   const activeAngles = Object.entries(result.jointAngles).filter(([key]) =>
-    ['elbow_angle', 'knee_angle', 'upper_arm_angle', 'torso_lean', 'hip_alignment'].includes(key),
+    ['elbow_angle', 'knee_angle', 'hip_angle', 'upper_arm_angle', 'torso_lean', 'hip_alignment'].includes(key),
   );
   if (!activeAngles.length) return 0;
   const drive = activeAngles
@@ -12,7 +12,8 @@ export function muscleIntensity(exercise: ExerciseId, result: ExerciseResult | n
       if (key === 'torso_lean' || key === 'hip_alignment') {
         return Math.max(0, Math.min(1, (35 - value) / 35));
       }
-      const target = key === 'knee_angle' ? 105 : key === 'upper_arm_angle' ? 90 : 65;
+      const target =
+        key === 'knee_angle' || key === 'hip_angle' ? 105 : key === 'upper_arm_angle' ? 90 : 65;
       return Math.max(0, Math.min(1, (165 - value) / (165 - target)));
     })
     .reduce((sum, score) => sum + score, 0);
@@ -27,30 +28,75 @@ export function drawMuscleHeatmap(
   width: number,
   height: number,
 ) {
+  const segments: Partial<Record<ExerciseId, [number, number][]>> = {
+    squat: [
+      [23, 25],
+      [25, 27],
+    ],
+    lunge: [
+      [23, 25],
+      [25, 27],
+    ],
+    deadlift: [
+      [11, 23],
+      [23, 25],
+    ],
+    glute_bridge: [
+      [11, 23],
+      [23, 25],
+    ],
+    pushup: [
+      [11, 13],
+      [13, 15],
+    ],
+    curl: [
+      [11, 13],
+      [13, 15],
+    ],
+    press: [
+      [11, 13],
+      [13, 15],
+    ],
+    row: [
+      [11, 13],
+      [13, 15],
+    ],
+    dips: [
+      [11, 13],
+      [13, 15],
+    ],
+    pullup: [
+      [11, 13],
+      [13, 15],
+    ],
+  };
+  const exerciseSegments = segments[exercise] ?? [[11, 13]];
   const drawSegment = (side: number) => {
     if (!result.trackingValid || (exercise !== 'curl' && side === undefined)) return;
-    const a = landmarks[(exercise === 'squat' || exercise === 'lunge' ? 23 : 11) + side];
-    const b = landmarks[(exercise === 'squat' || exercise === 'lunge' ? 25 : 13) + side];
-    if (!a || !b || (a.visibility ?? 0) < 0.6 || (b.visibility ?? 0) < 0.6) return;
-    const dx = (b.x - a.x) * width,
-      dy = (b.y - a.y) * height;
-    const length = Math.hypot(dx, dy);
-    if (length < 4) return;
     const heat = muscleIntensity(exercise, result);
     const hue = 48 * (1 - heat);
-    ctx.save();
-    ctx.translate(((a.x + b.x) * width) / 2, ((a.y + b.y) * height) / 2);
-    ctx.rotate(Math.atan2(dy, dx));
-    ctx.scale(length * 0.48, Math.max(10, length * 0.19));
-    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    gradient.addColorStop(0, `hsla(${hue}, 100%, 56%, 0.85)`);
-    gradient.addColorStop(0.55, `hsla(${hue}, 100%, 50%, 0.55)`);
-    gradient.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(0, 0, 1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    for (const [start, end] of exerciseSegments) {
+      const a = landmarks[start + side];
+      const b = landmarks[end + side];
+      if (!a || !b || (a.visibility ?? 0) < 0.6 || (b.visibility ?? 0) < 0.6) continue;
+      const dx = (b.x - a.x) * width,
+        dy = (b.y - a.y) * height;
+      const length = Math.hypot(dx, dy);
+      if (length < 4) continue;
+      ctx.save();
+      ctx.translate(((a.x + b.x) * width) / 2, ((a.y + b.y) * height) / 2);
+      ctx.rotate(Math.atan2(dy, dx));
+      ctx.scale(length * 0.48, Math.max(10, length * 0.19));
+      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      gradient.addColorStop(0, `hsla(${hue}, 100%, 56%, 0.85)`);
+      gradient.addColorStop(0.55, `hsla(${hue}, 100%, 50%, 0.55)`);
+      gradient.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   };
 
   if (exercise === 'curl' && result.arms) {
