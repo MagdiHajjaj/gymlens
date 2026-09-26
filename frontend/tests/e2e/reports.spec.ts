@@ -108,7 +108,7 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history filters real workouts and demos on mobile, and repeat keeps the exercise', async ({ page }) => {
+test('history filters by split and exercise on mobile, and repeat keeps the exercise', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seed(page, [
     recordedSession,
@@ -116,13 +116,17 @@ test('history filters real workouts and demos on mobile, and repeat keeps the ex
   ]);
   await page.goto('/history');
   await expect(page.getByRole('article')).toHaveCount(2);
-  await page.getByRole('combobox', { name: 'Filter session type' }).selectOption('workouts');
+  await expect(page.getByRole('combobox', { name: 'Filter session type' })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Camera workout');
-  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
+  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('lunge');
   await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
   await page.getByRole('button', { name: 'Clear filters' }).click();
-  await page.getByRole('combobox', { name: 'Filter session type' }).selectOption('demo');
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('pull');
+  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
+  await expect(page.getByRole('article')).toHaveCount(1);
   await page.getByRole('link', { name: 'View Bicep curl session' }).click();
   await expect(page.getByText(/It demonstrates the report/)).toBeVisible();
   await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Arm not recorded');

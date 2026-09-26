@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { WorkoutFilters } from '../components/WorkoutFilters';
+import { matchesSplit, type SplitFilter, type ExerciseFilter } from '../features/exercises/workoutSplits';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -29,6 +32,12 @@ export function DashboardPage() {
   const select = useWorkout((s) => s.select);
   const { sessions, error } = useSessions();
   const { goalId, goal, setGoalId } = useFitnessGoal();
+  const [split, setSplit] = useState<SplitFilter>('all');
+  const [exerciseFilter, setExerciseFilter] = useState<ExerciseFilter>('all');
+  const exerciseIds = Object.keys(exercises) as ExerciseId[];
+  const visibleExercises = exerciseIds.filter(
+    (id) => matchesSplit(id, split) && (exerciseFilter === 'all' || id === exerciseFilter),
+  );
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
   return (
@@ -167,14 +176,42 @@ export function DashboardPage() {
         <div className="section-heading">
           <div>
             <h2>Find your movement</h2>
-            <p>
-              {Object.keys(exercises).length} movements. Thoughtful feedback for each.
-            </p>
+            <p>{Object.keys(exercises).length} movements. Thoughtful feedback for each.</p>
           </div>
           <span className="tag outlined">SIDE-VIEW TRAINING</span>
         </div>
+        <div className="history-filters">
+          <WorkoutFilters
+            split={split}
+            exercise={exerciseFilter}
+            onSplitChange={(value) => {
+              setSplit(value);
+              setExerciseFilter('all');
+              if (!matchesSplit(selected, value)) select(exerciseIds.find((id) => matchesSplit(id, value))!);
+            }}
+            onExerciseChange={(value) => {
+              setExerciseFilter(value);
+              if (value !== 'all') select(value);
+            }}
+          />
+          <p role="status">
+            {visibleExercises.length} {visibleExercises.length === 1 ? 'exercise' : 'exercises'}
+          </p>
+          {(split !== 'all' || exerciseFilter !== 'all') && (
+            <Button
+              size="small"
+              variant="ghost"
+              onClick={() => {
+                setSplit('all');
+                setExerciseFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
         <div className="exercise-grid">
-          {(Object.keys(exercises) as ExerciseId[]).map((id) => {
+          {visibleExercises.map((id) => {
             const exercise = exercises[id];
             return (
               <button
