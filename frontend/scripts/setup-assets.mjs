@@ -78,10 +78,10 @@ const DEMO_VIDEOS = [
   },
   {
     id: 'pushup',
-    url: 'https://videos.pexels.com/video-files/4812839/4812839-hd_1280_720_25fps.mp4',
-    bytes: 2888568,
+    url: 'https://videos.pexels.com/video-files/4804819/4804819-hd_1280_720_25fps.mp4',
+    bytes: 4537731,
     credit: 'Ketut Subiyanto',
-    source: 'https://www.pexels.com/video/video-of-man-doing-push-ups-exercises-4812839/',
+    source: 'https://www.pexels.com/video/topless-man-doing-push-ups-4804819/',
     license: 'Pexels License',
   },
   {
