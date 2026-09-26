@@ -18,8 +18,19 @@ import { api } from '../../lib/api';
 export function Shell({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(false);
   const [tiger, setTiger] = useState<string>('Not checked');
+  const [profileName, setProfileName] = useState('');
   const identity = useIdentity();
   const location = useLocation();
+  useEffect(() => {
+    if (!identity.authenticated) {
+      setProfileName('');
+      return;
+    }
+    void api.profile().then((profile) => setProfileName(profile.display_name)).catch(() => setProfileName(''));
+    const updateName = (event: Event) => setProfileName((event as CustomEvent<string>).detail);
+    window.addEventListener('gymlens:profile-name', updateName);
+    return () => window.removeEventListener('gymlens:profile-name', updateName);
+  }, [identity.authenticated]);
   useEffect(() => {
     if (!settings || !identity.authenticated) {
       if (!identity.authenticated) setTiger('Sign in to check');
@@ -89,9 +100,9 @@ export function Shell({ children }: { children: ReactNode }) {
             <Settings2 size={18} /> Settings & connections
           </button>
           <div className="sidebar-profile">
-            <div className="avatar">{identity.authenticated ? identity.name[0] : 'G'}</div>
+            <div className="avatar">{identity.authenticated ? (profileName || identity.name)[0] : 'G'}</div>
             <Link to={identity.authenticated ? '/profile' : '/'} className="sidebar-profile-copy">
-              <strong>{identity.name}</strong>
+              <strong>{identity.authenticated ? profileName || identity.name : identity.name}</strong>
               <small>{identity.authenticated ? 'Connected account' : 'Guest workspace'}</small>
             </Link>
             {identity.authenticated && location.pathname !== '/workout' && (

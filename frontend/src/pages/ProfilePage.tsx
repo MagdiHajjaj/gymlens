@@ -53,6 +53,7 @@ export function ProfilePage() {
     try {
       const updated = await api.updateProfile(profile);
       setProfile(updated);
+      window.dispatchEvent(new CustomEvent('gymlens:profile-name', { detail: updated.display_name }));
       setSaved(true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to save profile.');
