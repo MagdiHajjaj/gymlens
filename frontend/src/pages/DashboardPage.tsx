@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { WorkoutFilters } from '../components/WorkoutFilters';
-import { matchesSplit, type SplitFilter, type ExerciseFilter } from '../features/exercises/workoutSplits';
+import {
+  matchesSplit,
+  workoutSplits,
+  type SplitFilter,
+  type ExerciseFilter,
+} from '../features/exercises/workoutSplits';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -16,7 +21,11 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
-import { exercises } from '../features/exercises/ExerciseRegistry';
+import {
+  exercises,
+  exercisesForMovement,
+  type ExerciseMovement,
+} from '../features/exercises/ExerciseRegistry';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
@@ -32,14 +41,37 @@ export function DashboardPage() {
   // Keep the deterministic e2e demo flag when entering demo mode from here.
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
   const selected = useWorkout((s) => s.selected);
+  const selectedIds = useWorkout((s) => s.selectedIds);
   const select = useWorkout((s) => s.select);
+  const toggleExercise = useWorkout((s) => s.toggleExercise);
+  const selectMovement = useWorkout((s) => s.selectMovement);
   const { sessions, error } = useSessions();
   const [split, setSplit] = useState<SplitFilter>('all');
   const [exerciseFilter, setExerciseFilter] = useState<ExerciseFilter>('all');
+  const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
   const exerciseIds = Object.keys(exercises) as ExerciseId[];
   const visibleExercises = exerciseIds.filter(
-    (id) => matchesSplit(id, split) && (exerciseFilter === 'all' || id === exerciseFilter),
+    (id) =>
+      matchesSplit(id, split) &&
+      (exerciseFilter === 'all' || id === exerciseFilter) &&
+      (movementFilter === null || exercises[id].movement === movementFilter),
   );
+  const movementChips: (ExerciseMovement | null)[] = [null, 'push', 'pull', 'legs'];
+  const applyMovementChip = (movement: ExerciseMovement | null) => {
+    setMovementFilter(movement);
+    if (movement === null) return; // keep the current selection, just clear the filter
+    setSplit('all');
+    setExerciseFilter('all');
+    selectMovement(movement);
+  };
+  const selectedNames = selectedIds.map((id) => exercises[id].name);
+  const barTitle =
+    selectedIds.length === 1
+      ? selectedNames[0]
+      : movementFilter !== null &&
+          selectedIds.every((id) => exercises[id].movement === movementFilter)
+        ? `${workoutSplits[movementFilter]} day`
+        : `${selectedIds.length} selected`;
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
   return (
@@ -166,7 +198,14 @@ export function DashboardPage() {
             onSplitChange={(value) => {
               setSplit(value);
               setExerciseFilter('all');
-              if (!matchesSplit(selected, value)) select(exerciseIds.find((id) => matchesSplit(id, value))!);
+              setMovementFilter(null);
+              const matching = selectedIds.filter((id) => matchesSplit(id, value));
+              if (matching.length === 0) {
+                select(exerciseIds.find((id) => matchesSplit(id, value))!);
+              } else if (!matchesSplit(selected, value)) {
+                // Keep the multi-selection, but point the primary at a visible exercise.
+                useWorkout.setState({ selected: matching[0] });
+              }
             }}
             onExerciseChange={(value) => {
               setExerciseFilter(value);
@@ -176,33 +215,55 @@ export function DashboardPage() {
           <p role="status">
             {visibleExercises.length} {visibleExercises.length === 1 ? 'exercise' : 'exercises'}
           </p>
-          {(split !== 'all' || exerciseFilter !== 'all') && (
+          {(split !== 'all' || exerciseFilter !== 'all' || movementFilter !== null) && (
             <Button
               size="small"
               variant="ghost"
               onClick={() => {
                 setSplit('all');
                 setExerciseFilter('all');
+                setMovementFilter(null);
               }}
             >
               Clear filters
             </Button>
           )}
         </div>
+        <div className="movement-chips" role="group" aria-label="Filter by movement">
+          {movementChips.map((movement) => {
+            const active = movementFilter === movement;
+            const label =
+              movement === null
+                ? 'All'
+                : `${workoutSplits[movement]} (${exercisesForMovement(movement).length})`;
+            return (
+              <button
+                key={movement ?? 'all'}
+                type="button"
+                className={`movement-chip${active ? ' is-active' : ''}`}
+                aria-pressed={active}
+                onClick={() => applyMovementChip(movement)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <div className="exercise-grid">
           {visibleExercises.map((id) => {
             const exercise = exercises[id];
+            const isSelected = selectedIds.includes(id);
             return (
               <button
                 key={id}
-                className={`exercise-card ${selected === id ? 'selected' : ''}`}
-                onClick={() => select(id)}
-                aria-pressed={selected === id}
+                className={`exercise-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => toggleExercise(id)}
+                aria-pressed={isSelected}
               >
                 <div className={`exercise-image ${exercise.color}`}>
                   <span className="exercise-category">{exercise.category}</span>
-                  <span className={`selection-dot ${selected === id ? 'checked' : ''}`}>
-                    {selected === id && <Check size={12} />}
+                  <span className={`selection-dot ${isSelected ? 'checked' : ''}`}>
+                    {isSelected && <Check size={12} />}
                   </span>
                   <ExerciseArt exercise={id} />
                   <span className="exercise-number">{badgeNumber(Object.keys(exercises).indexOf(id))}</span>
@@ -222,7 +283,8 @@ export function DashboardPage() {
         </div>
         <div className="selection-bar">
           <span>
-            <strong>{exercises[selected].name}</strong> selected{' '}
+            <strong>{barTitle}</strong>
+            {selectedIds.length > 1 && <> — {selectedNames.join(', ')}</>}{' '}
             <span className="selection-separator">·</span> Find your space. We’ll handle the counting.
           </span>
           <Button size="small" onClick={() => navigate('/workout')}>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ExerciseId, ExerciseResult, WorkoutSession, WorkoutSetRange } from '../../types/workout';
+import { exercisesForMovement, type ExerciseMovement } from '../exercises/ExerciseRegistry';
 
 type RestPreset = 30 | 60 | 90;
 interface WorkoutRest {
@@ -8,6 +9,8 @@ interface WorkoutRest {
 }
 interface Store {
   selected: ExerciseId;
+  /** Multi-selection, in the order exercises were picked. `selected` always mirrors the first entry. */
+  selectedIds: ExerciseId[];
   session: WorkoutSession | null;
   result: ExerciseResult | null;
   paused: boolean;
@@ -17,6 +20,8 @@ interface Store {
   rest: WorkoutRest | null;
   currentSetStartRep: number;
   select: (id: ExerciseId) => void;
+  toggleExercise: (id: ExerciseId) => void;
+  selectMovement: (movement: ExerciseMovement | null) => void;
   begin: (source: 'camera' | 'demo' | 'upload') => void;
   ingest: (result: ExerciseResult, timestamp: number) => void;
   pause: () => void;
@@ -53,6 +58,7 @@ const closeCurrentSet = (
 
 export const useWorkout = create<Store>((set, get) => ({
   selected: 'squat',
+  selectedIds: ['squat'],
   session: null,
   result: null,
   paused: false,
@@ -61,7 +67,22 @@ export const useWorkout = create<Store>((set, get) => ({
   targetReps: 8,
   rest: null,
   currentSetStartRep: 1,
-  select: (selected) => set({ selected }),
+  select: (selected) => set({ selected, selectedIds: [selected] }),
+  toggleExercise: (id) =>
+    set((state) => {
+      const selectedIds = state.selectedIds.includes(id)
+        ? state.selectedIds.filter((entry) => entry !== id)
+        : [...state.selectedIds, id];
+      // Always keep at least one exercise picked so the workout always has a target.
+      if (selectedIds.length === 0) return {};
+      return { selectedIds, selected: selectedIds[0] };
+    }),
+  selectMovement: (movement) => {
+    // null only clears the dashboard filter; the current selection is kept.
+    if (!movement) return;
+    const selectedIds = exercisesForMovement(movement);
+    set({ selectedIds, selected: selectedIds[0] });
+  },
   begin: (source) => {
     lastMetric = 0;
     set({

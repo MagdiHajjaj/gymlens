@@ -678,6 +678,30 @@ nav a.active:after {
   letter-spacing: 0.8px;
   font-size: 10px;
 }
+.movement-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 2px 0 16px;
+}
+.movement-chip {
+  border: 1px solid #e1e6db;
+  background: #fcfdf9;
+  color: #5d6b57;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.movement-chip:hover {
+  border-color: #7d9e66;
+}
+.movement-chip.is-active {
+  background: #28472e;
+  border-color: #28472e;
+  color: #f2f6ea;
+}
 .exercise-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

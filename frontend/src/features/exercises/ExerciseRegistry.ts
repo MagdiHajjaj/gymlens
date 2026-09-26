@@ -1,10 +1,15 @@
 import { MovementAnalyzer } from './ExerciseAnalyzer';
 import { CurlAnalyzer } from './CurlAnalyzer';
 import type { ExerciseId } from '../../types/workout';
+
+/** Push/pull/legs movement taxonomy. Separate from `category` ('UPPER BODY' etc.), which other UI still uses. */
+export type ExerciseMovement = 'push' | 'pull' | 'legs';
+
 export const exercises = {
   squat: {
     name: 'Squat',
     category: 'LOWER BODY',
+    movement: 'legs',
     subtitle: 'Build a stronger foundation',
     muscles: 'Quads · Glutes · Core',
     setup: 'Stand side-on, 2–3 metres from your camera. Keep your head and feet in view.',
@@ -15,6 +20,7 @@ export const exercises = {
   curl: {
     name: 'Bicep curl',
     category: 'UPPER BODY',
+    movement: 'pull',
     subtitle: 'Make every curl count',
     muscles: 'Biceps · Forearms',
     setup:
@@ -26,6 +32,7 @@ export const exercises = {
   pushup: {
     name: 'Push-up',
     category: 'FULL BODY',
+    movement: 'push',
     subtitle: 'Strength from the ground up',
     muscles: 'Chest · Triceps · Core',
     setup: 'Place your camera low and side-on. Begin in a plank with your full body visible.',
@@ -36,6 +43,7 @@ export const exercises = {
   deadlift: {
     name: 'Romanian deadlift',
     category: 'LOWER BODY',
+    movement: 'legs',
     subtitle: 'Hinge with control',
     muscles: 'Hamstrings · Glutes · Back',
     setup:
@@ -47,6 +55,7 @@ export const exercises = {
   lunge: {
     name: 'Lunge',
     category: 'LOWER BODY',
+    movement: 'legs',
     subtitle: 'Own every step down',
     muscles: 'Quads · Glutes · Core',
     setup:
@@ -58,6 +67,7 @@ export const exercises = {
   press: {
     name: 'Overhead press',
     category: 'UPPER BODY',
+    movement: 'push',
     subtitle: 'Press with a braced core',
     muscles: 'Shoulders · Triceps · Core',
     setup:
@@ -69,6 +79,7 @@ export const exercises = {
   glute_bridge: {
     name: 'Glute bridge',
     category: 'LOWER BODY',
+    movement: 'legs',
     subtitle: 'Drive your hips to the sky',
     muscles: 'Glutes · Hamstrings · Core',
     setup:
@@ -80,6 +91,7 @@ export const exercises = {
   row: {
     name: 'Bent-over row',
     category: 'UPPER BODY',
+    movement: 'pull',
     subtitle: 'Pull with your back',
     muscles: 'Back · Biceps · Rear delts',
     setup:
@@ -91,6 +103,7 @@ export const exercises = {
   dips: {
     name: 'Tricep dips',
     category: 'UPPER BODY',
+    movement: 'push',
     subtitle: 'Own the press-up',
     muscles: 'Triceps · Chest · Shoulders',
     setup:
@@ -102,6 +115,7 @@ export const exercises = {
   pullup: {
     name: 'Pull-up',
     category: 'UPPER BODY',
+    movement: 'pull',
     subtitle: 'Chin over the bar',
     muscles: 'Back · Biceps · Core',
     setup:
@@ -113,3 +127,7 @@ export const exercises = {
 } as const;
 export const createAnalyzer = (id: ExerciseId) =>
   id === 'curl' ? new CurlAnalyzer() : new MovementAnalyzer(id);
+
+/** Exercise ids in a movement pattern, in registry order. */
+export const exercisesForMovement = (movement: ExerciseMovement): ExerciseId[] =>
+  (Object.keys(exercises) as ExerciseId[]).filter((id) => exercises[id].movement === movement);
