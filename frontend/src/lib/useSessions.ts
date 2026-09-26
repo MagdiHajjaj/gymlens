@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { api } from './api';
 import { localSessions } from './sessionBuffer';
-import type { WorkoutSession } from '../types/workout';
+import type { WorkoutHistoryEntry } from '../types/workout';
 export function useSessions() {
   const { authenticated, owner } = useIdentity();
-  const [sessions, setSessions] = useState<WorkoutSession[]>(() => localSessions(owner));
+  const [sessions, setSessions] = useState<WorkoutHistoryEntry[]>(() => localSessions(owner));
   const [loading, setLoading] = useState(authenticated);
   const [error, setError] = useState('');
   const [version, setVersion] = useState(0);
@@ -21,13 +21,13 @@ export function useSessions() {
     }
     setLoading(true);
     void (async () => {
-      const remote: WorkoutSession[] = [];
-      let page: WorkoutSession[];
+      const remote: WorkoutHistoryEntry[] = [];
+      let page: WorkoutHistoryEntry[];
       do {
         page = await api.history(remote.length);
         remote.push(...page);
       } while (page.length === 50 && remote.length < 1000);
-      const merged = new Map(local.map((s) => [s.id, s]));
+      const merged = new Map<string, WorkoutHistoryEntry>(local.map((s) => [s.id, s]));
       remote.forEach((s) => merged.set(s.id, { ...merged.get(s.id), ...s, local: false }));
       if (!cancelled)
         setSessions([...merged.values()].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)));

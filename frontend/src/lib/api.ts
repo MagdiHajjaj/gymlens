@@ -1,4 +1,4 @@
-import type { Insight, WorkoutSession } from '../types/workout';
+import type { Insight, WorkoutSession, WorkoutHistoryEntry } from '../types/workout';
 export interface AthleteProfile {
   id: string;
   display_name: string;
@@ -74,7 +74,7 @@ export const api = {
     request<{ connected: boolean; database: string; timescale: boolean; continuous_aggregate: boolean }>(
       '/api/platform/tiger',
     ),
-  history: (offset = 0) => request<WorkoutSession[]>(`/api/workouts?offset=${offset}&limit=50`),
+  history: (offset = 0) => request<WorkoutHistoryEntry[]>(`/api/workouts?offset=${offset}&limit=50`),
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
   speech: (text: string) =>

@@ -19,22 +19,36 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'Your camera is busy or unavailable. Close other apps using it, then try again.',
   OverconstrainedError: 'Your camera does not support this configuration. Try another camera or the demo.',
 };
+export interface CameraReadiness {
+  cameraReady: boolean;
+  trackingValid: boolean;
+  calibrated: boolean;
+  guidance: string;
+}
+
 export function CameraView({
   onDemo,
   voiceCoach,
   videoFile,
   onFinish,
+  preview = false,
+  onReadiness,
 }: {
   onDemo: () => void;
   voiceCoach: VoiceCoach;
   /** An uploaded workout video to analyze instead of the live webcam. */
   videoFile?: File | null;
   onFinish?: () => void;
+  preview?: boolean;
+  onReadiness?: (readiness: CameraReadiness) => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const session = useWorkout((s) => s.session)!;
-  const paused = useWorkout((s) => s.paused);
+  const storedSession = useWorkout((s) => s.session);
+  const selected = useWorkout((s) => s.selected);
+  const session = preview ? { id: 'preview', exercise: selected, source: 'camera' } : storedSession!;
+  const storedPaused = useWorkout((s) => s.paused);
+  const paused = !preview && storedPaused;
   const { authenticated } = useIdentity();
   const [status, setStatus] = useState('Preparing your session…');
   const [error, setError] = useState('');
@@ -61,8 +75,16 @@ export function CameraView({
     let warmedVoice = false;
     async function start() {
       setError('');
+      onReadiness?.({
+        cameraReady: false,
+        trackingValid: false,
+        calibrated: false,
+        guidance: 'Enable your camera to check your position.',
+      });
       setVideoEnded(false);
-      setStatus(demo ? 'Loading landmark replay…' : upload ? 'Loading your video…' : 'Requesting camera access…');
+      setStatus(
+        demo ? 'Loading landmark replay…' : upload ? 'Loading your video…' : 'Requesting camera access…',
+      );
       let frames: PoseFrame[] = [];
       try {
         if (demo) {
@@ -80,7 +102,9 @@ export function CameraView({
           await new Promise<void>((resolve, reject) => {
             player.onloadeddata = () => resolve();
             player.onerror = () =>
-              reject(new Error('This video format isn’t supported. Try an MP4 or MOV recorded on your phone.'));
+              reject(
+                new Error('This video format isn’t supported. Try an MP4 or MOV recorded on your phone.'),
+              );
           });
           setStatus('Loading the local pose model…');
           try {
@@ -117,6 +141,12 @@ export function CameraView({
           return;
         }
         setStatus('ready');
+        onReadiness?.({
+          cameraReady: true,
+          trackingValid: false,
+          calibrated: false,
+          guidance: 'Move into frame and hold your starting position.',
+        });
         let demoTime = 0,
           previousTick = performance.now();
         function tick(now: number) {
@@ -129,7 +159,7 @@ export function CameraView({
             if (state.paused && !video.current.paused) video.current.pause();
             else if (!state.paused && video.current.paused && !video.current.ended) void video.current.play();
           }
-          if (state.paused || state.rest) {
+          if (!preview && (state.paused || state.rest)) {
             if (!wasPaused) {
               analyzer.reset();
               stabilizer.reset();
@@ -177,10 +207,17 @@ export function CameraView({
               displayResult = { ...result, trackedSide: result.trackedSide ?? displayResult?.trackedSide };
               if (demo) demoLandmarks = frame.landmarks;
               if (result.repCompleted || now - lastUi >= 100) {
-                state.ingest(result, now);
+                if (preview) {
+                  onReadiness?.({
+                    cameraReady: true,
+                    trackingValid: result.trackingValid,
+                    calibrated: result.calibrated,
+                    guidance: result.guidance,
+                  });
+                } else state.ingest(result, now);
                 lastUi = now;
               }
-              if (state.voice) {
+              if (!preview && state.voice) {
                 if (authenticated && !warmedVoice) {
                   warmedVoice = true;
                   void voice.warmPhrases(selectedExerciseWarmPhrases(session.exercise), true);
@@ -212,12 +249,25 @@ export function CameraView({
             tick(now);
           } catch {
             setError('Pose tracking stopped unexpectedly. Retry the camera or use the landmark demo.');
+            onReadiness?.({
+              cameraReady: false,
+              trackingValid: false,
+              calibrated: false,
+              guidance: 'Tracking stopped. Try the camera again.',
+            });
             stream?.getTracks().forEach((t) => t.stop());
           }
         };
         raf = requestAnimationFrame(safeTick);
       } catch (e) {
         stream?.getTracks().forEach((t) => t.stop());
+        if (!disposed)
+          onReadiness?.({
+            cameraReady: false,
+            trackingValid: false,
+            calibrated: false,
+            guidance: 'Camera unavailable. Follow the instructions in the preview.',
+          });
         if (!disposed)
           setError(
             e instanceof Error ? cameraErrors[e.name] || e.message : 'Camera could not start. Try the demo.',
@@ -238,7 +288,17 @@ export function CameraView({
       }
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
-  }, [session.id, session.exercise, session.source, authenticated, attempt, voiceCoach, videoFile]);
+  }, [
+    session.id,
+    session.exercise,
+    session.source,
+    authenticated,
+    attempt,
+    voiceCoach,
+    videoFile,
+    preview,
+    onReadiness,
+  ]);
   return (
     <div
       className={`camera-stage ${session.source === 'demo' ? 'is-demo' : ''} ${session.source === 'upload' ? 'is-upload' : ''}`}
@@ -254,7 +314,13 @@ export function CameraView({
       <div className="camera-top">
         <span className="camera-badge">
           <span className="live-dot" />
-          {session.source === 'demo' ? 'LANDMARK REPLAY' : session.source === 'upload' ? 'VIDEO ANALYSIS' : 'LIVE CAMERA'}
+          {preview
+            ? 'CAMERA PREVIEW'
+            : session.source === 'demo'
+              ? 'LANDMARK REPLAY'
+              : session.source === 'upload'
+                ? 'VIDEO ANALYSIS'
+                : 'LIVE CAMERA'}
         </span>
         <span className="camera-badge">
           <ShieldCheck size={13} /> ON-DEVICE
@@ -287,9 +353,7 @@ export function CameraView({
           <CheckCircle2 size={32} />
           <h3>Video analyzed.</h3>
           <p>Every rep has been counted and checked.</p>
-          <div className="button-row">
-            {onFinish && <Button onClick={onFinish}>See my report</Button>}
-          </div>
+          <div className="button-row">{onFinish && <Button onClick={onFinish}>See my report</Button>}</div>
         </div>
       )}
       {paused && !error && (
@@ -304,9 +368,9 @@ export function CameraView({
             ? 'Synthetic movement · no camera required'
             : session.source === 'upload'
               ? 'Uploaded video · analyzed on your device'
-            : session.exercise === 'curl'
-              ? 'Keep shoulder, elbow, and wrist in view'
-              : 'Side view · keep your full movement in frame'}
+              : session.exercise === 'curl'
+                ? 'Keep shoulder, elbow, and wrist in view'
+                : 'Side view · keep your full movement in frame'}
         </span>
         <span>GYMLENS</span>
       </div>

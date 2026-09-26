@@ -31,7 +31,7 @@ export function exportSession(session: WorkoutSession) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function duration(session: WorkoutSession) {
+export function duration(session: Pick<WorkoutSession, 'started_at' | 'ended_at'>) {
   return Math.max(
     0,
     Math.floor(

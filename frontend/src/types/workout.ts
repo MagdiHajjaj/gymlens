@@ -1,4 +1,5 @@
-export type ExerciseId = 'squat' | 'curl' | 'pushup' | 'deadlift' | 'lunge' | 'press' | 'glute_bridge' | 'row' | 'dips' | 'pullup';
+export type ExerciseId =
+  'squat' | 'curl' | 'pushup' | 'deadlift' | 'lunge' | 'press' | 'glute_bridge' | 'row' | 'dips' | 'pullup';
 export type MovementPhase = 'ready' | 'eccentric' | 'concentric';
 export interface Landmark {
   x: number;
@@ -76,3 +77,8 @@ export interface WorkoutSession {
   local?: boolean;
   synced_id?: string;
 }
+
+// The account history endpoint omits rep/metric details; browser copies may
+// include them. Fetch a session report before treating a summary as full data.
+export type WorkoutHistoryEntry = Omit<WorkoutSession, 'reps' | 'metrics'> &
+  Partial<Pick<WorkoutSession, 'reps' | 'metrics'>>;

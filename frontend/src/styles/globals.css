@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import './workout.css';
+@import './reports.css';
 @theme {
   --font-sans: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
