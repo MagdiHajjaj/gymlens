@@ -19,6 +19,8 @@ import { exercises } from '../exercises/ExerciseRegistry';
 import { useWorkout } from './workoutStore';
 import type { ExerciseId } from '../../types/workout';
 
+const AUTO_START_MS = 3000;
+
 export function WorkoutSetup({
   demo,
   voiceCoach,
@@ -41,6 +43,9 @@ export function WorkoutSetup({
   });
   const fileInput = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const autoStartTimer = useRef<number | undefined>(undefined);
+  const startRef = useRef(onStart);
+  startRef.current = onStart;
   useEffect(() => {
     if (preview) {
       heading.current?.focus({ preventScroll: true });
@@ -50,6 +55,31 @@ export function WorkoutSetup({
   const exercise = exercises[selected];
   const ready = readiness.cameraReady && readiness.trackingValid && readiness.calibrated;
   const step = preview ? (ready ? 3 : 2) : 1;
+  const [autoStartRemaining, setAutoStartRemaining] = useState(0);
+
+  useEffect(() => {
+    if (!preview || !ready) {
+      if (autoStartTimer.current !== undefined) window.clearInterval(autoStartTimer.current);
+      autoStartTimer.current = undefined;
+      setAutoStartRemaining(0);
+      return;
+    }
+    const deadline = Date.now() + AUTO_START_MS;
+    const update = () => {
+      const remaining = Math.max(0, deadline - Date.now());
+      setAutoStartRemaining(Math.ceil(remaining / 1000));
+      if (remaining > 0) return;
+      if (autoStartTimer.current !== undefined) window.clearInterval(autoStartTimer.current);
+      autoStartTimer.current = undefined;
+      startRef.current('camera');
+    };
+    update();
+    autoStartTimer.current = window.setInterval(update, 100);
+    return () => {
+      if (autoStartTimer.current !== undefined) window.clearInterval(autoStartTimer.current);
+      autoStartTimer.current = undefined;
+    };
+  }, [preview, ready]);
 
   return (
     <div className="page workout-setup-page">
@@ -105,8 +135,10 @@ export function WorkoutSetup({
                 onDemo={() => onStart('demo')}
                 onReadiness={setReadiness}
               />
-              <p className="preview-note">
-                Your workout timer and rep count start only when you choose Start workout.
+              <p className="preview-note" aria-live="polite">
+                {autoStartRemaining > 0
+                  ? `Starting automatically in ${autoStartRemaining}… Move out of frame to cancel.`
+                  : 'Your workout starts automatically when your position is ready.'}
               </p>
             </>
           ) : (
@@ -196,7 +228,7 @@ export function WorkoutSetup({
 
           {preview ? (
             <Button className="full-width setup-primary" disabled={!ready} onClick={() => onStart('camera')}>
-              <Play size={18} /> Start workout
+              <Play size={18} /> {autoStartRemaining > 0 ? `Start now (${autoStartRemaining})` : 'Start workout'}
             </Button>
           ) : demo ? (
             <>

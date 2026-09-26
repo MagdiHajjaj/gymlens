@@ -45,6 +45,15 @@ it('keeps counting the visible arm when the other arm is missing', () => {
   expect(results.every((r) => !r.arms![1].trackingValid)).toBe(true);
 });
 
+it('does not count a one-arm partial movement as a completed rep', () => {
+  const analyzer = new CurlAnalyzer();
+  const results = frames().slice(0, 40).map((frame) => {
+    frame.landmarks[16].visibility = 0;
+    return analyzer.analyze(frame);
+  });
+  expect(results.flatMap((result) => result.completedReps ?? [])).toHaveLength(0);
+});
+
 it('tolerates a brief dropout but never counts while an arm is invisible', () => {
   const analyzer = new CurlAnalyzer();
   const results = frames().map((frame, i) => {

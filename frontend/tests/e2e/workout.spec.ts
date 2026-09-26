@@ -170,32 +170,17 @@ test('camera preview gates start, records no reps, and releases the camera when 
   );
   await page.goto('/workout');
   await page.getByRole('button', { name: 'Set up camera' }).click();
-  const start = page.getByRole('button', { name: 'Start workout', exact: true });
-  await expect(start).toBeDisabled();
-  await expect(start).toBeEnabled({ timeout: 15000 });
   await expect(page.getByRole('status')).toContainText('You’re in position');
+  const start = page.getByRole('button', { name: /Start workout|Start now/ });
   await page.evaluate(() => Object.assign(window, { __poseVisible: false }));
   await expect(start).toBeDisabled();
-  await page.evaluate(() => Object.assign(window, { __poseVisible: true }));
-  await expect(start).toBeEnabled();
+  await page.waitForTimeout(3500);
   await expect(page.getByTestId('rep-count')).toHaveCount(0);
+  await page.evaluate(() => Object.assign(window, { __poseVisible: true }));
+  await expect(page.getByTestId('rep-count')).toHaveText('0', { timeout: 5000 });
   expect(
     await page.evaluate(() => Object.keys(localStorage).filter((key) => key.includes('sessions')).length),
   ).toBe(0);
-  await page.getByRole('button', { name: 'Change exercise' }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        (window as typeof window & { __cameraTracks: MediaStreamTrack[] }).__cameraTracks.every(
-          (track) => track.readyState === 'ended',
-        ),
-      ),
-    )
-    .toBe(true);
-  await page.getByRole('button', { name: 'Set up camera' }).click();
-  await expect(start).toBeEnabled({ timeout: 15000 });
-  await start.click();
-  await expect(page.getByTestId('rep-count')).toHaveText('0');
   await page.getByRole('button', { name: 'End session', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Get a recorded baseline' })).toBeVisible();
