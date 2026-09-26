@@ -13,7 +13,6 @@ import {
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
-import { GoalPicker } from '../goals/GoalPicker';
 import { CameraView, type CameraReadiness } from '../camera/CameraView';
 import { VoiceCoach } from '../coaching/VoiceCoach';
 import { exercises } from '../exercises/ExerciseRegistry';
@@ -88,13 +87,6 @@ export function WorkoutSetup({
       </ol>
 
       <div className="guided-setup-grid">
-        {!preview && (
-          <div className="setup-goal">
-            <span className="eyebrow">Your training goal</span>
-            <GoalPicker />
-            <p className="small-muted">Session insights adapt to what you are working toward.</p>
-          </div>
-        )}
         <section
           className="panel exercise-picker"
           aria-label={preview ? 'Camera preview' : 'Choose exercise'}

@@ -14,7 +14,6 @@ import {
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { exercises } from '../features/exercises/ExerciseRegistry';
-import { GoalChip } from '../features/goals/GoalChip';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
@@ -142,9 +141,6 @@ export function DashboardPage() {
           </div>
           <MoveUpRight size={15} aria-hidden />
         </Link>
-      </section>
-      <section className="goal-strip" aria-label="Training goal">
-        <GoalChip />
       </section>
       <section>
         <div className="section-heading">
