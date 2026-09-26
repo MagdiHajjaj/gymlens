@@ -98,31 +98,29 @@ it('keeps completion when the same plan is rebuilt, resets it for a new plan', (
   expect(usePlan.getState().completedExerciseIds).toEqual([]);
 });
 
-it('moves plan rows up and down, ignoring moves past the edges', () => {
+it('reorders plan rows by index, ignoring no-ops and out-of-range moves', () => {
   usePlan.getState().setPlan(['squat', 'pushup', 'curl']);
-  const { movePlanItem } = usePlan.getState();
+  const { reorderPlan } = usePlan.getState();
+  const order = () => usePlan.getState().plan.map((item) => item.exerciseId);
 
-  movePlanItem('pushup', -1);
-  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat', 'curl']);
+  reorderPlan(1, 0);
+  expect(order()).toEqual(['pushup', 'squat', 'curl']);
 
-  movePlanItem('pushup', 1);
-  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
+  reorderPlan(0, 2);
+  expect(order()).toEqual(['squat', 'curl', 'pushup']);
 
-  // Edge moves are no-ops.
-  movePlanItem('squat', -1);
-  movePlanItem('curl', 1);
-  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
-
-  // Unknown exercises are ignored.
-  movePlanItem('press', 1);
-  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
+  // No-ops: same index and out-of-range indices leave the plan untouched.
+  reorderPlan(1, 1);
+  reorderPlan(-1, 2);
+  reorderPlan(0, 3);
+  reorderPlan(5, 0);
+  expect(order()).toEqual(['squat', 'curl', 'pushup']);
 });
 
 it('preserves a custom row order when the same plan is rebuilt', () => {
   usePlan.getState().setPlan(['squat', 'pushup', 'curl']);
   usePlan.getState().updatePlanItem('curl', { weightKg: 15 });
-  usePlan.getState().movePlanItem('curl', -1);
-  usePlan.getState().movePlanItem('curl', -1);
+  usePlan.getState().reorderPlan(2, 0);
 
   usePlan.getState().setPlan(['pushup', 'squat', 'curl']);
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['curl', 'squat', 'pushup']);

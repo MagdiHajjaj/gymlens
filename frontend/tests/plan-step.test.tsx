@@ -101,29 +101,64 @@ it('shows a completion checkmark only on finished rows', () => {
   expect(within(pushupRow).queryByText('Completed')).toBeNull();
 });
 
-it('reorders rows with the up/down arrows and disables them at the edges', () => {
+it('reorders rows with the keyboard arrows on the drag handle', () => {
   renderStep();
   const [squatRow] = screen.getAllByRole('listitem');
+  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
 
-  const squatDown = within(squatRow).getByLabelText('Move Squat down') as HTMLButtonElement;
-  const squatUp = within(squatRow).getByLabelText('Move Squat up') as HTMLButtonElement;
-  expect(squatUp.disabled).toBe(true);
-  expect(squatDown.disabled).toBe(false);
-
-  fireEvent.click(squatDown);
+  fireEvent.keyDown(handle, { key: 'ArrowDown' });
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
 
-  // Rows re-render in the new plan order.
-  const [firstRow, secondRow] = screen.getAllByRole('listitem');
-  expect(within(firstRow).getByText('Push-up')).toBeTruthy();
-  expect(within(secondRow).getByText('Squat')).toBeTruthy();
+  const rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Push-up')).toBeTruthy();
 
-  const pushupDown = within(firstRow).getByLabelText('Move Push-up down') as HTMLButtonElement;
-  expect(pushupDown.disabled).toBe(false);
-  const squatDownNow = within(secondRow).getByLabelText('Move Squat down') as HTMLButtonElement;
-  expect(squatDownNow.disabled).toBe(true);
-
-  // Moving back up restores the original order.
-  fireEvent.click(within(secondRow).getByLabelText('Move Squat up'));
+  fireEvent.keyDown(within(rows[1]).getByRole('button', { name: 'Reorder Squat' }), {
+    key: 'ArrowUp',
+  });
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup']);
+
+  // ArrowUp on the first row is a no-op.
+  const reordered = screen.getAllByRole('listitem');
+  fireEvent.keyDown(within(reordered[0]).getByRole('button', { name: 'Reorder Squat' }), {
+    key: 'ArrowUp',
+  });
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup']);
+});
+
+it('drags a row to a new position with pointer events', async () => {
+  renderStep();
+  const [squatRow, pushupRow] = screen.getAllByRole('listitem');
+  const list = screen.getByRole('list');
+  // Realistic layout: two 100px rows stacked at the top of the viewport.
+  const rect = (top: number, height = 100) =>
+    ({ top, height, bottom: top + height, left: 0, right: 300, width: 300, x: 0, y: top }) as DOMRect;
+  vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 200));
+  vi.spyOn(squatRow, 'getBoundingClientRect').mockReturnValue(rect(0));
+  vi.spyOn(pushupRow, 'getBoundingClientRect').mockReturnValue(rect(100));
+  Object.defineProperty(list, 'scrollHeight', { value: 200, configurable: true });
+
+  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
+  fireEvent.pointerDown(handle, { clientY: 50, pointerId: 1 });
+
+  // A small move that doesn't cross a slot yet: the row still follows the cursor.
+  fireEvent.pointerMove(window, { clientY: 80, pointerId: 1 });
+  expect(squatRow.className).toContain('is-dragging');
+  expect(squatRow.style.transform).toContain('30px');
+  expect(pushupRow.style.transform).toBe('');
+
+  // Past the second row's midpoint: the sibling slides aside. The dragged row
+  // is clamped inside the 200px list (max 100px of travel for a 100px row).
+  fireEvent.pointerMove(window, { clientY: 170, pointerId: 1 });
+  expect(squatRow.style.transform).toContain('100px');
+  expect(pushupRow.style.transform).toContain('-100px');
+
+  fireEvent.pointerUp(window, { pointerId: 1 });
+
+  // After the settle animation the new order is committed to the store.
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
+  const [firstRow] = screen.getAllByRole('listitem');
+  expect(within(firstRow).getByText('Push-up')).toBeTruthy();
+  // Inline drag styles are cleaned up.
+  expect(firstRow.style.transform).toBe('');
 });

@@ -521,6 +521,26 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fafbf8;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+/* Compositor hint only while a reorder is in flight; always-on will-change
+   keeps a layer per row and can make the drag feel heavy. */
+body.is-reordering .plan-row {
+  will-change: transform;
+}
+body.is-reordering .plan-row-handle {
+  cursor: grabbing;
+}
+.plan-row.is-dragging {
+  position: relative;
+  z-index: 5;
+  background: #fff;
+  border-color: #9db48f;
+  box-shadow: 0 14px 30px rgba(35, 78, 56, 0.22);
 }
 .plan-row.is-complete {
   border-color: #9db48f;
@@ -566,30 +586,35 @@
   font-size: 14px;
   color: #5d6d62;
 }
-.plan-row-reorder {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.plan-row-reorder-button {
+.plan-row-handle {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: #234e38;
-  cursor: pointer;
+  width: 40px;
+  height: 56px;
+  flex-shrink: 0;
   padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #8a978d;
+  cursor: grab;
+  touch-action: none;
 }
-.plan-row-reorder-button:hover:not(:disabled) {
+.plan-row-handle:hover {
   background: #eef3ea;
+  color: #234e38;
 }
-.plan-row-reorder-button:disabled {
-  opacity: 0.3;
-  cursor: default;
+.plan-row-handle:active {
+  cursor: grabbing;
+}
+.plan-row.is-dragging .plan-row-handle {
+  cursor: grabbing;
+  color: #234e38;
+}
+body.is-reordering,
+body.is-reordering * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 .plan-row-art {
   width: 64px;
