@@ -107,9 +107,14 @@ function finiteMetric(rep: RepEvent, key: string) {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function setNumberRaw(rep: RepEvent) {
+  return (
+    finiteMetric(rep, 'set_number') ?? finiteMetric(rep, 'set') ?? finiteMetric(rep, 'set_index')
+  );
+}
+
 function setNumber(rep: RepEvent) {
-  const raw =
-    finiteMetric(rep, 'set_number') ?? finiteMetric(rep, 'set') ?? finiteMetric(rep, 'set_index');
+  const raw = setNumberRaw(rep);
   return raw === undefined ? 1 : Math.max(1, Math.round(raw));
 }
 
@@ -203,6 +208,8 @@ function durationStats(reps: RepEvent[]) {
 }
 
 function buildSetBreakdown(reps: RepEvent[]): SetBreakdown[] {
+  // Don't fabricate a single-set breakdown when the session carries no set metadata.
+  if (!reps.some((rep) => setNumberRaw(rep) !== undefined)) return [];
   const groups = new Map<number, RepEvent[]>();
   for (const rep of reps) {
     const key = setNumber(rep);

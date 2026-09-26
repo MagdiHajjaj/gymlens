@@ -249,3 +249,24 @@ describe('goal-oriented insights', () => {
     expect(insight.next_focus).toContain('Measured cue text.');
   });
 });
+
+describe('set breakdown honesty', () => {
+  it('returns an empty set breakdown when no rep carries set metadata', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    expect(insight.stats.setBreakdown).toEqual([]);
+  });
+
+  it('groups reps by set when set metadata is present', () => {
+    const session = baseSession({
+      reps: [1, 2, 3].map((rep_number) => ({
+        rep_number,
+        completed_at: '2026-01-01T00:00:10.000Z',
+        metrics_json: { min_angle: 95, duration_ms: 2000, set_number: rep_number <= 2 ? 1 : 2 },
+        faults_json: [],
+      })),
+    });
+    const insight = generateStatisticsInsight(session);
+    expect(insight.stats.setBreakdown.map((set) => set.setNumber)).toEqual([1, 2]);
+    expect(insight.stats.setBreakdown[0]?.reps).toEqual([1, 2]);
+  });
+});
