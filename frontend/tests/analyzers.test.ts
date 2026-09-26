@@ -146,6 +146,27 @@ it('accepts the overhead press starting position when facing the camera', () => 
   expect(results.every((result) => result.trackingValid)).toBe(true);
 });
 
+it('calibrates overhead press at the rack position and counts an upward press', () => {
+  const analyzer = new MovementAnalyzer('press');
+  const frames = Array.from({ length: 20 }, (_, index) => {
+    const frame = structuredClone(fixture('press')[0]);
+    frame.timestampMs = index * 50;
+    for (const side of [0, 1]) {
+      const shoulder = frame.landmarks[11 + side];
+      const elbow = frame.landmarks[13 + side];
+      const wrist = frame.landmarks[15 + side];
+      elbow.x = shoulder.x;
+      elbow.y = shoulder.y + 0.12;
+      wrist.x = shoulder.x + 0.12;
+      wrist.y = elbow.y;
+    }
+    return frame;
+  });
+  const results = frames.map((frame) => analyzer.analyze(frame));
+  expect(results.at(-1)?.calibrated).toBe(true);
+  expect(results.at(-1)?.guidance).not.toContain('rack position');
+});
+
 it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
   const analyzer = new MovementAnalyzer('curl');
   const results = fixture('curl').map((original) => {

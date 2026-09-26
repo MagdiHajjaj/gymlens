@@ -71,10 +71,10 @@ export const exercises = {
     subtitle: 'Press with a braced core',
     muscles: 'Shoulders · Triceps · Core',
     setup:
-      'Face the camera with both shoulders, elbows, and wrists visible. Begin with both arms extended overhead.',
+      'Face the camera with both shoulders, elbows, and wrists visible. Start with your hands at shoulder height and elbows bent.',
     checks: 'Range & back position',
     color: 'rose',
-    calibrate: 'Extend both arms overhead',
+    calibrate: 'Hold the rack position with your hands near your shoulders',
   },
   glute_bridge: {
     name: 'Glute bridge',

@@ -72,6 +72,13 @@ export class FeedbackEngine {
         15000,
       );
     }
+    if (!result.repCompleted && result.guidance.startsWith('Rep not counted:')) {
+      return announce(
+        result.guidance,
+        { text: result.guidance, kind: 'fault', priority: PRIORITY.fault },
+        5000,
+      );
+    }
     const fault = result.faults[0];
     if (fault) {
       if (this.current !== fault.code) {

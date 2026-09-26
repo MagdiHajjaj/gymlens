@@ -171,6 +171,23 @@ it('prioritizes active faults over simultaneous rep totals', () => {
   expect(cue).toMatchObject({ text: 'Keep your upper arm close to your side.', priority: 100 });
 });
 
+it('speaks a specific reason when a rep is not counted', () => {
+  const engine = new FeedbackEngine();
+  const result: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: false,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Rep not counted: press overhead until your arms are straight, then return to your shoulders.',
+  };
+  expect(engine.nextCue(result, 0, { exercise: 'press', totalReps: 0 })).toMatchObject({
+    text: result.guidance,
+    priority: 100,
+  });
+});
+
 it('warms count and exercise-specific fault phrases for every exercise', () => {
   const phrases = selectedExerciseWarmPhrases('deadlift' as ExerciseId);
   expect(phrases).toContain('1.');

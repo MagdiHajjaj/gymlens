@@ -446,6 +446,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
   private reversalSince = -1;
   private exitSince = -1;
   private cycleFaults = new Map<string, FormFault>();
+  private pressDirection: 'up' | 'down' | undefined;
   constructor(
     readonly id: ExerciseId,
     options: Partial<Thresholds> = {},
@@ -468,6 +469,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     this.reversalSince = -1;
     this.exitSince = -1;
     this.cycleFaults.clear();
+    this.pressDirection = undefined;
   }
   analyze(frame: PoseFrame): ExerciseResult {
     const empty = (guidance: string): ExerciseResult => ({
@@ -590,7 +592,9 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         ? 'This looks more like a push-up position. Stand upright for bicep curls, with your elbows beside your torso.'
         : this.id === 'pushup' && !this.armed && bodyInclination < 50
           ? 'Set up in a horizontal plank for push-ups. Keep your shoulders, hips, and ankles in one line.'
-          : !this.armed && (this.id === 'press' || this.id === 'pullup') && wrist.y > shoulder.y - 0.04
+            : !this.armed &&
+              ((this.id === 'press' && angle > this.config.enter) || this.id === 'pullup') &&
+              wrist.y > shoulder.y - 0.04
             ? this.id === 'press'
               ? 'Raise your hands overhead and straighten your arms to begin the overhead press.'
               : 'Start from a dead hang with your hands above your shoulders.'
@@ -649,24 +653,33 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       trackedSide: this.side,
     };
     if (!this.armed) {
-      if (value >= this.config.exit) {
+      const pressRack = this.id === 'press' && value <= this.config.enter;
+      const pressOverhead = this.id === 'press' && value >= this.config.exit;
+      if (pressRack || pressOverhead || (this.id !== 'press' && value >= this.config.exit)) {
         if (this.readySince < 0) this.readySince = frame.timestampMs;
-        if (frame.timestampMs - this.readySince >= this.config.calibrationMs) this.armed = true;
+        if (frame.timestampMs - this.readySince >= this.config.calibrationMs) {
+          this.armed = true;
+          if (this.id === 'press') this.pressDirection = pressRack ? 'up' : 'down';
+        }
       } else this.readySince = -1;
       result.calibrated = this.armed;
       result.guidance = this.armed
         ? 'Ready. Move at a comfortable, controlled pace.'
-        : this.exercise.calibrationGuidance;
+        : this.id === 'press' && value > this.config.enter
+          ? 'Lower your hands to shoulder height and hold the rack position before starting.'
+          : this.exercise.calibrationGuidance;
       return result;
     }
     result.guidance = 'Keep your movement steady and controlled.';
     if (this.phase === 'ready') {
-      if (value < this.config.enter) {
+      const movingUp = this.id === 'press' && this.pressDirection === 'up';
+      const entering = movingUp ? value > this.config.enter : value < this.config.enter;
+      if (entering) {
         if (this.enterSince < 0) this.enterSince = frame.timestampMs;
         if (frame.timestampMs - this.enterSince >= MovementAnalyzer.PHASE_HOLD_MS) {
           this.phase = 'eccentric';
           this.started = this.enterSince;
-          this.minimum = value;
+          this.minimum = movingUp ? 180 : value;
           this.maximumLean = 0;
           this.reversalSince = -1;
           this.exitSince = -1;
@@ -675,7 +688,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       } else this.enterSince = -1;
     }
     if (this.phase !== 'ready') {
-      this.minimum = Math.min(this.minimum, value);
+      const movingUp = this.id === 'press' && this.pressDirection === 'up';
+      this.minimum = movingUp ? Math.min(this.minimum, 180 - value) : Math.min(this.minimum, value);
       this.maximumLean = Math.max(this.maximumLean, torsoAngle);
       for (const check of this.exercise.cycleFaults) {
         let hit = false;
@@ -694,7 +708,10 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       }
       for (const f of result.faults) this.cycleFaults.set(f.code, f);
       if (this.phase === 'eccentric') {
-        if (value > this.minimum + this.config.reversal) {
+        const reversing = movingUp
+          ? value < 180 - this.minimum - this.config.reversal
+          : value > this.minimum + this.config.reversal;
+        if (reversing) {
           if (this.reversalSince < 0) this.reversalSince = frame.timestampMs;
           if (frame.timestampMs - this.reversalSince >= MovementAnalyzer.PHASE_HOLD_MS) {
             this.phase = 'concentric';
@@ -706,7 +723,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         this.reset();
         return empty('Reset your starting position before your next rep.');
       }
-      if (this.phase === 'concentric' && value >= this.config.exit) {
+      const atEnd = movingUp ? value <= this.config.enter : value >= this.config.exit;
+      if (this.phase === 'concentric' && atEnd) {
         if (this.exitSince < 0) this.exitSince = frame.timestampMs;
       } else if (this.phase === 'concentric') this.exitSince = -1;
       if (
@@ -714,20 +732,26 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         this.exitSince >= 0 &&
         frame.timestampMs - this.exitSince >= MovementAnalyzer.PHASE_HOLD_MS
       ) {
-        result.repCompleted =
-          frame.timestampMs - this.started >= this.config.minimumMs &&
-          this.minimum <= this.config.exit - this.config.minimumRange;
+        const duration = frame.timestampMs - this.started;
+        const rangeReached = movingUp
+          ? 180 - this.minimum >= this.config.exit
+          : this.minimum <= this.config.exit - this.config.minimumRange;
+        result.repCompleted = duration >= this.config.minimumMs && rangeReached;
         if (result.repCompleted) {
-          if (this.minimum > this.config.depth) {
+          if (!movingUp && this.minimum > this.config.depth) {
             const f = fault(this.exercise.depthFault.code, this.exercise.depthFault.message);
             this.cycleFaults.set(f.code, f);
           }
           result.faults = [...this.cycleFaults.values()];
           result.repMetrics = {
             min_angle: Math.round(this.minimum),
-            duration_ms: Math.round(frame.timestampMs - this.started),
+            duration_ms: Math.round(duration),
             ...(this.exercise.trackMaxLean ? { max_torso_lean: Math.round(this.maximumLean) } : {}),
           };
+        } else {
+          result.guidance = duration < this.config.minimumMs
+            ? `Rep not counted: keep the press moving for at least ${this.config.minimumMs / 1000} seconds.`
+            : `Rep not counted: press overhead until your arms are straight, then return to your shoulders.`;
         }
         this.phase = 'ready';
         this.enterSince = -1;
