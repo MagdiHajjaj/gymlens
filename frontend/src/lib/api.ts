@@ -1,4 +1,27 @@
 import type { Insight, WorkoutSession } from '../types/workout';
+export interface AthleteProfile {
+  id: string;
+  display_name: string;
+  fitness_goal: 'strength' | 'muscle' | 'mobility' | 'general_fitness' | null;
+  experience_level: 'beginner' | 'intermediate' | 'advanced' | null;
+  preferred_units: 'metric' | 'imperial';
+  height_cm: number | null;
+  weight_kg: number | null;
+  weekly_workout_target: number | null;
+  profile_complete: boolean;
+  created_at: string;
+  updated_at: string | null;
+}
+export type AthleteProfileInput = Pick<
+  AthleteProfile,
+  | 'display_name'
+  | 'fitness_goal'
+  | 'experience_level'
+  | 'preferred_units'
+  | 'height_cm'
+  | 'weight_kg'
+  | 'weekly_workout_target'
+>;
 let getToken: (() => Promise<string>) | undefined;
 export function setTokenProvider(provider?: () => Promise<string>) {
   getToken = provider;
@@ -23,6 +46,9 @@ async function request<T>(path: string, options: RequestInit = {}, blob = false)
   return (blob ? response.blob() : response.json()) as Promise<T>;
 }
 export const api = {
+  profile: () => request<AthleteProfile>('/api/me'),
+  updateProfile: (profile: AthleteProfileInput) =>
+    request<AthleteProfile>('/api/me', { method: 'PATCH', body: JSON.stringify(profile) }),
   tigerStatus: () =>
     request<{ connected: boolean; database: string; timescale: boolean; continuous_aggregate: boolean }>(
       '/api/platform/tiger',

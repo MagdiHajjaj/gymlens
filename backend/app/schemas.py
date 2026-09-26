@@ -18,6 +18,24 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+class ProfileUpdate(StrictModel):
+    display_name: str = Field(min_length=1, max_length=100)
+    fitness_goal: Literal["strength", "muscle", "mobility", "general_fitness"]
+    experience_level: Literal["beginner", "intermediate", "advanced"]
+    preferred_units: Literal["metric", "imperial"] = "metric"
+    height_cm: float | None = Field(default=None, ge=100, le=250)
+    weight_kg: float | None = Field(default=None, ge=30, le=350)
+    weekly_workout_target: int = Field(ge=1, le=14)
+
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, value):
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Display name is required")
+        return value
+
+
 class WorkoutCreate(StrictModel):
     id: UUID
     exercise: Exercise

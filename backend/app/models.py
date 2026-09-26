@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -20,7 +20,14 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     auth0_sub: Mapped[str] = mapped_column(String(255), unique=True)
     display_name: Mapped[str] = mapped_column(String(100), default="Gym Lens member")
+    fitness_goal: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    experience_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    preferred_units: Mapped[str] = mapped_column(String(10), default="metric")
+    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weekly_workout_target: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    profile_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Workout(Base):

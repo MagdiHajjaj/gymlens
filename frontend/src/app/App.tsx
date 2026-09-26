@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { Shell } from '../components/layout/Shell';
 import { DashboardPage } from '../pages/DashboardPage';
 import { HistoryPage } from '../pages/HistoryPage';
+import { ProfilePage } from '../pages/ProfilePage';
 const WorkoutPage = lazy(() => import('../pages/WorkoutPage').then((m) => ({ default: m.WorkoutPage })));
 const SessionPage = lazy(() => import('../pages/SessionPage').then((m) => ({ default: m.SessionPage })));
 export function App() {
@@ -14,6 +15,7 @@ export function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/workout" element={<WorkoutPage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/session/:id" element={<SessionPage />} />
             <Route
               path="*"

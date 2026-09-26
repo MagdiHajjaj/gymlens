@@ -14,7 +14,15 @@ from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import current_subject
 from app.models import MovementMetric, RepEvent, SessionInsight, User, Workout
-from app.schemas import MetricBatch, MetricSummary, RepBatch, SpeechRequest, WorkoutCreate, WorkoutFinish
+from app.schemas import (
+    MetricBatch,
+    MetricSummary,
+    ProfileUpdate,
+    RepBatch,
+    SpeechRequest,
+    WorkoutCreate,
+    WorkoutFinish,
+)
 
 
 @asynccontextmanager
@@ -159,7 +167,33 @@ def tiger_status(db: Session = Depends(get_db), user: User = Depends(current_use
 
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
-    return {"id": user.id, "display_name": user.display_name}
+    return serialize_profile(user)
+
+
+def serialize_profile(user: User):
+    return {
+        "id": user.id,
+        "display_name": user.display_name,
+        "fitness_goal": user.fitness_goal,
+        "experience_level": user.experience_level,
+        "preferred_units": user.preferred_units,
+        "height_cm": user.height_cm,
+        "weight_kg": user.weight_kg,
+        "weekly_workout_target": user.weekly_workout_target,
+        "profile_complete": bool(user.fitness_goal and user.experience_level and user.weekly_workout_target),
+        "created_at": utc(user.created_at),
+        "updated_at": utc(user.profile_updated_at) if user.profile_updated_at else None,
+    }
+
+
+@app.patch("/api/me")
+def update_me(payload: ProfileUpdate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    for field, value in payload.model_dump().items():
+        setattr(user, field, value)
+    user.profile_updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(user)
+    return serialize_profile(user)
 
 
 @app.post("/api/workouts", status_code=201)

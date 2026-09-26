@@ -10,6 +10,7 @@ import {
   X,
   LogOut,
   CircleHelp,
+  UserRound,
 } from 'lucide-react';
 import { authConfigured, useIdentity } from '../../features/auth/AuthProvider';
 import { Button } from '../ui/button';
@@ -62,6 +63,12 @@ export function Shell({ children }: { children: ReactNode }) {
             <History size={19} />
             History
           </NavLink>
+          {identity.authenticated && (
+            <NavLink to="/profile">
+              <UserRound size={19} />
+              Profile
+            </NavLink>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <div className="privacy-card">
@@ -83,10 +90,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </button>
           <div className="sidebar-profile">
             <div className="avatar">{identity.authenticated ? identity.name[0] : 'G'}</div>
-            <div>
+            <Link to={identity.authenticated ? '/profile' : '/'} className="sidebar-profile-copy">
               <strong>{identity.name}</strong>
               <small>{identity.authenticated ? 'Connected account' : 'Guest workspace'}</small>
-            </div>
+            </Link>
             {identity.authenticated && location.pathname !== '/workout' && (
               <button className="icon-button" aria-label="Sign out" onClick={identity.logout}>
                 <LogOut size={16} />
@@ -106,6 +113,8 @@ export function Shell({ children }: { children: ReactNode }) {
                   ? 'Session report'
                   : location.pathname === '/history'
                     ? 'Workout history'
+                    : location.pathname === '/profile'
+                      ? 'Athlete profile'
                     : 'Training studio'}
             </strong>
           </span>

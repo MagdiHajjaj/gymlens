@@ -15,6 +15,7 @@ def test_all_api_routes_require_authentication(client):
     sid = str(uuid4())
     endpoints = [
         ("GET", "/api/me"),
+        ("PATCH", "/api/me"),
         ("GET", "/api/workouts"),
         ("POST", "/api/workouts"),
         ("GET", f"/api/workouts/{sid}"),
@@ -62,6 +63,44 @@ def test_valid_rs256_token_provisions_user(client, signing):
     assert first.status_code == 200, first.text
     second = client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
     assert first.json()["id"] == second.json()["id"]
+
+
+def test_profile_is_private_and_persists_training_preferences(client, switch_user):
+    payload = {
+        "display_name": "Alice Athlete",
+        "fitness_goal": "strength",
+        "experience_level": "intermediate",
+        "preferred_units": "metric",
+        "height_cm": 168.5,
+        "weight_kg": 67.2,
+        "weekly_workout_target": 4,
+    }
+    response = client.patch("/api/me", json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["profile_complete"] is True
+    assert response.json()["fitness_goal"] == "strength"
+
+    assert client.get("/api/me").json()["display_name"] == "Alice Athlete"
+    switch_user("auth0|bob")
+    other = client.get("/api/me").json()
+    assert other["display_name"] == "Gym Lens member"
+    assert other["fitness_goal"] is None
+
+
+def test_profile_rejects_out_of_range_measurements(client):
+    response = client.patch(
+        "/api/me",
+        json={
+            "display_name": "Alice",
+            "fitness_goal": "mobility",
+            "experience_level": "beginner",
+            "preferred_units": "metric",
+            "height_cm": 20,
+            "weight_kg": None,
+            "weekly_workout_target": 3,
+        },
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(
