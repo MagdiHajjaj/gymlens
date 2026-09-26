@@ -1,0 +1,17 @@
+{
+  "name": "gym-lens-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "test": "npm --prefix frontend test",
+    "test:e2e": "npm --prefix frontend run test:e2e",
+    "lint": "npm --prefix frontend run lint",
+    "preview": "npm --prefix frontend run preview",
+    "setup": "npm --prefix frontend ci && npm --prefix frontend run assets",
+    "api": "uv run --directory backend uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
+    "test:api": "uv run --directory backend pytest -q"
+  }
+}
