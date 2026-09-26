@@ -109,7 +109,11 @@ export function HistoryPage() {
                 <div>
                   <dt>Recorded cues</dt>
                   <dd>
-                    {details ? `${cued} / ${details} reps` : session.reps ? 'No rep details' : 'Open report'}
+                    {details
+                      ? `${cued} / ${details} detailed reps`
+                      : session.reps
+                        ? 'No rep details'
+                        : 'Open report'}
                   </dd>
                 </div>
               </dl>

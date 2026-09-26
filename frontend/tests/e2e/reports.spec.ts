@@ -68,14 +68,14 @@ test('account history handles summaries without rep arrays and loads report deta
     });
   });
   await page.goto('/history');
-  const card = page.getByRole('article', { name: 'Squat session' });
+  const card = page.getByRole('article', { name: 'Squat workout' });
   await expect(card).toContainText('Open report');
   await expect(card).toContainText('Saved to account');
-  await page.getByRole('link', { name: 'View Squat session' }).click();
+  await page.getByRole('link', { name: 'View Squat report' }).click();
   await expect(page.locator('.session-key-stats dd')).toHaveText(['6', '02:00', '2 / 6']);
   await expect(page.locator('.report-sets')).toContainText('Set boundaries are unavailable');
   await page.getByRole('link', { name: 'Overview', exact: true }).click();
-  await expect(page.locator('.stat-card strong')).toHaveText([/1\s*sessions/, /6\s*reps/, /2\s*minutes/]);
+  await expect(page.locator('.stat-card strong')).toHaveText([/1\s*workouts/, /6\s*reps/, /2\s*minutes/]);
 });
 
 test('report ties the next focus to recorded reps and reveals measurements on demand', async ({ page }) => {
@@ -83,8 +83,8 @@ test('report ties the next focus to recorded reps and reveals measurements on de
   await page.goto('/session/grounded-report');
   await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
   await expect(page.locator('.session-key-stats dd')).toHaveText(['6', '02:00', '2 / 6']);
-  await expect(page.locator('.report-focus')).toContainText(
-    '2 of 6 detailed reps triggered this cue: reps 4, 5',
+  await expect(page.locator('.report-coach')).toContainText(
+    'The most common cue was insufficient depth on 2 reps (33%)',
   );
   await expect(page.getByRole('region', { name: 'What the tracker observed' })).toContainText('Depth cue');
   await expect(page.getByRole('table')).toBeHidden();
@@ -101,8 +101,8 @@ test('report ties the next focus to recorded reps and reveals measurements on de
 test('missing details do not produce invented technique or timing findings', async ({ page }) => {
   await seed(page, [{ ...recordedSession, reps: [], set_ranges: undefined, total_reps: 5 }]);
   await page.goto('/session/grounded-report');
-  await expect(page.getByRole('heading', { name: 'Get a recorded baseline' })).toBeVisible();
-  await expect(page.locator('.report-focus')).toContainText('individual details are unavailable');
+  await expect(page.getByRole('heading', { name: 'A moment to reflect.' })).toBeVisible();
+  await expect(page.locator('.report-coach')).toContainText('minimum joint angle was unavailable');
   await expect(page.locator('.report-coverage')).toContainText('do not match the session total');
   await expect(page.locator('.report-sets')).toContainText('Set boundaries are unavailable');
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
@@ -179,10 +179,11 @@ test('failed account save preserves the browser copy and retry confirms account 
   await expect(page.locator('.report-save-state')).toContainText('Saved to your account');
   expect(saves).toBe(2);
   expect(insightRequests).toBe(0);
-  await page.getByText('Additional AI commentary', { exact: true }).click();
-  await page.getByRole('button', { name: 'Request commentary' }).click();
-  await expect(page.getByRole('alert')).toContainText('recorded findings above remain available');
-  await expect(page.locator('.report-focus')).toContainText('2 of 6 detailed reps');
+  await page.getByRole('button', { name: 'Request AI commentary' }).click();
+  await expect(page.locator('.report-coach').getByRole('alert')).toContainText(
+    'recorded findings above remain available',
+  );
+  await expect(page.locator('.report-coach')).toContainText('insufficient depth on 2 reps (33%)');
 });
 
 test('bilateral curl reports retain the combined rep count', async ({ page }) => {
