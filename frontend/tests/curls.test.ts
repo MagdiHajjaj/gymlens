@@ -8,16 +8,15 @@ import type { PoseFrame } from '../src/types/workout';
 const frames = (): PoseFrame[] =>
   JSON.parse(readFileSync(new URL('../public/exercises/curl.json', import.meta.url), 'utf8'));
 
-it('counts both arms when they curl together and saves both events in the same frame', () => {
+it('counts a synchronized two-arm curl once while crediting both arms', () => {
   const analyzer = new CurlAnalyzer();
   useWorkout.getState().select('curl');
   useWorkout.getState().begin('demo');
   for (const frame of frames()) useWorkout.getState().ingest(analyzer.analyze(frame), frame.timestampMs);
   const reps = useWorkout.getState().session!.reps;
-  expect(reps).toHaveLength(6);
-  expect(reps.filter((r) => r.metrics_json.arm_side === 0)).toHaveLength(3);
-  expect(reps.filter((r) => r.metrics_json.arm_side === 1)).toHaveLength(3);
-  expect(reps.map((r) => r.rep_number)).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(reps).toHaveLength(3);
+  expect(reps.every((r) => r.metrics_json.arm_side === 2)).toBe(true);
+  expect(reps.map((r) => r.rep_number)).toEqual([1, 2, 3]);
 });
 
 it('tracks alternating arms without borrowing the other arm cycle', () => {
@@ -53,7 +52,7 @@ it('tolerates a brief dropout but never counts while an arm is invisible', () =>
     return analyzer.analyze(frame);
   });
   expect(results[55].completedReps).toHaveLength(0);
-  expect(results.flatMap((r) => r.completedReps!)).toHaveLength(6);
+  expect(results.flatMap((r) => r.completedReps!)).toHaveLength(3);
 });
 
 it('uses depth to resolve an elbow bend toward the camera', () => {

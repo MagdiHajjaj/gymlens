@@ -1,14 +1,19 @@
 import { MovementAnalyzer, type ExerciseAnalyzer } from './ExerciseAnalyzer';
 import type { ExerciseResult, PoseFrame } from '../../types/workout';
 
+const PAIR_WINDOW_MS = 250;
+type CurlRep = { metrics: Record<string, number>; faults: ExerciseResult['faults'] };
+
 /** Each arm has its own calibration and cycle; one arm never borrows the other's state. */
 export class CurlAnalyzer implements ExerciseAnalyzer {
   readonly id = 'curl' as const;
   private analyzers = [new MovementAnalyzer('curl', {}, 0), new MovementAnalyzer('curl', {}, 1)];
   private lastSeen = [-Infinity, -Infinity];
+  private pending: { side: number; at: number; rep: CurlRep }[] = [];
   reset() {
     this.analyzers.forEach((analyzer) => analyzer.reset());
     this.lastSeen = [-Infinity, -Infinity];
+    this.pending = [];
   }
   analyze(frame: PoseFrame): ExerciseResult {
     const results = this.analyzers.map((analyzer, side): ExerciseResult => {
@@ -41,9 +46,33 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
     });
     const visible = results.filter((r) => r.trackingValid);
     const focus = visible.find((r) => r.phase !== 'ready') ?? visible[0] ?? results[0];
-    const completedReps = results.flatMap((r, side) =>
-      r.repCompleted ? [{ metrics: { ...r.repMetrics, arm_side: side }, faults: r.faults }] : [],
-    );
+    results.forEach((r, side) => {
+      if (r.repCompleted)
+        this.pending.push({
+          side,
+          at: frame.timestampMs,
+          rep: { metrics: { ...r.repMetrics, arm_side: side }, faults: r.faults },
+        });
+    });
+    const completedReps: CurlRep[] = [];
+    const left = this.pending.find((rep) => rep.side === 0);
+    const right = this.pending.find((rep) => rep.side === 1);
+    if (left && right && Math.abs(left.at - right.at) <= PAIR_WINDOW_MS) {
+      const keys = new Set([...Object.keys(left.rep.metrics), ...Object.keys(right.rep.metrics)]);
+      const metrics = Object.fromEntries(
+        [...keys]
+          .filter((key) => key !== 'arm_side')
+          .map((key) => [key, ((left.rep.metrics[key] ?? 0) + (right.rep.metrics[key] ?? 0)) / 2]),
+      );
+      const faults = [
+        ...new Map([...left.rep.faults, ...right.rep.faults].map((item) => [item.code, item])).values(),
+      ];
+      completedReps.push({ metrics: { ...metrics, arm_side: 2 }, faults });
+      this.pending = this.pending.filter((rep) => rep !== left && rep !== right);
+    }
+    const ready = this.pending.filter((rep) => frame.timestampMs - rep.at > PAIR_WINDOW_MS);
+    completedReps.push(...ready.map((rep) => rep.rep));
+    this.pending = this.pending.filter((rep) => !ready.includes(rep));
     const jointAngles: Record<string, number> = {};
     results.forEach((r, side) => {
       if (r.trackingValid)

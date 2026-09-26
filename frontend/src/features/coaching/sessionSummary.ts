@@ -33,7 +33,6 @@ const SESSION_FOCUS: Record<string, string> = {
 };
 
 const repLabel = (session: WorkoutSession, count: number) => {
-  if (session.exercise === 'curl') return `${count} ${count === 1 ? 'arm rep' : 'arm reps'}`;
   return `${count} ${count === 1 ? 'rep' : 'reps'}`;
 };
 

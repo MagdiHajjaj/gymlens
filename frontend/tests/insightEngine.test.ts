@@ -169,7 +169,7 @@ describe('generateStatisticsInsight', () => {
       const insight = generateStatisticsInsight(sessionFromFixture(id));
 
       expect(insight.recap).toMatch(/^Simulated demo movement:/);
-      const expectedReps = id === 'curl' ? 6 : 3;
+      const expectedReps = 3;
       expect(insight.stats.totalReps).toBe(expectedReps);
       expect(insight.stats.measuredReps).toBe(expectedReps);
       expect(insight.strengths.join(' ')).toMatch(/\d/);

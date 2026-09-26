@@ -62,10 +62,10 @@ class Rep(StrictModel):
     @field_validator("metrics_json")
     @classmethod
     def valid_metrics(cls, values):
-        bounds = {"min_angle": (0, 180), "duration_ms": (0, 60000), "max_torso_lean": (0, 180), "arm_side": (0, 1)}
+        bounds = {"min_angle": (0, 180), "duration_ms": (0, 60000), "max_torso_lean": (0, 180), "arm_side": (0, 2)}
         for key, value in values.items():
-            if key == "arm_side" and value not in (0, 1):
-                raise ValueError("Arm side must be left (0) or right (1)")
+            if key == "arm_side" and value not in (0, 1, 2):
+                raise ValueError("Arm side must be left (0), right (1), or bilateral (2)")
             if key not in bounds or not bounds[key][0] <= value <= bounds[key][1]:
                 raise ValueError("Unsupported metric or value")
         return values

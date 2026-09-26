@@ -65,7 +65,7 @@ it('handles zero reps and curl arm-rep grammar without inventing cues', () => {
   });
 
   expect(summarizeSet(workout, workout.set_ranges![0])).toBe(
-    'Set 1 complete. 1 arm rep. No technique cues detected.',
+    'Set 1 complete. 1 rep. No technique cues detected.',
   );
 });
 

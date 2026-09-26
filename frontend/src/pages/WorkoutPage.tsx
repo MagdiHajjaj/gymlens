@@ -487,7 +487,7 @@ export function WorkoutPage() {
             <strong className="rep-number" data-testid="rep-count">
               {session?.total_reps || 0}
             </strong>
-            <span className="rep-label">{selected === 'curl' ? 'completed arm reps' : 'completed reps'}</span>
+            <span className="rep-label">completed reps</span>
             <span className="set-progress">
               {rest
                 ? `Rest after set ${rest.completed_set}`
@@ -497,7 +497,10 @@ export function WorkoutPage() {
               <div className="arm-tracking">
                 {[0, 1].map((side) => {
                   const arm = result?.arms?.find((a) => a.side === side);
-                  const count = session?.reps.filter((r) => r.metrics_json.arm_side === side).length ?? 0;
+                  const count =
+                    session?.reps.filter(
+                      (r) => r.metrics_json.arm_side === side || r.metrics_json.arm_side === 2,
+                    ).length ?? 0;
                   return (
                     <div key={side}>
                       <span>{side === 0 ? 'Left arm' : 'Right arm'}</span>
