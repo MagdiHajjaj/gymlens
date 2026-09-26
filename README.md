@@ -46,7 +46,7 @@ Copy `frontend/.env.example` to `frontend/.env` and fill in your own account con
    ```
 
    The migrations create the relational schema, convert metrics to a hypertable, add a real-time one-minute continuous aggregate, and move raw chunks older than seven days to columnstore. On ordinary PostgreSQL, metrics remain a regular table. The database user needs permission to create the extension. Local SQLite auto-initialization is a separate convenience path; do not run initial migrations over already auto-created tables.
-3. **ElevenLabs:** set backend `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`. Only approved coaching phrases are sent. Audio is cached and browser speech is the fallback. Voice starts disabled until enabled by the athlete.
+3. **ElevenLabs:** set backend `ELEVENLABS_API_KEY`. The example configuration selects the premade **Rachel** voice (`21m00Tcm4TlvDq8ikWAM`) for a warm, clear coaching tone; replace `ELEVENLABS_VOICE_ID` with another library voice if preferred. Only bounded coaching phrases and measured summaries are sent. Audio is cached and browser speech is the fallback. Voice starts disabled until the athlete enables it with one tap on the setup screen.
 4. **Gemini:** set backend `GEMINI_API_KEY` and optionally `GEMINI_MODEL` (default `gemini-3.8-flash`). Completed cloud reports request structured insights once and offer a retry on failure. Deterministic statistics remain available.
 5. Set `VITE_API_BASE_URL` to your API origin and backend `CORS_ORIGINS` to a JSON array of allowed frontend origins.
 
@@ -59,7 +59,7 @@ Provider keys belong only in `backend/.env`. Never use a `VITE_` prefix for prov
 - Local camera model, canvas skeleton, distinct camera error states, pause/resume recalibration, timer, optional spoken coaching, and replay fallback.
 - Squat depth/torso cues, curl range/upper-arm cues, and push-up range/hip cues. No side-view knee-valgus claim.
 - Independent left/right curl tracking with per-arm counts and a comfortable return threshold, plus an angle-driven muscle heatmap. Color represents joint bend, not measured muscle activation.
-- Voice setup guidance and rep feedback, with a Test voice button and visible playback status. Enable voice in the training studio; account users receive ElevenLabs cues with browser fallback.
+- Real-time voice coaching with prioritized, non-overlapping speech: early rep counts and milestones, persistent form corrections, set summaries, rest countdowns, and a measured session recap. Selected phrases warm in the background for account users; browser speech keeps the complete flow available without provider credentials. Manual set boundaries remain browser-local metadata while measured reps and metrics use the existing session API.
 - Local reports and 50 recent browser sessions, separated by guest/account identity. Demo sessions are labeled and excluded from totals. JSON export is available.
 - Protected FastAPI persistence, retry-safe uploads, account history, angle charts, and validated Gemini insights.
 - Local backup before cloud upload, visible pending-save status, and retry. Navigating away from an active studio finishes it locally; explicitly ending a session also attempts cloud saving.
