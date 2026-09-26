@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MovementAnalyzer } from '../src/features/exercises/ExerciseAnalyzer';
+import { CurlAnalyzer } from '../src/features/exercises/CurlAnalyzer';
 import { jointAngle } from '../src/lib/biomechanics/angles';
 import { FeedbackEngine } from '../src/features/coaching/FeedbackEngine';
 import { PoseStabilizer } from '../src/features/pose/PoseStabilizer';
@@ -159,6 +160,26 @@ it('rejects a front-facing squat during calibration', () => {
   frame.landmarks[12].x = frame.landmarks[11].x + 0.4;
   expect(analyzer.analyze(frame).trackingValid).toBe(false);
 });
+
+it('rejects push-up motion when bicep curls are selected and explains how to correct it', () => {
+  const analyzer = new CurlAnalyzer();
+  const results = fixture('pushup').map((frame) => analyzer.analyze(frame));
+  expect(results.flatMap((result) => result.completedReps ?? [])).toHaveLength(0);
+  expect(results.some((result) => result.guidance.includes('push-up position'))).toBe(true);
+  expect(results.every((result) => !result.calibrated)).toBe(true);
+});
+
+it('does not start a rep from one noisy threshold crossing', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const frames = fixture('curl');
+  frames.slice(0, 24).forEach((frame) => analyzer.analyze(frame));
+  const spike = structuredClone(frames[58]);
+  spike.timestampMs = frames[23].timestampMs + 50;
+  expect(analyzer.analyze(spike).phase).toBe('ready');
+  const standing = structuredClone(frames[0]);
+  standing.timestampMs = spike.timestampMs + 50;
+  expect(analyzer.analyze(standing).repCompleted).toBe(false);
+});
 describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
   '%s live measurements',
   (id) => {
@@ -220,6 +241,7 @@ it('detects supported curl upper-arm movement and push-up hip alignment cues', (
           (fault) => fault.code === (id === 'curl' ? 'upper_arm_movement' : 'hip_alignment'),
         ),
       ),
+      `${id} should report its supported form cue`,
     ).toBe(true);
   }
 });
@@ -238,6 +260,6 @@ it('coaching requires persistence and obeys message cooldowns', () => {
   expect(engine.next(result, 500)).toBeNull();
   expect(engine.next(result, 1000)).toBe('Stand tall');
   expect(engine.next(result, 2000)).toBeNull();
-  expect(engine.next(result, 12000)).toBe('Stand tall');
+  expect(engine.next(result, 12000)).toBe('Reset your position. Stand tall');
   expect(engine.next({ ...result, trackingValid: false }, 24000)).toBeNull();
 });

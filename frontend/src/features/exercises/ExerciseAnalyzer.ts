@@ -429,6 +429,7 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
 };
 const fault = (code: string, message: string): FormFault => ({ code, message, severity: 'warning' });
 export class MovementAnalyzer implements ExerciseAnalyzer {
+  private static readonly PHASE_HOLD_MS = 100;
   readonly config: Thresholds;
   private readonly exercise: ExerciseConfig;
   private smoother = new Smoother();
@@ -441,6 +442,9 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
   private started = 0;
   private minimum = 180;
   private maximumLean = 0;
+  private enterSince = -1;
+  private reversalSince = -1;
+  private exitSince = -1;
   private cycleFaults = new Map<string, FormFault>();
   constructor(
     readonly id: ExerciseId,
@@ -460,6 +464,9 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     this.phase = 'ready';
     this.minimum = 180;
     this.maximumLean = 0;
+    this.enterSince = -1;
+    this.reversalSince = -1;
+    this.exitSince = -1;
     this.cycleFaults.clear();
   }
   analyze(frame: PoseFrame): ExerciseResult {
@@ -529,6 +536,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       (p(23).visibility ?? 0) >= this.config.visibility &&
       [p(23).x, p(23).y].every((v) => Number.isFinite(v) && v >= 0 && v <= 1);
     const torso = hipVisible ? Math.hypot((p(11).x - p(23).x) * aspect, p(11).y - p(23).y) : 0;
+    const bodyInclination = hipVisible ? inclination(p(11), p(23), aspect) : 0;
     if (
       this.id !== 'curl' &&
       (torso < 0.04 ||
@@ -566,6 +574,41 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     if (!Number.isFinite(angle) || !Number.isFinite(alignment)) {
       this.reset();
       return empty('Move into clear view of the camera.');
+    }
+    const wrist = p(15);
+    const shoulder = p(11);
+    const poseMismatch =
+      this.id === 'curl' && hipVisible && alignment > 65
+        ? 'This looks more like a push-up position. Stand upright for bicep curls, with your elbows beside your torso.'
+        : this.id === 'pushup' && !this.armed && bodyInclination < 50
+          ? 'Set up in a horizontal plank for push-ups. Keep your shoulders, hips, and ankles in one line.'
+          : !this.armed && (this.id === 'press' || this.id === 'pullup') && wrist.y > shoulder.y - 0.04
+            ? this.id === 'press'
+              ? 'Raise your hands overhead and straighten your arms to begin the overhead press.'
+              : 'Start from a dead hang with your hands above your shoulders.'
+            : this.id === 'row' && !this.armed && alignment < 25
+              ? 'Hinge forward and hold your torso still before starting the row.'
+              : null;
+    if (poseMismatch) {
+      this.readySince = -1;
+      this.armed = false;
+      this.phase = 'ready';
+      this.enterSince = -1;
+      this.reversalSince = -1;
+      this.exitSince = -1;
+      this.cycleFaults.clear();
+      this.previousTime = frame.timestampMs;
+      this.smoother.reset();
+      return {
+        phase: 'ready',
+        trackingValid: true,
+        calibrated: false,
+        repCompleted: false,
+        jointAngles: { [this.exercise.angleNames.primary]: Math.round(angle) },
+        faults: [],
+        guidance: poseMismatch,
+        trackedSide: this.side,
+      };
     }
     const dt = this.previousTime < 0 ? 100 : frame.timestampMs - this.previousTime;
     this.previousTime = frame.timestampMs;
@@ -609,12 +652,19 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       return result;
     }
     result.guidance = 'Keep your movement steady and controlled.';
-    if (this.phase === 'ready' && value < this.config.enter) {
-      this.phase = 'eccentric';
-      this.started = frame.timestampMs;
-      this.minimum = value;
-      this.maximumLean = 0;
-      this.cycleFaults.clear();
+    if (this.phase === 'ready') {
+      if (value < this.config.enter) {
+        if (this.enterSince < 0) this.enterSince = frame.timestampMs;
+        if (frame.timestampMs - this.enterSince >= MovementAnalyzer.PHASE_HOLD_MS) {
+          this.phase = 'eccentric';
+          this.started = this.enterSince;
+          this.minimum = value;
+          this.maximumLean = 0;
+          this.reversalSince = -1;
+          this.exitSince = -1;
+          this.cycleFaults.clear();
+        }
+      } else this.enterSince = -1;
     }
     if (this.phase !== 'ready') {
       this.minimum = Math.min(this.minimum, value);
@@ -630,12 +680,27 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         if (hit) result.faults.push(fault(check.code, check.message));
       }
       for (const f of result.faults) this.cycleFaults.set(f.code, f);
-      if (value > this.minimum + this.config.reversal) this.phase = 'concentric';
+      if (this.phase === 'eccentric') {
+        if (value > this.minimum + this.config.reversal) {
+          if (this.reversalSince < 0) this.reversalSince = frame.timestampMs;
+          if (frame.timestampMs - this.reversalSince >= MovementAnalyzer.PHASE_HOLD_MS) {
+            this.phase = 'concentric';
+            this.exitSince = -1;
+          }
+        } else this.reversalSince = -1;
+      }
       if (frame.timestampMs - this.started > this.config.maximumMs) {
         this.reset();
         return empty('Reset your starting position before your next rep.');
       }
       if (this.phase === 'concentric' && value >= this.config.exit) {
+        if (this.exitSince < 0) this.exitSince = frame.timestampMs;
+      } else if (this.phase === 'concentric') this.exitSince = -1;
+      if (
+        this.phase === 'concentric' &&
+        this.exitSince >= 0 &&
+        frame.timestampMs - this.exitSince >= MovementAnalyzer.PHASE_HOLD_MS
+      ) {
         result.repCompleted =
           frame.timestampMs - this.started >= this.config.minimumMs &&
           this.minimum <= this.config.exit - this.config.minimumRange;
@@ -652,6 +717,9 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
           };
         }
         this.phase = 'ready';
+        this.enterSince = -1;
+        this.reversalSince = -1;
+        this.exitSince = -1;
       }
     }
     result.phase = this.phase;

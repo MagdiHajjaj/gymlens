@@ -33,12 +33,14 @@ export class FeedbackEngine {
   private current = '';
   private since = 0;
   private last = new Map<string, number>();
+  private faultRepeats = new Map<string, number>();
   private lastAny = -Infinity;
   private lastRepTotal = 0;
   reset() {
     this.current = '';
     this.since = 0;
     this.last.clear();
+    this.faultRepeats.clear();
     this.lastAny = -Infinity;
     this.lastRepTotal = 0;
   }
@@ -84,8 +86,16 @@ export class FeedbackEngine {
         return null;
       this.last.set(fault.code, time);
       this.lastAny = time;
+      const repeats = this.faultRepeats.get(fault.code) ?? 0;
+      this.faultRepeats.set(fault.code, repeats + 1);
+      const message =
+        repeats === 0
+          ? fault.message
+          : repeats % 2 === 1
+            ? `Reset your position. ${fault.message}`
+            : `Slow the next rep down. ${fault.message}`;
       return {
-        text: fault.message,
+        text: message,
         kind: 'fault',
         priority: PRIORITY.fault,
         metadata: { code: fault.code, severity: fault.severity },

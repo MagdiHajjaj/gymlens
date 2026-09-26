@@ -104,7 +104,7 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
         visible.length === 0
           ? 'Keep your shoulders and elbows in view so the tracker can see the movement.'
           : !visible.some((r) => r.calibrated)
-            ? 'Lower your arms and pause for a second to start clean.'
+            ? focus.guidance || 'Lower your arms and pause for a second to start clean.'
             : visible.length === 1
               ? 'One arm is visible. Keep both hands in frame to track both sides.'
               : 'Both arms are tracked. Curl together or alternate, then lower each arm to finish the rep.',
