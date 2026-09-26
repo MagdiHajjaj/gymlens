@@ -3,6 +3,14 @@ import { Check, Database, LockKeyhole, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { api, type AthleteProfileInput } from '../lib/api';
+import {
+  backendToCanonicalGoal,
+  canonicalToBackendGoal,
+  getStoredGoalId,
+  useFitnessGoal,
+  type GoalId,
+} from '../features/goals/goals';
+import { ProfileGoalSelect } from '../features/goals/ProfileGoalSelect';
 
 const EMPTY: AthleteProfileInput = {
   display_name: '',
@@ -14,8 +22,22 @@ const EMPTY: AthleteProfileInput = {
   weekly_workout_target: null,
 };
 
+/**
+ * Merge the canonical local training goal into the backend profile payload.
+ * The backend `fitness_goal` field keeps its old vocabulary; the mapping is
+ * documented in features/goals/goals.ts. Local explicit choice wins — when no
+ * canonical goal is set, the payload keeps whatever the backend last stored.
+ */
+export function profileSubmitPayload(
+  profile: AthleteProfileInput,
+  goalId: GoalId | null,
+): AthleteProfileInput {
+  return { ...profile, fitness_goal: goalId ? canonicalToBackendGoal(goalId) : profile.fitness_goal };
+}
+
 export function ProfilePage() {
   const identity = useIdentity();
+  const { goalId, setGoalId } = useFitnessGoal();
   const [profile, setProfile] = useState<AthleteProfileInput>(EMPTY);
   const [loading, setLoading] = useState(identity.authenticated);
   const [saving, setSaving] = useState(false);
@@ -39,19 +61,28 @@ export function ProfilePage() {
     setLoading(true);
     void api
       .profile()
-      .then((value) => setProfile(value))
+      .then((value) => {
+        setProfile(value);
+        // Seed the canonical goal from the backend only when the user has
+        // never chosen one on this device. An explicit local choice always
+        // wins over the vaguer mapped backend value.
+        if (getStoredGoalId() === null) {
+          const seeded = backendToCanonicalGoal(value.fitness_goal);
+          if (seeded) setGoalId(seeded);
+        }
+      })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Unable to load profile.'))
       .finally(() => setLoading(false));
-  }, [identity.authenticated]);
+  }, [identity.authenticated, setGoalId]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!profile.fitness_goal || !profile.experience_level || !profile.weekly_workout_target) return;
+    if (!goalId || !profile.experience_level || !profile.weekly_workout_target) return;
     setSaving(true);
     setSaved(false);
     setError('');
     try {
-      const updated = await api.updateProfile(profile);
+      const updated = await api.updateProfile(profileSubmitPayload(profile, goalId));
       setProfile(updated);
       window.dispatchEvent(new CustomEvent('gymlens:profile-name', { detail: updated.display_name }));
       setSaved(true);
@@ -101,17 +132,7 @@ export function ProfilePage() {
                   onChange={(e) => setProfile({ ...profile, display_name: e.target.value })} />
               </div>
               <div className="profile-fields">
-                <div className="profile-field">
-                  <label htmlFor="goal">Primary goal *</label>
-                  <select id="goal" required value={profile.fitness_goal || ''}
-                    onChange={(e) => setProfile({ ...profile, fitness_goal: e.target.value as AthleteProfileInput['fitness_goal'] })}>
-                    <option value="" disabled>Choose a goal</option>
-                    <option value="strength">Build strength</option>
-                    <option value="muscle">Build muscle</option>
-                    <option value="mobility">Improve mobility</option>
-                    <option value="general_fitness">General fitness</option>
-                  </select>
-                </div>
+                <ProfileGoalSelect />
                 <div className="profile-field">
                   <label htmlFor="experience">Experience *</label>
                   <select id="experience" required value={profile.experience_level || ''}
