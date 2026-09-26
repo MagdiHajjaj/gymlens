@@ -26,6 +26,7 @@ import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import { generateStatisticsInsight } from '../features/insights/insightEngine';
+import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
 import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
 import type { WorkoutSession } from '../types/workout';
@@ -37,6 +38,7 @@ export function SessionPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const attemptedInsight = useRef('');
+  const { goal } = useFitnessGoal();
   useEffect(() => {
     let cancelled = false;
     const local = localSessions(owner).find((s) => s.id === id);
@@ -122,7 +124,7 @@ export function SessionPage() {
       </div>
     );
   const faulty = session.reps.filter((r) => r.faults_json.length > 0).length;
-  const observedInsight = generateStatisticsInsight(session);
+  const observedInsight = generateStatisticsInsight(session, goal?.id);
   const primary = session.exercise === 'squat' ? 'knee_angle' : 'elbow_angle';
   const chart = session.metrics
     .filter((m) => m.metric_name === primary)
@@ -263,6 +265,7 @@ export function SessionPage() {
             <Sparkles size={15} />
             {session.insight ? 'GEMINI SESSION INSIGHTS' : 'OBSERVED SESSION SUMMARY'}
           </span>
+          {goal && <span className="tag green">Training for: {goal.name}</span>}
           <h2>A moment to reflect.</h2>
           <p>{session.insight?.recap || observedInsight.recap}</p>
           <h3>What went well</h3>

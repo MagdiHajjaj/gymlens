@@ -177,3 +177,75 @@ describe('generateStatisticsInsight', () => {
     },
   );
 });
+
+describe('goal-oriented insights', () => {
+  it('keeps form goal output identical to the goal-free default', () => {
+    const session = baseSession();
+    const withForm = generateStatisticsInsight(session, 'form');
+    const withoutGoal = generateStatisticsInsight(session);
+
+    expect(withForm.recap).toBe(withoutGoal.recap);
+    expect(withForm.strengths).toEqual(withoutGoal.strengths);
+    expect(withForm.improvements).toEqual(withoutGoal.improvements);
+    expect(withForm.next_focus).toBe(withoutGoal.next_focus);
+  });
+
+  it('strength goal leads with progression when reps are clean and consistent', () => {
+    const steady = baseSession({
+      total_reps: 4,
+      reps: baseSession()
+        .reps.slice(0, 4)
+        .map((rep, index) => ({
+          ...rep,
+          rep_number: index + 1,
+          faults_json: [],
+          metrics_json: { min_angle: 95 + index, duration_ms: 2000 },
+        })),
+    });
+    const insight = generateStatisticsInsight(steady, 'strength');
+
+    expect(insight.goalId).toBe('strength');
+    expect(insight.next_focus).toContain('add 1 rep');
+    expect(insight.evidence.next_focus.why).toContain('4/4 reps');
+  });
+
+  it('strength goal falls back to the fault drill when cues exist', () => {
+    const insight = generateStatisticsInsight(baseSession(), 'strength');
+
+    expect(insight.next_focus).toContain('slow 3-second descent');
+    expect(insight.next_focus).toContain('3 of 6 reps (50%)');
+  });
+
+  it('consistency goal focuses on the measured clean streak', () => {
+    const insight = generateStatisticsInsight(baseSession(), 'consistency');
+
+    expect(insight.next_focus).toContain('clean streak was 2 of 6');
+    expect(insight.evidence.next_focus.why).toContain('Longest clean streak: 2 reps');
+  });
+
+  it('weight_loss goal cites measured volume without diet or outcome claims', () => {
+    const insight = generateStatisticsInsight(baseSession(), 'weight_loss');
+
+    expect(insight.next_focus).toContain('6 squat reps');
+    expect(insight.evidence.next_focus.why).toMatch(/\d/);
+    expect(insight.next_focus).not.toMatch(/diet|calorie|lose \d|guarantee/i);
+    expect(insight.recap).toContain('6 squat reps recorded');
+  });
+
+  it('falls back to the measured cue message for fault codes without drill entries', () => {
+    const session = baseSession({
+      total_reps: 2,
+      reps: [1, 2].map((rep_number) => ({
+        rep_number,
+        completed_at: '2026-01-01T00:00:10.000Z',
+        metrics_json: { min_angle: 95, duration_ms: 2000 },
+        faults_json: [
+          { code: 'brand_new_cue', message: 'Measured cue text.', severity: 'warning' as const },
+        ],
+      })),
+    });
+    const insight = generateStatisticsInsight(session, 'strength');
+
+    expect(insight.next_focus).toContain('Measured cue text.');
+  });
+});
