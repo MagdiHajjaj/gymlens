@@ -14,6 +14,7 @@ import { LineChart, Line, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tool
 import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
+import { generateStatisticsInsight } from '../features/insights/insightEngine';
 import { api } from '../lib/api';
 import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
 import type { WorkoutSession } from '../types/workout';
@@ -110,12 +111,7 @@ export function SessionPage() {
       </div>
     );
   const faulty = session.reps.filter((r) => r.faults_json.length > 0).length;
-  const faultCounts = new Map<string, { message: string; count: number }>();
-  for (const rep of session.reps)
-    for (const f of rep.faults_json) {
-      const existing = faultCounts.get(f.code);
-      faultCounts.set(f.code, { message: f.message, count: (existing?.count || 0) + 1 });
-    }
+  const observedInsight = generateStatisticsInsight(session);
   const primary = session.exercise === 'squat' ? 'knee_angle' : 'elbow_angle';
   const chart = session.metrics
     .filter((m) => m.metric_name === primary)
@@ -248,40 +244,36 @@ export function SessionPage() {
             {session.insight ? 'GEMINI SESSION INSIGHTS' : 'OBSERVED SESSION SUMMARY'}
           </span>
           <h2>A moment to reflect.</h2>
-          <p>
-            {session.insight?.recap ||
-              (session.total_reps
-                ? `${session.total_reps} full movement cycles recorded. ${faulty} ${faulty === 1 ? 'rep included' : 'reps included'} a supported technique cue.`
-                : 'No full movement cycles were recorded in this session.')}
+          <p>{session.insight?.recap || observedInsight.recap}</p>
+          <h3>What went well</h3>
+          <ul>
+            {(session.insight?.strengths || observedInsight.strengths).map((text, i) => (
+              <li key={i}>
+                {text}
+                {!session.insight && observedInsight.evidence.strengths[i]?.why && (
+                  <span className="small-muted"> Why: {observedInsight.evidence.strengths[i].why}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <h3>Room to grow</h3>
+          <ul>
+            {(session.insight?.improvements || observedInsight.improvements).map((text, i) => (
+              <li key={i}>
+                {text}
+                {!session.insight && observedInsight.evidence.improvements[i]?.why && (
+                  <span className="small-muted"> Why: {observedInsight.evidence.improvements[i].why}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="small-muted">
+            No detected cues does not guarantee correct form. These measurements depend on a clear side view.
           </p>
-          {session.insight ? (
-            <>
-              <h3>What went well</h3>
-              <ul>
-                {session.insight.strengths.map((text, i) => (
-                  <li key={i}>{text}</li>
-                ))}
-              </ul>
-              <h3>Room to grow</h3>
-              <ul>
-                {session.insight.improvements.map((text, i) => (
-                  <li key={i}>{text}</li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="small-muted">
-              No detected cues does not guarantee correct form. These measurements depend on a clear side
-              view.
-            </p>
-          )}
           <div className="next-focus">
             <span className="eyebrow">NEXT SESSION’S FOCUS</span>
-            <p>
-              {session.insight?.next_focus ||
-                [...faultCounts.values()].sort((a, b) => b.count - a.count)[0]?.message ||
-                'Set up a clear side view, then move at a steady, comfortable pace.'}
-            </p>
+            <p>{session.insight?.next_focus || observedInsight.next_focus}</p>
+            {!session.insight && <p className="small-muted">Why: {observedInsight.evidence.next_focus.why}</p>}
           </div>
           {authenticated && !session.local && !session.insight && (
             <Button
