@@ -32,7 +32,7 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, select, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
+  const { selected, select, selectedIds, toggleExercise, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
@@ -144,24 +144,32 @@ export function WorkoutSetup({
           ) : (
             <>
               <h2>Choose your exercise</h2>
+              {selectedIds.length > 1 && (
+                <p className="small-muted" role="status">
+                  {selectedIds.length} picked — tap to add or remove
+                </p>
+              )}
               <div className="workout-exercise-options" role="group" aria-label="Exercise">
-                {(Object.keys(exercises) as ExerciseId[]).map((id) => (
-                  <button
-                    key={id}
-                    aria-label={exercises[id].name}
-                    aria-pressed={id === selected}
-                    className={id === selected ? 'is-selected' : ''}
-                    onClick={() => select(id)}
-                  >
-                    <span>
-                      <strong>{exercises[id].name}</strong>
-                      <small>{exercises[id].muscles}</small>
-                    </span>
-                    <span className="exercise-choice-mark" aria-hidden="true">
-                      {id === selected && <Check size={16} />}
-                    </span>
-                  </button>
-                ))}
+                {(Object.keys(exercises) as ExerciseId[]).map((id) => {
+                  const picked = selectedIds.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      aria-label={exercises[id].name}
+                      aria-pressed={picked}
+                      className={picked ? 'is-selected' : ''}
+                      onClick={() => toggleExercise(id)}
+                    >
+                      <span>
+                        <strong>{exercises[id].name}</strong>
+                        <small>{exercises[id].muscles}</small>
+                      </span>
+                      <span className="exercise-choice-mark" aria-hidden="true">
+                        {picked && <Check size={16} />}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </>
           )}

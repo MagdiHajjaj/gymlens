@@ -152,7 +152,6 @@ export function WorkoutPage() {
     if (!active || !autoSets || rest || paused || session?.status !== 'active') return;
     if (currentSetReps >= targetReps) finishSet();
       // finishSet reads the latest store state itself; re-run only when the rep count or set state changes.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, autoSets, currentSetReps, targetReps, rest, paused, session?.status]);
   
   function skipRest() {
