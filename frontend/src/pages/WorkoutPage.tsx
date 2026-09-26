@@ -48,6 +48,7 @@ export function WorkoutPage() {
     voice,
     toggleVoice,
     restPreset,
+    targetReps,
     rest,
     currentSetStartRep,
     startRest,
@@ -144,7 +145,16 @@ export function WorkoutPage() {
       });
     }
   }
-
+      // Auto-finish the set once the chosen rep target is reached, which starts the rest timer.
+    // Uploaded videos keep playing, so they are analyzed as one continuous set instead.
+  const autoSets = targetReps > 0 && session?.source !== 'upload';
+  useEffect(() => {
+    if (!active || !autoSets || rest || paused || session?.status !== 'active') return;
+    if (currentSetReps >= targetReps) finishSet();
+      // finishSet reads the latest store state itself; re-run only when the rep count or set state changes.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, autoSets, currentSetReps, targetReps, rest, paused, session?.status]);
+  
   function skipRest() {
     if (!rest) return;
     const nextSet = rest.completed_set + 1;
@@ -456,7 +466,9 @@ export function WorkoutPage() {
             <span className="set-progress">
               {rest
                 ? `Rest after set ${rest.completed_set}`
-                : `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} ${currentSetReps === 1 ? 'rep' : 'reps'}`}
+                                  : autoSets
+                    ? `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} of ${targetReps} reps`
+                    : `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} ${currentSetReps === 1 ? 'rep' : 'reps'}`}
             </span>
             {selected === 'curl' && (
               <div className="arm-tracking">

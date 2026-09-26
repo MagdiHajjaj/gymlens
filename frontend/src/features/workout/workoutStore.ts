@@ -13,6 +13,7 @@ interface Store {
   paused: boolean;
   voice: boolean;
   restPreset: RestPreset;
+  targetReps: number;
   rest: WorkoutRest | null;
   currentSetStartRep: number;
   select: (id: ExerciseId) => void;
@@ -21,6 +22,7 @@ interface Store {
   pause: () => void;
   toggleVoice: () => void;
   setRestPreset: (preset: RestPreset) => void;
+  setTargetReps: (reps: number) => void;
   startRest: (now?: number) => WorkoutSetRange | null;
   completeRest: () => void;
   cancelRest: () => void;
@@ -56,6 +58,7 @@ export const useWorkout = create<Store>((set, get) => ({
   paused: false,
   voice: false,
   restPreset: 30,
+  targetReps: 8,
   rest: null,
   currentSetStartRep: 1,
   select: (selected) => set({ selected }),
@@ -118,6 +121,7 @@ export const useWorkout = create<Store>((set, get) => ({
   pause: () => set((s) => ({ paused: !s.paused, result: null })),
   toggleVoice: () => set((s) => ({ voice: !s.voice })),
   setRestPreset: (restPreset) => set({ restPreset }),
+  setTargetReps: (targetReps) => set({ targetReps }),
   startRest: (now = Date.now()) => {
     const current = get().session;
     if (!current || current.status !== 'active') return null;

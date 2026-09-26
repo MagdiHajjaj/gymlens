@@ -32,7 +32,7 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, select, voice, restPreset, setRestPreset } = useWorkout();
+  const { selected, select, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
@@ -213,6 +213,17 @@ export function WorkoutSetup({
                 {voice ? 'Voice on' : 'Enable voice'}
               </Button>
             </div>
+            <label className="rest-select">
+              Reps per set
+              <select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>
+                <option value={0}>I’ll finish sets myself</option>
+                {[5, 6, 8, 10, 12, 15, 20].map((n) => (
+                  <option key={n} value={n}>
+                    {n} reps
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="rest-select">
               Rest between sets
               <select
