@@ -1,11 +1,10 @@
-import { WorkoutFilters } from '../components/WorkoutFilters';
-import { matchesSplit, type SplitFilter, type ExerciseFilter } from '../features/exercises/workoutSplits';
+import { MovementChips } from '../components/MovementChips';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, History, Repeat2 } from 'lucide-react';
 import { useSessions } from '../lib/useSessions';
 import { useIdentity } from '../features/auth/AuthProvider';
-import { exercises } from '../features/exercises/ExerciseRegistry';
+import { exercises, type ExerciseMovement } from '../features/exercises/ExerciseRegistry';
 import { useWorkout } from '../features/workout/workoutStore';
 import { duration, timeLabel } from '../lib/sessionBuffer';
 import { Button } from '../components/ui/button';
@@ -15,12 +14,11 @@ export function HistoryPage() {
   const { authenticated } = useIdentity();
   const select = useWorkout((state) => state.select);
   const navigate = useNavigate();
-  const [exercise, setExercise] = useState<ExerciseFilter>('all');
-  const [split, setSplit] = useState<SplitFilter>('all');
+  const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
   const filtered = sessions
     .filter(
       (session) =>
-        (exercise === 'all' || session.exercise === exercise) && matchesSplit(session.exercise, split),
+        movementFilter === null || exercises[session.exercise].movement === movementFilter,
     )
     .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
 
@@ -43,33 +41,18 @@ export function HistoryPage() {
         </Button>
       </div>
       <div className="history-filters">
-        <WorkoutFilters
-          split={split}
-          exercise={exercise}
-          onSplitChange={(value) => {
-            setSplit(value);
-            setExercise('all');
-          }}
-          onExerciseChange={setExercise}
-        />
         <p role="status">
           {loading
             ? 'Updating history…'
             : `${filtered.length} ${filtered.length === 1 ? 'session' : 'sessions'}`}
         </p>
-        {(exercise !== 'all' || split !== 'all') && (
-          <Button
-            size="small"
-            variant="ghost"
-            onClick={() => {
-              setExercise('all');
-              setSplit('all');
-            }}
-          >
+        {movementFilter !== null && (
+          <Button size="small" variant="ghost" onClick={() => setMovementFilter(null)}>
             Clear filters
           </Button>
         )}
       </div>
+      <MovementChips value={movementFilter} onChange={setMovementFilter} showCounts={false} />
       {error && (
         <div className="notice error" role="alert">
           <span>Account history couldn’t load. Showing any sessions saved in this browser.</span>
@@ -161,27 +144,21 @@ export function HistoryPage() {
           <section className="panel history-empty">
             <History size={30} />
             <h2>
-              {exercise !== 'all' || split !== 'all'
+              {movementFilter !== null
                 ? 'No sessions match these filters.'
                 : error
                   ? 'No browser sessions available.'
                   : 'Your first session belongs here.'}
             </h2>
             <p>
-              {exercise !== 'all' || split !== 'all'
-                ? 'Try another workout split or exercise, or clear the filters.'
+              {movementFilter !== null
+                ? 'Try another movement, or clear the filter.'
                 : error
                   ? 'Retry account history to check your saved workouts.'
                   : 'Complete a workout to see your report here.'}
             </p>
-            {exercise !== 'all' || split !== 'all' ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setExercise('all');
-                  setSplit('all');
-                }}
-              >
+            {movementFilter !== null ? (
+              <Button variant="secondary" onClick={() => setMovementFilter(null)}>
                 Show all sessions
               </Button>
             ) : (

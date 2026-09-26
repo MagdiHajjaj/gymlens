@@ -1,11 +1,6 @@
 import { useState } from 'react';
-import { WorkoutFilters } from '../components/WorkoutFilters';
-import {
-  matchesSplit,
-  workoutSplits,
-  type SplitFilter,
-  type ExerciseFilter,
-} from '../features/exercises/workoutSplits';
+import { MovementChips } from '../components/MovementChips';
+import { workoutSplits } from '../features/exercises/workoutSplits';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -23,7 +18,6 @@ import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import {
   exercises,
-  exercisesForMovement,
   type ExerciseMovement,
 } from '../features/exercises/ExerciseRegistry';
 import { useWorkout } from '../features/workout/workoutStore';
@@ -40,28 +34,18 @@ export function DashboardPage() {
   const [searchParams] = useSearchParams();
   // Keep the deterministic e2e demo flag when entering demo mode from here.
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
-  const selected = useWorkout((s) => s.selected);
   const selectedIds = useWorkout((s) => s.selectedIds);
-  const select = useWorkout((s) => s.select);
   const toggleExercise = useWorkout((s) => s.toggleExercise);
   const selectMovement = useWorkout((s) => s.selectMovement);
   const { sessions, error } = useSessions();
-  const [split, setSplit] = useState<SplitFilter>('all');
-  const [exerciseFilter, setExerciseFilter] = useState<ExerciseFilter>('all');
   const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
   const exerciseIds = Object.keys(exercises) as ExerciseId[];
   const visibleExercises = exerciseIds.filter(
-    (id) =>
-      matchesSplit(id, split) &&
-      (exerciseFilter === 'all' || id === exerciseFilter) &&
-      (movementFilter === null || exercises[id].movement === movementFilter),
+    (id) => movementFilter === null || exercises[id].movement === movementFilter,
   );
-  const movementChips: (ExerciseMovement | null)[] = [null, 'push', 'pull', 'legs'];
   const applyMovementChip = (movement: ExerciseMovement | null) => {
     setMovementFilter(movement);
     if (movement === null) return; // keep the current selection, just clear the filter
-    setSplit('all');
-    setExerciseFilter('all');
     selectMovement(movement);
   };
   const selectedNames = selectedIds.map((id) => exercises[id].name);
@@ -192,63 +176,16 @@ export function DashboardPage() {
           <span className="tag outlined">SIDE-VIEW TRAINING</span>
         </div>
         <div className="history-filters">
-          <WorkoutFilters
-            split={split}
-            exercise={exerciseFilter}
-            onSplitChange={(value) => {
-              setSplit(value);
-              setExerciseFilter('all');
-              setMovementFilter(null);
-              const matching = selectedIds.filter((id) => matchesSplit(id, value));
-              if (matching.length === 0) {
-                select(exerciseIds.find((id) => matchesSplit(id, value))!);
-              } else if (!matchesSplit(selected, value)) {
-                // Keep the multi-selection, but point the primary at a visible exercise.
-                useWorkout.setState({ selected: matching[0] });
-              }
-            }}
-            onExerciseChange={(value) => {
-              setExerciseFilter(value);
-              if (value !== 'all') select(value);
-            }}
-          />
           <p role="status">
             {visibleExercises.length} {visibleExercises.length === 1 ? 'exercise' : 'exercises'}
           </p>
-          {(split !== 'all' || exerciseFilter !== 'all' || movementFilter !== null) && (
-            <Button
-              size="small"
-              variant="ghost"
-              onClick={() => {
-                setSplit('all');
-                setExerciseFilter('all');
-                setMovementFilter(null);
-              }}
-            >
+          {movementFilter !== null && (
+            <Button size="small" variant="ghost" onClick={() => setMovementFilter(null)}>
               Clear filters
             </Button>
           )}
         </div>
-        <div className="movement-chips" role="group" aria-label="Filter by movement">
-          {movementChips.map((movement) => {
-            const active = movementFilter === movement;
-            const label =
-              movement === null
-                ? 'All'
-                : `${workoutSplits[movement]} (${exercisesForMovement(movement).length})`;
-            return (
-              <button
-                key={movement ?? 'all'}
-                type="button"
-                className={`movement-chip${active ? ' is-active' : ''}`}
-                aria-pressed={active}
-                onClick={() => applyMovementChip(movement)}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+        <MovementChips value={movementFilter} onChange={applyMovementChip} />
         <div className="exercise-grid">
           {visibleExercises.map((id) => {
             const exercise = exercises[id];
