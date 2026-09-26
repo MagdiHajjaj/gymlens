@@ -332,7 +332,7 @@ function progressionFocus(stats: InsightStats): InsightEvidenceItem {
 function consistencyFocus(stats: InsightStats): InsightEvidenceItem {
   return evidenceText(
     `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps. Book your next session soon — showing up again is the whole game.`,
-    `Longest clean streak: ${stats.longestCleanStreak} reps; total recorded reps: ${stats.totalReps}.`,
+    `Longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}; total recorded reps: ${stats.totalReps}.`,
   );
 }
 
@@ -345,9 +345,24 @@ function weightLossFocus(session: WorkoutSession, stats: InsightStats): InsightE
   );
 }
 
+function tempoFocus(stats: InsightStats): InsightEvidenceItem {
+  return evidenceText(
+    `Use a steadier tempo: rep duration spread was ${((stats.durationSpreadMs ?? 0) / 1000).toFixed(1)}s from fastest to slowest.`,
+    `duration_ms spread: ${stats.durationSpreadMs}ms across reps with duration measurements.`,
+  );
+}
+
+function repeatabilityFocus(stats: InsightStats): InsightEvidenceItem {
+  return evidenceText(
+    `Make each rep more repeatable: your minimum joint angle varied by ${stats.minAngleStdDev}° standard deviation.`,
+    `min_angle standard deviation across ${stats.measuredReps} measured reps: ${stats.minAngleStdDev}°.`,
+  );
+}
+
 interface FocusParts {
   topFault?: FaultFrequency;
   decay?: DepthDecayStats;
+  faultFrequencies: FaultFrequency[];
   dedupedImprovements: InsightEvidenceItem[];
   exercise: { name: string; setup: string };
 }
@@ -355,6 +370,11 @@ interface FocusParts {
 /**
  * The goal reorders which grounded finding becomes the next-session focus.
  * 'form' (and no goal) keeps the original fault-first behavior exactly.
+ *
+ * The focus must differ from every "room to grow" item: candidates are tried
+ * in goal-priority order and the first one not already listed as an
+ * improvement wins. When every candidate is already listed, the primary
+ * candidate is reused rather than inventing a weaker fallback.
  */
 function selectNextFocus(
   session: WorkoutSession,
@@ -362,20 +382,33 @@ function selectNextFocus(
   goalId: GoalId | null | undefined,
   parts: FocusParts,
 ): InsightEvidenceItem {
-  const { topFault, decay, dedupedImprovements, exercise } = parts;
+  const { topFault, decay, faultFrequencies, dedupedImprovements, exercise } = parts;
+  const candidates: InsightEvidenceItem[] = [];
   if (goalId === 'strength') {
-    if (isCleanAndConsistent(stats)) return progressionFocus(stats);
-    if (topFault) return faultImprovement(session.exercise, topFault, stats.totalReps);
-    if (decay && decay.change >= 5) return pauseFocus(decay);
+    if (isCleanAndConsistent(stats)) candidates.push(progressionFocus(stats));
+    if (topFault) candidates.push(faultImprovement(session.exercise, topFault, stats.totalReps));
+    if (decay && decay.change >= 5) candidates.push(pauseFocus(decay));
   } else if (goalId === 'consistency') {
-    if (stats.totalReps > 0) return consistencyFocus(stats);
+    if (stats.totalReps > 0) candidates.push(consistencyFocus(stats));
   } else if (goalId === 'weight_loss') {
-    if (stats.totalReps > 0) return weightLossFocus(session, stats);
+    if (stats.totalReps > 0) candidates.push(weightLossFocus(session, stats));
   } else {
-    if (topFault) return faultImprovement(session.exercise, topFault, stats.totalReps);
-    if (decay && decay.change >= 5) return pauseFocus(decay);
-    if (isCleanAndConsistent(stats)) return progressionFocus(stats);
+    if (topFault) candidates.push(faultImprovement(session.exercise, topFault, stats.totalReps));
+    if (decay && decay.change >= 5) candidates.push(pauseFocus(decay));
+    if (isCleanAndConsistent(stats)) candidates.push(progressionFocus(stats));
   }
+  // Secondary grounded findings for when the primary pick duplicates a room-to-grow item.
+  const secondFault = faultFrequencies[1];
+  if (secondFault) candidates.push(faultImprovement(session.exercise, secondFault, stats.totalReps));
+  if (stats.durationSpreadMs !== undefined && stats.durationSpreadMs >= 1500)
+    candidates.push(tempoFocus(stats));
+  if (stats.minAngleStdDev !== undefined && stats.minAngleStdDev > 10)
+    candidates.push(repeatabilityFocus(stats));
+
+  const used = new Set(dedupedImprovements.map((item) => item.text));
+  const distinct = candidates.find((candidate) => !used.has(candidate.text));
+  if (distinct) return distinct;
+  if (candidates[0]) return candidates[0];
   if (dedupedImprovements[0]) return dedupedImprovements[0];
   return evidenceText(
     `Set up a clear ${exercise.setup.toLowerCase()} Then move at a steady, comfortable pace.`,
@@ -415,7 +448,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
     strengths.push(
       evidenceText(
         `${stats.cleanReps} of ${stats.totalReps} reps had no supported technique cue, with a longest clean streak of ${stats.longestCleanStreak}.`,
-        `Clean reps: ${stats.cleanReps}/${stats.totalReps}; longest clean streak: ${stats.longestCleanStreak} reps.`,
+        `Clean reps: ${stats.cleanReps}/${stats.totalReps}; longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}.`,
       ),
     );
     if (stats.bestRep && stats.bestRepMinAngle !== undefined) {
@@ -455,21 +488,11 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
   }
 
   if (stats.minAngleStdDev !== undefined && stats.minAngleStdDev > 10) {
-    improvements.push(
-      evidenceText(
-        `Make each rep more repeatable: your minimum joint angle varied by ${stats.minAngleStdDev}° standard deviation.`,
-        `min_angle standard deviation across ${stats.measuredReps} measured reps: ${stats.minAngleStdDev}°.`,
-      ),
-    );
+    improvements.push(repeatabilityFocus(stats));
   }
 
   if (stats.durationSpreadMs !== undefined && stats.durationSpreadMs >= 1500) {
-    improvements.push(
-      evidenceText(
-        `Use a steadier tempo: rep duration spread was ${(stats.durationSpreadMs / 1000).toFixed(1)}s from fastest to slowest.`,
-        `duration_ms spread: ${stats.durationSpreadMs}ms across reps with duration measurements.`,
-      ),
-    );
+    improvements.push(tempoFocus(stats));
   }
 
   if (!stats.measuredReps && stats.totalReps > 0) {
@@ -488,6 +511,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
   const nextFocus = selectNextFocus(session, stats, goalId, {
     topFault,
     decay: stats.depthDecay,
+    faultFrequencies: stats.faultFrequencies,
     dedupedImprovements,
     exercise,
   });
