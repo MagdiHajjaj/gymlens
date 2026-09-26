@@ -108,20 +108,34 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history excludes legacy demos on mobile and repeat keeps the exercise', async ({ page }) => {
+test('history filters splits and exercises, excludes legacy demos, and repeats on mobile', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seed(page, [
     recordedSession,
     { ...recordedSession, id: 'curl-demo', exercise: 'curl', source: 'demo' },
+    { ...recordedSession, id: 'curl-real', exercise: 'curl', source: 'camera' },
   ]);
   await page.goto('/history');
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('combobox', { name: 'Filter session type' })).toHaveCount(0);
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
+  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('lunge');
+  await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('pull');
+  await expect(page.getByRole('combobox', { name: 'Filter exercise' })).toHaveValue('all');
+  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(page.getByRole('article')).toContainText('Bicep curl');
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Camera workout');
   await expect(page.getByText(/sample data/i)).toHaveCount(0);
   expect(
-    await page.evaluate(() =>
-      Object.values(localStorage).every((value) => !value.includes('curl-demo')),
-    ),
+    await page.evaluate(() => Object.values(localStorage).every((value) => !value.includes('curl-demo'))),
   ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Repeat Squat' }).click();
@@ -171,4 +185,12 @@ test('failed account save preserves the browser copy and retry confirms account 
   await page.getByRole('button', { name: 'Request commentary' }).click();
   await expect(page.getByRole('alert')).toContainText('recorded findings above remain available');
   await expect(page.locator('.report-focus')).toContainText('2 of 6 detailed reps');
+});
+
+test('bilateral curl reports retain the combined rep count', async ({ page }) => {
+  await seed(page, [{ ...recordedSession, exercise: 'curl', reps: recordedSession.reps.map(rep => ({...rep, metrics_json: {...rep.metrics_json, arm_side: 2}})) }]);
+  await page.goto('/session/grounded-report');
+  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
+  await expect(page.locator('.session-key-stats')).toContainText('Simultaneous curls count as one rep');
+  await expect(page.locator('.session-key-stats dd').first()).toHaveText('6');
 });

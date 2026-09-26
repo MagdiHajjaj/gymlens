@@ -195,7 +195,12 @@ export function CameraView({
           previousTick = now;
           if ((upload || demo) && video.current) {
             if (state.paused && !video.current.paused) video.current.pause();
-            else if (!state.paused && video.current.paused && !video.current.ended) void video.current.play();
+            else if (!state.paused && video.current.paused && !video.current.ended) {
+              void video.current.play().catch((error: unknown) => {
+                if (!disposed && !(error instanceof DOMException && error.name === 'AbortError'))
+                  setError('Video playback could not resume. Retry the video demo.');
+              });
+            }
           }
           if (!preview && (state.paused || state.rest)) {
             if (!wasPaused) {

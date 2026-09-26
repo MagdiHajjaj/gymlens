@@ -1,3 +1,5 @@
+import { WorkoutFilters } from '../components/WorkoutFilters';
+import { matchesSplit, type SplitFilter, type ExerciseFilter } from '../features/exercises/workoutSplits';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, History, Repeat2 } from 'lucide-react';
@@ -13,13 +15,12 @@ export function HistoryPage() {
   const { authenticated } = useIdentity();
   const select = useWorkout((state) => state.select);
   const navigate = useNavigate();
-  const [exercise, setExercise] = useState('all');
-  const [source, setSource] = useState('all');
+  const [exercise, setExercise] = useState<ExerciseFilter>('all');
+  const [split, setSplit] = useState<SplitFilter>('all');
   const filtered = sessions
     .filter(
       (session) =>
-        (exercise === 'all' || session.exercise === exercise) &&
-        (source === 'all' || session.source === source),
+        (exercise === 'all' || session.exercise === exercise) && matchesSplit(session.exercise, split),
     )
     .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
 
@@ -42,45 +43,27 @@ export function HistoryPage() {
         </Button>
       </div>
       <div className="history-filters">
-        <label>
-          Exercise
-          <select
-            aria-label="Filter exercise"
-            value={exercise}
-            onChange={(event) => setExercise(event.target.value)}
-          >
-            <option value="all">All exercises</option>
-            {Object.entries(exercises).map(([id, item]) => (
-              <option key={id} value={id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Session type
-          <select
-            aria-label="Filter session type"
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-          >
-            <option value="all">All sessions</option>
-            <option value="camera">Camera workouts</option>
-            <option value="upload">Video analysis</option>
-          </select>
-        </label>
+        <WorkoutFilters
+          split={split}
+          exercise={exercise}
+          onSplitChange={(value) => {
+            setSplit(value);
+            setExercise('all');
+          }}
+          onExerciseChange={setExercise}
+        />
         <p role="status">
           {loading
             ? 'Updating history…'
             : `${filtered.length} ${filtered.length === 1 ? 'session' : 'sessions'}`}
         </p>
-        {(exercise !== 'all' || source !== 'all') && (
+        {(exercise !== 'all' || split !== 'all') && (
           <Button
             size="small"
             variant="ghost"
             onClick={() => {
               setExercise('all');
-              setSource('all');
+              setSplit('all');
             }}
           >
             Clear filters
@@ -178,25 +161,25 @@ export function HistoryPage() {
           <section className="panel history-empty">
             <History size={30} />
             <h2>
-              {exercise !== 'all' || source !== 'all'
+              {exercise !== 'all' || split !== 'all'
                 ? 'No sessions match these filters.'
                 : error
                   ? 'No browser sessions available.'
                   : 'Your first session belongs here.'}
             </h2>
             <p>
-              {exercise !== 'all' || source !== 'all'
-                ? 'Try another exercise or session type, or clear the filters.'
+              {exercise !== 'all' || split !== 'all'
+                ? 'Try another workout split or exercise, or clear the filters.'
                 : error
                   ? 'Retry account history to check your saved workouts.'
                   : 'Complete a workout to see your report here.'}
             </p>
-            {exercise !== 'all' || source !== 'all' ? (
+            {exercise !== 'all' || split !== 'all' ? (
               <Button
                 variant="secondary"
                 onClick={() => {
                   setExercise('all');
-                  setSource('all');
+                  setSplit('all');
                 }}
               >
                 Show all sessions
