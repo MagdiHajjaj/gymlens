@@ -46,6 +46,34 @@ export const FAULT_PHRASES: Partial<Record<ExerciseId, FormFault[]>> = {
       severity: 'warning',
     },
   ],
+  deadlift: [
+    { code: 'excessive_back_rounding', message: 'Keep your back flat — hinge at the hips, chest proud.', severity: 'warning' },
+    { code: 'insufficient_hinge', message: 'Hinge deeper at the hips within your comfortable range.', severity: 'warning' },
+  ],
+  lunge: [
+    { code: 'knee_over_toes', message: 'Keep your front knee behind your toes.', severity: 'warning' },
+    { code: 'insufficient_depth', message: 'Try a little more depth within your comfortable range.', severity: 'warning' },
+  ],
+  press: [
+    { code: 'excessive_back_arch', message: "Keep your ribs down — don't arch your back.", severity: 'warning' },
+    { code: 'limited_range', message: 'Try a fuller range of motion at a comfortable pace.', severity: 'warning' },
+  ],
+  glute_bridge: [
+    { code: 'excessive_back_arch', message: 'Keep your ribs down — squeeze your glutes, not your low back.', severity: 'warning' },
+    { code: 'incomplete_extension', message: 'Lower your hips all the way down, then drive up to a full bridge.', severity: 'warning' },
+  ],
+  row: [
+    { code: 'torso_rising', message: "Keep your torso still — don't stand up to pull the weight.", severity: 'warning' },
+    { code: 'incomplete_pull', message: 'Pull your elbow all the way up toward your hip.', severity: 'warning' },
+  ],
+  dips: [
+    { code: 'excessive_forward_lean', message: "Keep your torso upright — don't pitch forward over your hands.", severity: 'warning' },
+    { code: 'insufficient_depth', message: 'Lower a little deeper within your comfortable range.', severity: 'warning' },
+  ],
+  pullup: [
+    { code: 'excessive_swing', message: "Keep your body still — don't swing or kip.", severity: 'warning' },
+    { code: 'incomplete_pull', message: 'Pull all the way up — chin over the bar.', severity: 'warning' },
+  ],
 };
 
 const WARM_COUNT_PHRASES = [

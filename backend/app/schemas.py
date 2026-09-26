@@ -108,6 +108,44 @@ PHRASES = {
     "4. Keep the rhythm.",
     "5. Control the return.",
     "10. Keep the rhythm.",
+    "Ready.",
+    "Step back so your full movement is visible.",
+    "Keep your shoulder, elbow, and wrist in frame. Move the camera back if your hand is cropped.",
+    "Waiting for a fresh camera frame.",
+    "Keep the same arm or leg in view. Reacquiring tracking.",
+    "Turn side-on to the camera for this exercise.",
+    "Move into clear view of the camera.",
+    "Hold your starting position to calibrate.",
+    "Keep your movement steady and controlled.",
+    "Reset your starting position before your next rep.",
+    "Curl your hand toward your shoulder. Keep your elbow steady.",
+    "Lower your hand back to a comfortably straight arm to finish the rep.",
+    "Reacquiring arm.",
+    "Keep your shoulders and elbows in view so the tracker can see the movement.",
+    "Lower your arms and pause for a second to start clean.",
+    "One arm is visible. Keep both hands in frame to track both sides.",
+    "Both arms are tracked. Curl together or alternate, then lower each arm to finish the rep.",
+    "Stand side-on with your joints extended.",
+    "Lower your hand until your arm is comfortably straight. Hold briefly to start.",
+    "Hold a side-on plank with arms extended.",
+    "Stand side-on, then hinge at the hips with a flat back.",
+    "Stand side-on, arms extended overhead.",
+    "Lie on your back and hold the top of your bridge.",
+    "Hinge at the hips and let your arms hang. Hold still to calibrate.",
+    "Press up into support with arms extended. Hold still to calibrate.",
+    "Hang from the bar with arms fully extended.",
+    "Keep your back flat — hinge at the hips, chest proud.",
+    "Hinge deeper at the hips within your comfortable range.",
+    "Keep your front knee behind your toes.",
+    "Keep your ribs down — don't arch your back.",
+    "Keep your ribs down — squeeze your glutes, not your low back.",
+    "Lower your hips all the way down, then drive up to a full bridge.",
+    "Keep your torso still — don't stand up to pull the weight.",
+    "Pull your elbow all the way up toward your hip.",
+    "Keep your torso upright — don't pitch forward over your hands.",
+    "Lower a little deeper within your comfortable range.",
+    "Keep your body still — don't swing or kip.",
+    "Pull all the way up — chin over the bar.",
 }
 
 SET_FOCUS_PHRASES = {
@@ -144,6 +182,13 @@ SESSION_FOCUS_PHRASES = {
 NUMERIC_PHRASE = re.compile(r"(?:[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000)\.")
 REST_PHRASE = re.compile(r"Rest (?:30|60|90) seconds\.")
 SET_GO_PHRASE = re.compile(r"Set (?P<set>[1-9]|[1-9][0-9]), go\.")
+REP_COMPLETE_PHRASE = re.compile(
+    r"Rep (?P<rep>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) complete\."
+    r"(?: Bottom angle (?P<angle>[0-9]|[1-9][0-9]|1[0-7][0-9]|180) degrees\.)?"
+)
+READY_PROGRESS_PHRASE = re.compile(
+    r"Ready\. (?P<reps>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) (?P<unit>rep|reps) so far\."
+)
 SET_SUMMARY = re.compile(
     r"Set (?P<set>[1-9]|[1-9][0-9]) complete\. "
     r"(?P<reps>[0-9]{1,4}) (?P<unit>rep|reps|arm rep|arm reps)\. (?P<detail>.+)"
@@ -208,11 +253,18 @@ def _summary(value: str) -> bool:
 
 
 def approved_speech(value: str) -> bool:
+    ready = READY_PROGRESS_PHRASE.fullmatch(value)
+    ready_valid = bool(
+        ready
+        and _count_unit(int(ready["reps"]), ready["unit"], "rep", "reps")
+    )
     return (
         value in PHRASES
         or bool(NUMERIC_PHRASE.fullmatch(value))
         or bool(REST_PHRASE.fullmatch(value))
         or bool(SET_GO_PHRASE.fullmatch(value))
+        or bool(REP_COMPLETE_PHRASE.fullmatch(value))
+        or ready_valid
         or _summary(value)
     )
 

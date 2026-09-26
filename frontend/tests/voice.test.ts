@@ -179,15 +179,11 @@ it('prioritizes active faults over simultaneous rep totals', () => {
   expect(cue).toMatchObject({ text: 'Keep your upper arm close to your side.', priority: 100 });
 });
 
-it('returns only warm count phrases for exercises without fault phrases', () => {
+it('warms count and exercise-specific fault phrases for every exercise', () => {
   const phrases = selectedExerciseWarmPhrases('deadlift' as ExerciseId);
-  expect(phrases).toEqual([
-    '1.',
-    '2. Settle into your pace.',
-    '3. Stay controlled.',
-    '4. Keep the rhythm.',
-    '5. Control the return.',
-  ]);
+  expect(phrases).toContain('1.');
+  expect(phrases).toContain('Keep your back flat — hinge at the hips, chest proud.');
+  expect(phrases).toContain('Hinge deeper at the hips within your comfortable range.');
 });
 
 it('announces rep completion for counts outside the spoken-count schedule', () => {
