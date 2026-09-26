@@ -18,6 +18,8 @@ def test_all_api_routes_require_authentication(client):
         ("GET", "/api/workouts"),
         ("POST", "/api/workouts"),
         ("GET", f"/api/workouts/{sid}"),
+        ("GET", f"/api/workouts/{sid}/metrics/summary"),
+        ("GET", "/api/platform/tiger"),
         ("PATCH", f"/api/workouts/{sid}"),
         ("POST", f"/api/workouts/{sid}/reps/batch"),
         ("POST", f"/api/workouts/{sid}/metrics/batch"),
@@ -27,6 +29,7 @@ def test_all_api_routes_require_authentication(client):
     for method, path in endpoints:
         assert client.request(method, path, json={}).status_code == 401
     assert client.get("/health").status_code == 200
+    assert client.get("/health/ready").status_code == 200
 
 
 @pytest.fixture

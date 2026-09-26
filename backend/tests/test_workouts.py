@@ -83,6 +83,30 @@ def test_both_arm_reps_and_angles_are_saved(client):
     assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": [invalid]}).status_code == 422
 
 
+def test_metric_summary_buckets_and_tiger_status(client):
+    workout = create(client)
+    sid = workout["id"]
+    start = datetime.fromisoformat(workout["started_at"]).replace(second=5, microsecond=0) + timedelta(minutes=1)
+    metrics = [
+        {"recorded_at": (start + timedelta(seconds=offset)).isoformat(),
+         "metric_name": "elbow_angle", "metric_value": value}
+        for offset, value in [(0, 80), (10, 100), (60, 120)]
+    ]
+    response = client.post(f"/api/workouts/{sid}/metrics/batch", json={"metrics": metrics})
+    assert response.status_code == 200, response.text
+    summary = client.get(f"/api/workouts/{sid}/metrics/summary")
+    assert summary.status_code == 200, summary.text
+    rows = summary.json()
+    assert len(rows) == 2
+    assert rows[0]["average"] == 90
+    assert rows[0]["minimum"] == 80
+    assert rows[0]["maximum"] == 100
+    assert rows[0]["samples"] == 2
+    assert client.get("/api/platform/tiger").json() == {
+        "connected": False, "database": "sqlite", "timescale": False, "continuous_aggregate": False
+    }
+
+
 def test_conflicting_retries_and_rep_gaps_are_rejected(client):
     sid = create(client)["id"]
     data = rep(2)

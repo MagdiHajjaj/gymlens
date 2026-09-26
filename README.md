@@ -39,13 +39,13 @@ For complete login, signup, password reset, and deployment configuration, follow
 Copy `frontend/.env.example` to `frontend/.env` and fill in your own account configuration. Restart the relevant server after environment changes.
 
 1. **Auth0:** create a Single Page Application and an API with RS256 tokens. Set allowed callback URLs, logout URLs, and web origins to `http://127.0.0.1:5173` (also add `http://localhost:5173` if used). Fill `VITE_AUTH0_DOMAIN`, `VITE_AUTH0_CLIENT_ID`, and `VITE_AUTH0_AUDIENCE`. Set matching backend `AUTH0_DOMAIN` and `AUTH0_AUDIENCE`. Use the bare domain without `https://`. Use your deployed HTTPS origin in production.
-2. **Tiger Data:** set backend `DATABASE_URL` to `postgresql+psycopg://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require`. URL-encode special characters in credentials. On a fresh managed database, run:
+2. **Tiger Data:** follow the [Tiger Data setup guide](docs/tiger-data-setup.md). Set backend `DATABASE_URL` to `postgresql+psycopg://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require`. URL-encode special characters in credentials. On a fresh managed database, run:
 
    ```powershell
    uv run --directory backend alembic upgrade head
    ```
 
-   The first migration creates the relational schema. The second enables TimescaleDB and converts metrics to a hypertable when the server offers the extension. On ordinary PostgreSQL, metrics remain a regular table. The database user needs permission to create the extension. Local SQLite auto-initialization is a separate convenience path; do not run initial migrations over already auto-created tables.
+   The migrations create the relational schema, convert metrics to a hypertable, add a real-time one-minute continuous aggregate, and move raw chunks older than seven days to columnstore. On ordinary PostgreSQL, metrics remain a regular table. The database user needs permission to create the extension. Local SQLite auto-initialization is a separate convenience path; do not run initial migrations over already auto-created tables.
 3. **ElevenLabs:** set backend `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`. Only approved coaching phrases are sent. Audio is cached and browser speech is the fallback. Voice starts disabled until enabled by the athlete.
 4. **Gemini:** set backend `GEMINI_API_KEY` and optionally `GEMINI_MODEL` (default `gemini-3.8-flash`). Completed cloud reports request structured insights once and offer a retry on failure. Deterministic statistics remain available.
 5. Set `VITE_API_BASE_URL` to your API origin and backend `CORS_ORIGINS` to a JSON array of allowed frontend origins.
@@ -81,6 +81,8 @@ Unit tests cover geometry, full/shallow cycles, calibration, tracking loss, mini
 **Validation limits:** fixtures are synthetic stored landmark sequences, not recordings of real athletes. Live accuracy depends on lighting, clothing, framing, body proportions, and camera angle. The analyzers are not clinically or biomechanically validated. Real Auth0 login, Tiger Data connectivity, ElevenLabs playback, and Gemini generation must be verified using your configured accounts; credentials are not included.
 
 ## Deployment
+
+For the configured Vercel frontend and Render API workflow, follow the [production deployment guide](docs/deployment.md).
 
 Run `npm run setup` then `npm run build`; host `frontend/dist` on HTTPS with app routes falling back to `index.html`. Preserve `/wasm/` and `/models/` assets. Deploy the Python API separately, install with `uv sync --locked --no-dev`, migrate Tiger Data, and run `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` from `backend/`.
 

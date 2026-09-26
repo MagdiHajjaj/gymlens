@@ -63,6 +63,15 @@ class MetricBatch(StrictModel):
     metrics: list[Metric] = Field(max_length=500)
 
 
+class MetricSummary(StrictModel):
+    bucket: AwareDatetime
+    metric_name: MetricName
+    average: float
+    minimum: float
+    maximum: float
+    samples: int = Field(ge=1)
+
+
 PHRASES = {
     "Voice coach is ready. Let's get moving.",
     "Rep complete. Keep your movement controlled.",

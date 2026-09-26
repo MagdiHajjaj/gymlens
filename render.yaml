@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: gymlens-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install uv && uv sync --locked --no-dev
+    startCommand: uv run alembic upgrade head && exec uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14.3
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH0_DOMAIN
+        sync: false
+      - key: AUTH0_AUDIENCE
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash

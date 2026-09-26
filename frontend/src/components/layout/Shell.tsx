@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -13,10 +13,31 @@ import {
 } from 'lucide-react';
 import { authConfigured, useIdentity } from '../../features/auth/AuthProvider';
 import { Button } from '../ui/button';
+import { api } from '../../lib/api';
 export function Shell({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState(false);
+  const [tiger, setTiger] = useState<string>('Not checked');
   const identity = useIdentity();
   const location = useLocation();
+  useEffect(() => {
+    if (!settings || !identity.authenticated) {
+      if (!identity.authenticated) setTiger('Sign in to check');
+      return;
+    }
+    setTiger('Checking…');
+    void api
+      .tigerStatus()
+      .then((status) =>
+        setTiger(
+          status.connected && status.timescale && status.continuous_aggregate
+            ? 'Connected · time-series ready'
+            : status.database === 'sqlite'
+              ? 'Local SQLite'
+              : 'PostgreSQL · migration needed',
+        ),
+      )
+      .catch(() => setTiger('Connection check failed'));
+  }, [settings, identity.authenticated]);
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -169,6 +190,10 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="tag">
                 {identity.authenticated ? 'Account + local backup' : 'This browser'}
               </span>
+            </div>
+            <div className="connection-row">
+              <span>Tiger Data</span>
+              <span className="tag">{tiger}</span>
             </div>
             <div className="connection-row">
               <span>Voice coaching</span>

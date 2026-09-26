@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import current_subject
 from app.models import MovementMetric, RepEvent, SessionInsight, User, Workout
-from app.schemas import MetricBatch, RepBatch, SpeechRequest, WorkoutCreate, WorkoutFinish
+from app.schemas import MetricBatch, MetricSummary, RepBatch, SpeechRequest, WorkoutCreate, WorkoutFinish
 
 
 @asynccontextmanager
@@ -133,6 +133,30 @@ def health():
     return {"status": "ok", "auth_configured": bool(settings.auth0_domain and settings.auth0_audience)}
 
 
+@app.get("/health/ready")
+def ready(db: Session = Depends(get_db)):
+    """Render readiness check: only route traffic when the database responds."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(503, "Database is unavailable") from None
+    return {"status": "ready"}
+
+
+@app.get("/api/platform/tiger")
+def tiger_status(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Report database capabilities without exposing connection details."""
+    del user
+    if db.bind.dialect.name != "postgresql":
+        return {"connected": False, "database": "sqlite", "timescale": False, "continuous_aggregate": False}
+    timescale = bool(
+        db.scalar(text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='timescaledb')"))
+    )
+    aggregate = bool(db.scalar(text("SELECT to_regclass('movement_metrics_1m') IS NOT NULL")))
+    return {"connected": True, "database": "postgresql", "timescale": timescale,
+            "continuous_aggregate": aggregate}
+
+
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
     return {"id": user.id, "display_name": user.display_name}
@@ -185,6 +209,36 @@ def history(
 @app.get("/api/workouts/{session_id}")
 def detail(session_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     return serialize(owned(session_id, db, user))
+
+
+@app.get("/api/workouts/{session_id}/metrics/summary", response_model=list[MetricSummary])
+def metric_summary(session_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Return minute buckets; Tiger serves these from a real-time continuous aggregate."""
+    workout = owned(session_id, db, user)
+    aggregate = db.bind.dialect.name == "postgresql" and bool(
+        db.scalar(text("SELECT to_regclass('movement_metrics_1m') IS NOT NULL"))
+    )
+    if aggregate:
+        rows = db.execute(
+            text(
+                "SELECT bucket, metric_name, average, minimum, maximum, samples "
+                "FROM movement_metrics_1m WHERE session_id=:session_id ORDER BY bucket, metric_name"
+            ),
+            {"session_id": workout.id},
+        ).mappings()
+        return [dict(row) for row in rows]
+
+    # SQLite keeps local development feature-complete without pretending to
+    # provide Tiger's incremental materialization.
+    grouped: dict[tuple[datetime, str], list[float]] = {}
+    for metric in workout.metrics:
+        timestamp = utc(metric.recorded_at).replace(second=0, microsecond=0)
+        grouped.setdefault((timestamp, metric.metric_name), []).append(metric.metric_value)
+    return [
+        {"bucket": bucket, "metric_name": name, "average": sum(values) / len(values),
+         "minimum": min(values), "maximum": max(values), "samples": len(values)}
+        for (bucket, name), values in sorted(grouped.items())
+    ]
 
 
 @app.post("/api/workouts/{session_id}/reps/batch")

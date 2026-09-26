@@ -25,6 +25,8 @@ The API derives ownership from validated RS256 tokens, never request-supplied us
 
 Client-generated UUIDs make retried session creation safe. Rep numbers are unique within a session; metric keys include session, timestamp, and metric name. Conflicting retries fail instead of overwriting existing events. Finalization derives counts from persisted events and rejects gaps. Backend batches are transactional and PostgreSQL session mutations acquire a row lock.
 
+On Tiger Cloud, `movement_metrics` is a Timescale hypertable. The `movement_metrics_1m` real-time continuous aggregate incrementally stores average, minimum, maximum, and sample counts by session and metric while including the newest raw bucket at query time. A five-minute refresh policy covers the previous 30 days. Raw chunks older than seven days move to Hypercore columnstore, segmented by session and metric and ordered by timestamp. The authenticated summary endpoint reads the continuous aggregate; SQLite computes the same contract as a development fallback.
+
 Each completed session gets a browser backup before upload. Local storage is scoped to the guest or signed-in subject, retains 50 sessions, and supports JSON export. It is standard same-origin storage, not encrypted. Guest sessions are not silently imported into an account.
 
 ElevenLabs receives eight approved phrases; generated audio is cached in process and in the live coach. Setup guidance uses browser speech, and a voice test exposes playback status. Gemini receives computed statistics from persisted reps, with instructions against invented metrics and medical claims. Pydantic validates its structure. Provider failures leave the workout and deterministic report intact.

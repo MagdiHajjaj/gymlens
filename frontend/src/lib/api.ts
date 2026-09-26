@@ -23,6 +23,10 @@ async function request<T>(path: string, options: RequestInit = {}, blob = false)
   return (blob ? response.blob() : response.json()) as Promise<T>;
 }
 export const api = {
+  tigerStatus: () =>
+    request<{ connected: boolean; database: string; timescale: boolean; continuous_aggregate: boolean }>(
+      '/api/platform/tiger',
+    ),
   history: (offset = 0) => request<WorkoutSession[]>(`/api/workouts?offset=${offset}&limit=50`),
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
