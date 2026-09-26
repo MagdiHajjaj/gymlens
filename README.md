@@ -1,5 +1,8 @@
 ﻿# Gym Lens
 
+
+**Live demo:** https://gymlens-kappa.vercel.app/
+
 Private, browser-based exercise tracking and voice coaching, rebuilt from `gym-lens-plan.md`.
 
 The application lives in **`frontend/` and `backend/`**. Root npm commands run these projects. Frontend configuration belongs in `frontend/.env`; API configuration and provider secrets belong in `backend/.env`.
@@ -31,6 +34,12 @@ npm run api
 API health: http://127.0.0.1:8000/health. Interactive contracts: http://127.0.0.1:8000/docs.
 
 SQLite is an optional local API database and initializes automatically on startup. **All `/api` endpoints still require valid Auth0 tokens**; there is no guest authentication bypass. Guest sessions stay in browser storage. Do not replace an existing `.env` when repeating setup.
+
+## Analyze an uploaded video
+
+On the **Workout** page, pick an exercise and choose **Upload a workout video**. GymLens runs the same on-device pose tracking, rep counting and voice cues on the clip, then shows the session report when it ends. The video never leaves your browser.
+
+For best results, film from the side with your whole body in frame and the phone held steady. MP4 works everywhere; iPhone HEVC (.mov) clips play in Chrome on macOS.
 
 ## Connect cloud services
 
