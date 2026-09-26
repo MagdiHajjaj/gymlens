@@ -9,6 +9,7 @@ import {
   Upload,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
@@ -21,6 +22,45 @@ import type { ExerciseId } from '../../types/workout';
 
 const AUTO_START_MS = 3000;
 
+function PlanStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <span className="plan-stepper">
+      <span>{label}</span>
+      <span className="stepper-controls">
+        <button
+          type="button"
+          aria-label={`Fewer ${label.toLowerCase()}`}
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+        >
+          −
+        </button>
+        <strong aria-live="polite">{value}</strong>
+        <button
+          type="button"
+          aria-label={`More ${label.toLowerCase()}`}
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+        >
+          +
+        </button>
+      </span>
+    </span>
+  );
+}
+
 export function WorkoutSetup({
   demo,
   voiceCoach,
@@ -32,8 +72,26 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, select, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
+  const {
+    selected,
+    select,
+    voice,
+    restPreset,
+    setRestPreset,
+    targetReps,
+    setTargetReps,
+    circuit,
+    toggleCircuitExercise,
+    removeFromCircuit,
+    clearCircuit,
+    setExercisePlan,
+    planFor,
+    setsDone,
+    isExerciseDone,
+    nextCircuitExercise,
+  } = useWorkout();
   const [preview, setPreview] = useState(false);
+  const [multiSelect, setMultiSelect] = useState(false);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
     cameraReady: false,
@@ -143,26 +201,114 @@ export function WorkoutSetup({
             </>
           ) : (
             <>
-              <h2>Choose your exercise</h2>
-              <div className="workout-exercise-options" role="group" aria-label="Exercise">
-                {(Object.keys(exercises) as ExerciseId[]).map((id) => (
-                  <button
-                    key={id}
-                    aria-label={exercises[id].name}
-                    aria-pressed={id === selected}
-                    className={id === selected ? 'is-selected' : ''}
-                    onClick={() => select(id)}
-                  >
-                    <span>
-                      <strong>{exercises[id].name}</strong>
-                      <small>{exercises[id].muscles}</small>
-                    </span>
-                    <span className="exercise-choice-mark" aria-hidden="true">
-                      {id === selected && <Check size={16} />}
-                    </span>
-                  </button>
-                ))}
+              <div className="section-heading">
+                <h2>{multiSelect ? 'Build your circuit' : 'Choose your exercise'}</h2>
+                <Button
+                  variant={multiSelect ? 'secondary' : 'ghost'}
+                  size="small"
+                  onClick={() => setMultiSelect((value) => !value)}
+                >
+                  {multiSelect ? 'Done' : 'Select multiple'}
+                </Button>
               </div>
+              {multiSelect && (
+                <p className="small-muted">
+                  Tap exercises to add them to your circuit, in the order you want to train them.
+                </p>
+              )}
+              <div className="workout-exercise-options" role="group" aria-label="Exercise">
+                {(Object.keys(exercises) as ExerciseId[]).map((id) => {
+                  const inCircuit = circuit.includes(id);
+                  const order = circuit.indexOf(id) + 1;
+                  const pressed = multiSelect ? inCircuit : id === selected;
+                  return (
+                    <button
+                      key={id}
+                      aria-label={exercises[id].name}
+                      aria-pressed={pressed}
+                      className={pressed ? 'is-selected' : ''}
+                      onClick={() => (multiSelect ? toggleCircuitExercise(id) : select(id))}
+                    >
+                      <span>
+                        <strong>{exercises[id].name}</strong>
+                        <small>{exercises[id].muscles}</small>
+                      </span>
+                      <span className="exercise-choice-mark" aria-hidden="true">
+                        {multiSelect ? (
+                          inCircuit ? (
+                            <strong className="circuit-order-badge">{order}</strong>
+                          ) : null
+                        ) : (
+                          id === selected && <Check size={16} />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {circuit.length > 0 && (
+                <div className="circuit-panel" aria-label="Your circuit">
+                  <div className="section-heading">
+                    <h2>Your circuit</h2>
+                    <Button variant="ghost" size="small" onClick={clearCircuit}>
+                      Clear
+                    </Button>
+                  </div>
+                  <ol className="circuit-list">
+                    {circuit.map((id, index) => {
+                      const plan = planFor(id);
+                      const done = setsDone(id);
+                      const complete = isExerciseDone(id);
+                      return (
+                        <li key={id} className={complete ? 'is-done' : ''}>
+                          <span className="circuit-order" aria-hidden="true">
+                            {complete ? <Check size={14} /> : index + 1}
+                          </span>
+                          <div className="circuit-exercise">
+                            <strong>{exercises[id].name}</strong>
+                            <small>
+                              {done} of {plan.targetSets} sets done
+                            </small>
+                          </div>
+                          <PlanStepper
+                            label="Sets"
+                            value={plan.targetSets}
+                            min={1}
+                            max={10}
+                            onChange={(targetSets) => setExercisePlan(id, { ...plan, targetSets })}
+                          />
+                          <PlanStepper
+                            label="Reps"
+                            value={plan.targetReps}
+                            min={1}
+                            max={50}
+                            onChange={(targetReps) => setExercisePlan(id, { ...plan, targetReps })}
+                          />
+                          <button
+                            type="button"
+                            className="circuit-remove"
+                            aria-label={`Remove ${exercises[id].name} from circuit`}
+                            onClick={() => removeFromCircuit(id)}
+                          >
+                            <X size={16} />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  <Button
+                    className="full-width setup-primary"
+                    onClick={() => {
+                      const next = nextCircuitExercise() ?? circuit[0];
+                      if (next !== selected) select(next);
+                      setPreview(true);
+                    }}
+                  >
+                    <Play size={18} /> Start circuit · {circuit.length}{' '}
+                    {circuit.length === 1 ? 'exercise' : 'exercises'}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </section>
@@ -215,14 +361,18 @@ export function WorkoutSetup({
             </div>
             <label className="rest-select">
               Reps per set
-              <select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>
-                <option value={0}>I’ll finish sets myself</option>
-                {[5, 6, 8, 10, 12, 15, 20].map((n) => (
-                  <option key={n} value={n}>
-                    {n} reps
-                  </option>
-                ))}
-              </select>
+              {circuit.length > 0 ? (
+                <span className="small-muted">Set per exercise in your circuit above.</span>
+              ) : (
+                <select value={targetReps} onChange={(event) => setTargetReps(Number(event.target.value))}>
+                  <option value={0}>I’ll finish sets myself</option>
+                  {[5, 6, 8, 10, 12, 15, 20].map((n) => (
+                    <option key={n} value={n}>
+                      {n} reps
+                    </option>
+                  ))}
+                </select>
+              )}
             </label>
             <label className="rest-select">
               Rest between sets
@@ -252,7 +402,16 @@ export function WorkoutSetup({
               </Button>
             </>
           ) : (
-            <Button className="full-width setup-primary" onClick={() => setPreview(true)}>
+            <Button
+              className="full-width setup-primary"
+              onClick={() => {
+                if (circuit.length > 0) {
+                  const next = nextCircuitExercise() ?? circuit[0];
+                  if (next !== selected) select(next);
+                }
+                setPreview(true);
+              }}
+            >
               <Camera size={18} /> Set up camera <ArrowRight size={17} />
             </Button>
           )}

@@ -33,6 +33,10 @@ export function DashboardPage() {
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
   const selected = useWorkout((s) => s.selected);
   const select = useWorkout((s) => s.select);
+  const circuit = useWorkout((s) => s.circuit);
+  const toggleCircuitExercise = useWorkout((s) => s.toggleCircuitExercise);
+  const clearCircuit = useWorkout((s) => s.clearCircuit);
+  const [multiSelect, setMultiSelect] = useState(false);
   const { sessions, error } = useSessions();
   const [split, setSplit] = useState<SplitFilter>('all');
   const [exerciseFilter, setExerciseFilter] = useState<ExerciseFilter>('all');
@@ -157,7 +161,16 @@ export function DashboardPage() {
             <h2>Find your movement</h2>
             <p>{Object.keys(exercises).length} movements. Thoughtful feedback for each.</p>
           </div>
-          <span className="tag outlined">SIDE-VIEW TRAINING</span>
+          <div className="section-actions">
+            <span className="tag outlined">SIDE-VIEW TRAINING</span>
+            <Button
+              variant={multiSelect ? 'secondary' : 'ghost'}
+              size="small"
+              onClick={() => setMultiSelect((value) => !value)}
+            >
+              {multiSelect ? 'Done' : 'Select multiple'}
+            </Button>
+          </div>
         </div>
         <div className="history-filters">
           <WorkoutFilters
@@ -192,17 +205,26 @@ export function DashboardPage() {
         <div className="exercise-grid">
           {visibleExercises.map((id) => {
             const exercise = exercises[id];
+            const inCircuit = circuit.includes(id);
+            const order = circuit.indexOf(id) + 1;
+            const isActive = multiSelect ? inCircuit : selected === id;
             return (
               <button
                 key={id}
-                className={`exercise-card ${selected === id ? 'selected' : ''}`}
-                onClick={() => select(id)}
-                aria-pressed={selected === id}
+                className={`exercise-card ${isActive ? 'selected' : ''}`}
+                onClick={() => (multiSelect ? toggleCircuitExercise(id) : select(id))}
+                aria-pressed={isActive}
               >
                 <div className={`exercise-image ${exercise.color}`}>
                   <span className="exercise-category">{exercise.category}</span>
-                  <span className={`selection-dot ${selected === id ? 'checked' : ''}`}>
-                    {selected === id && <Check size={12} />}
+                  <span className={`selection-dot ${isActive ? 'checked' : ''}`}>
+                    {multiSelect ? (
+                      inCircuit ? (
+                        <strong className="circuit-order-badge">{order}</strong>
+                      ) : null
+                    ) : (
+                      selected === id && <Check size={12} />
+                    )}
                   </span>
                   <ExerciseArt exercise={id} />
                   <span className="exercise-number">{badgeNumber(Object.keys(exercises).indexOf(id))}</span>
@@ -221,13 +243,39 @@ export function DashboardPage() {
           })}
         </div>
         <div className="selection-bar">
-          <span>
-            <strong>{exercises[selected].name}</strong> selected{' '}
-            <span className="selection-separator">·</span> Find your space. We’ll handle the counting.
-          </span>
-          <Button size="small" onClick={() => navigate('/workout')}>
-            Let’s go <ArrowRight size={15} />
-          </Button>
+          {multiSelect ? (
+            circuit.length > 0 ? (
+              <>
+                <span>
+                  <strong>
+                    {circuit.length} {circuit.length === 1 ? 'exercise' : 'exercises'}
+                  </strong>{' '}
+                  in your circuit <span className="selection-separator">·</span> Set your sets and reps on the
+                  next screen.
+                </span>
+                <div className="button-row">
+                  <Button size="small" variant="ghost" onClick={clearCircuit}>
+                    Clear
+                  </Button>
+                  <Button size="small" onClick={() => navigate('/workout')}>
+                    Start circuit <ArrowRight size={15} />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <span>Tap exercises to build your circuit, in the order you want to train them.</span>
+            )
+          ) : (
+            <>
+              <span>
+                <strong>{exercises[selected].name}</strong> selected{' '}
+                <span className="selection-separator">·</span> Find your space. We’ll handle the counting.
+              </span>
+              <Button size="small" onClick={() => navigate('/workout')}>
+                Let’s go <ArrowRight size={15} />
+              </Button>
+            </>
+          )}
         </div>
       </section>
       <div className="dashboard-bottom">

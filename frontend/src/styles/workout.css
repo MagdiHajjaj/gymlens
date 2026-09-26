@@ -498,3 +498,191 @@
     margin-inline: -4px;
   }
 }
+
+/* ---- Circuit training ---- */
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.circuit-order-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: #41623c;
+}
+.circuit-panel {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fbfdf8;
+  padding: 18px;
+}
+.circuit-panel .section-heading {
+  margin-bottom: 10px;
+}
+.circuit-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.circuit-list > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+}
+.circuit-list > li.is-done {
+  opacity: 0.75;
+  background: #eef4e4;
+}
+.circuit-order {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #41623c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.circuit-list > li.is-done .circuit-order {
+  background: #7d9e66;
+}
+.circuit-exercise {
+  flex: 1;
+  min-width: 0;
+}
+.circuit-exercise strong {
+  display: block;
+  font-size: 14px;
+}
+.circuit-exercise small {
+  color: #5d6d62;
+  font-size: 12px;
+}
+.plan-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #5d6d62;
+}
+.stepper-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stepper-controls button {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fafbf8;
+  font-size: 16px;
+  line-height: 1;
+  color: #41623c;
+  cursor: pointer;
+}
+.stepper-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.stepper-controls strong {
+  min-width: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #263c31;
+}
+.circuit-remove {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: #8b957f;
+  cursor: pointer;
+}
+.circuit-remove:hover {
+  color: #a33;
+  border-color: #d9a5a5;
+}
+.circuit-progress {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.circuit-progress > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px 6px 6px;
+  font-size: 13px;
+  background: #fbfdf8;
+}
+.circuit-progress > li.is-current {
+  border-color: #41623c;
+  background: #edf5e2;
+  font-weight: 600;
+}
+.circuit-progress > li.is-done {
+  opacity: 0.7;
+}
+.circuit-step {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #dfe5d6;
+  font-size: 12px;
+  font-weight: 700;
+  color: #55694a;
+}
+.circuit-progress > li.is-current .circuit-step {
+  background: #41623c;
+  color: #fff;
+}
+.circuit-progress > li.is-done .circuit-step {
+  background: #7d9e66;
+  color: #fff;
+}
+.circuit-progress small {
+  color: #8b957f;
+  font-size: 11px;
+}
+.circuit-exercise-done {
+  border: 2px solid #41623c;
+  border-radius: 14px;
+  background: #eef4e4;
+  padding: 20px;
+  margin-bottom: 18px;
+}
+.circuit-exercise-done h2 {
+  font-size: 20px;
+  margin: 6px 0 8px;
+}
+.circuit-exercise-done p {
+  margin: 0 0 14px;
+  color: #55694a;
+}
+@media (max-width: 640px) {
+  .circuit-list > li {
+    flex-wrap: wrap;
+  }
+}

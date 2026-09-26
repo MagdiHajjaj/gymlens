@@ -12,6 +12,7 @@ import {
   Download,
   SkipForward,
   Timer,
+  ArrowRight,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { WorkoutSetup } from '../features/workout/WorkoutSetup';
@@ -48,12 +49,16 @@ export function WorkoutPage() {
     voice,
     toggleVoice,
     restPreset,
-    targetReps,
     rest,
     currentSetStartRep,
     startRest,
     completeRest,
     finish,
+    circuit,
+    planFor,
+    setsDone,
+    isExerciseDone,
+    nextCircuitExercise,
   } = useWorkout();
   const [active, setActive] = useState(false);
   useEffect(() => {
@@ -147,13 +152,17 @@ export function WorkoutPage() {
   }
       // Auto-finish the set once the chosen rep target is reached, which starts the rest timer.
     // Uploaded videos keep playing, so they are analyzed as one continuous set instead.
-  const autoSets = targetReps > 0 && session?.source !== 'upload';
+    // Circuit exercises use their own per-exercise rep target; otherwise the global target applies.
+  const exercisePlan = planFor(selected);
+  const circuitActive = circuit.length > 0;
+  const currentExerciseDone = circuitActive && session !== null && isExerciseDone(selected);
+  const nextExercise = circuitActive ? nextCircuitExercise() : null;
+  const autoSets = exercisePlan.targetReps > 0 && session?.source !== 'upload';
   useEffect(() => {
     if (!active || !autoSets || rest || paused || session?.status !== 'active') return;
-    if (currentSetReps >= targetReps) finishSet();
-      // finishSet reads the latest store state itself; re-run only when the rep count or set state changes.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, autoSets, currentSetReps, targetReps, rest, paused, session?.status]);
+    if (currentSetReps >= exercisePlan.targetReps) finishSet();
+    // finishSet reads the latest store state itself; re-run only when the rep count or set state changes.
+  }, [active, autoSets, currentSetReps, exercisePlan.targetReps, rest, paused, session?.status]);
   
   function skipRest() {
     if (!rest) return;
@@ -256,6 +265,10 @@ export function WorkoutPage() {
     setError('');
     voiceCoach.stop();
     const completed = finish();
+    const state = useWorkout.getState();
+    if (state.circuit.length > 0 && state.circuit.every((id) => state.isExerciseDone(id))) {
+      state.clearCircuit();
+    }
     if (completed.source === 'demo') {
       setUnsaved(null);
       setActive(false);
@@ -289,6 +302,22 @@ export function WorkoutPage() {
     setActive(false);
     setSaving(false);
     navigate(`/session/${completed.id}`);
+  }
+  // Circuit flow: bank the finished exercise's session, then return to setup
+  // with the next incomplete exercise selected so the user can position for it.
+  function advanceToNextExercise() {
+    const state = useWorkout.getState();
+    const next = state.nextCircuitExercise();
+    if (!next || !state.session) return;
+    voiceCoach.stop();
+    const completed = state.finish();
+    try {
+      saveLocal(completed, identity.owner);
+    } catch {
+      setError('Browser storage is full or unavailable. Download this session before leaving.');
+    }
+    state.select(next);
+    setActive(false);
   }
   const exercise = exercises[selected];
   if (!active)
@@ -344,6 +373,51 @@ export function WorkoutPage() {
           {timeLabel(elapsed)}
         </div>
       </div>
+      {circuitActive && (
+        <ol className="circuit-progress" aria-label="Circuit progress">
+          {circuit.map((id, index) => {
+            const done = isExerciseDone(id);
+            const isCurrent = id === selected;
+            return (
+              <li key={id} className={done ? 'is-done' : isCurrent ? 'is-current' : ''}>
+                <span className="circuit-step" aria-hidden="true">
+                  {done ? <Check size={13} /> : index + 1}
+                </span>
+                <span>{exercises[id].name}</span>
+                <small>
+                  {setsDone(id)}/{planFor(id).targetSets} sets
+                </small>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {currentExerciseDone && (
+        <section className="circuit-exercise-done" aria-live="polite">
+          <span className="eyebrow">EXERCISE COMPLETE</span>
+          <h2>
+            {exercise.name} — all {exercisePlan.targetSets}{' '}
+            {exercisePlan.targetSets === 1 ? 'set' : 'sets'} done.
+          </h2>
+          {nextExercise ? (
+            <p>Your progress is saved. Ready for the next one?</p>
+          ) : (
+            <p>Circuit complete. Nice work — every exercise is done.</p>
+          )}
+          <div className="button-row">
+            {nextExercise ? (
+              <Button onClick={advanceToNextExercise}>
+                Next: {exercises[nextExercise].name} <ArrowRight size={16} />
+              </Button>
+            ) : (
+              <Button onClick={() => void end()}>Finish circuit</Button>
+            )}
+            <Button variant="secondary" onClick={() => void end()}>
+              End workout
+            </Button>
+          </div>
+        </section>
+      )}
       <div className={`workout-status workout-status-${trackingState}`} role="status">
         {trackingState === 'ready' ? (
           <Check size={18} />
@@ -467,7 +541,7 @@ export function WorkoutPage() {
               {rest
                 ? `Rest after set ${rest.completed_set}`
                                   : autoSets
-                    ? `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} of ${targetReps} reps`
+                    ? `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} of ${exercisePlan.targetReps} reps`
                     : `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} ${currentSetReps === 1 ? 'rep' : 'reps'}`}
             </span>
             {selected === 'curl' && (

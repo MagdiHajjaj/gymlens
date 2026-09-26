@@ -62,6 +62,13 @@ export interface WorkoutSetRange {
   completed_at: string;
   rest_seconds?: number;
 }
+
+// Per-exercise targets for circuit training: how many sets to complete and
+// how many reps close a set for one exercise.
+export interface ExercisePlan {
+  targetSets: number;
+  targetReps: number;
+}
 export interface WorkoutSession {
   id: string;
   exercise: ExerciseId;
