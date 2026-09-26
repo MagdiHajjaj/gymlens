@@ -324,13 +324,13 @@ nav a.active:after {
   margin-bottom: 30px;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.7px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #7c8a76;
+  color: #5d6b57;
 }
 .page-heading h1 {
   margin: 10px 0 9px;
@@ -364,9 +364,9 @@ nav a.active:after {
   z-index: 1;
 }
 .hero-tag {
-  font-size: 8px;
+  font-size: 10px;
   letter-spacing: 1.6px;
-  color: #becdb5;
+  color: #93a78b;
   display: flex;
   gap: 7px;
   align-items: center;
@@ -482,8 +482,8 @@ nav a.active:after {
   gap: 6px;
   align-items: center;
   margin-top: 22px;
-  color: #a7ba9f;
-  font-size: 8px;
+  color: #8ba183;
+  font-size: 10px;
 }
 .hero-visual {
   position: absolute;
@@ -506,11 +506,10 @@ nav a.active:after {
   pointer-events: none;
 }
 .hero-visual .exercise-art {
-  width: 110%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
   color: #8fa78c;
   filter: drop-shadow(0 10px 20px #0002);
-  transform: rotate(-5deg);
 }
 .hero-orbit {
   position: absolute;
@@ -651,14 +650,14 @@ nav a.active:after {
   margin-top: 4px;
 }
 .tag {
-  font-size: 9px;
+  font-size: 10px;
   padding: 5px 8px;
   border-radius: 5px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   background: #eff2ea;
-  color: #7c8871;
+  color: #5d6b57;
   white-space: nowrap;
 }
 .tag.green {
@@ -669,7 +668,7 @@ nav a.active:after {
   border: 1px solid #dfe5d6;
   background: transparent;
   letter-spacing: 0.8px;
-  font-size: 7px;
+  font-size: 10px;
 }
 .exercise-grid {
   display: grid;
@@ -767,10 +766,9 @@ img.exercise-art {
   position: absolute;
   top: 13px;
   left: 12px;
-  font-size: 6px;
+  font-size: 10px;
   letter-spacing: 1.15px;
   font-weight: 600;
-  opacity: 0.8;
 }
 .selection-dot {
   position: absolute;
@@ -1183,13 +1181,23 @@ img.exercise-art {
   border-radius: 8px;
   padding: 5px;
   margin-bottom: 24px;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.exercise-tabs::-webkit-scrollbar {
+  display: none;
 }
 .exercise-tabs button {
   background: transparent;
   border-radius: 6px;
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: max-content;
+  min-height: 44px;
+  white-space: nowrap;
   font-size: 11px;
-  padding: 10px;
+  padding: 10px 12px;
   color: #85927a;
 }
 .exercise-tabs button.active {
@@ -1269,9 +1277,24 @@ img.exercise-art {
 .rest-presets > div {
   display: flex;
   gap: 7px;
+  background: #f1f4eb;
+  border-radius: 8px;
+  padding: 5px;
 }
 .rest-presets .button {
   flex: 1;
+  background: transparent;
+  border-color: transparent;
+  color: #85927a;
+}
+.rest-presets .button:hover {
+  background: #e8ede1;
+}
+.rest-presets .button[aria-pressed='true'] {
+  background: #fff;
+  border-color: var(--border);
+  color: #315338;
+  box-shadow: 0 1px 6px #0001;
 }
 .setup-voice {
   display: flex;
@@ -1692,6 +1715,11 @@ img.exercise-art {
   border-color: #eddbcd;
   color: #a17053;
 }
+.notice.info {
+  background: #edf1f6;
+  border-color: #d7e0ea;
+  color: #5a6b7d;
+}
 .notice .button {
   margin-left: auto;
 }
@@ -1872,6 +1900,12 @@ td strong {
 .report-coach h3 {
   font-size: 11px;
   margin-top: 14px;
+}
+.report-coach h3.reflect-pos {
+  color: #3f7348;
+}
+.report-coach h3.reflect-neg {
+  color: #a33f2c;
 }
 .report-coach ul {
   margin: 6px 0;
@@ -2253,8 +2287,8 @@ td strong {
     padding: 0 12px;
   }
   .workout-controls .button-ghost {
-    font-size: 0;
-    gap: 0;
+    font-size: 10px;
+    gap: 7px;
   }
   .setup-grid {
     grid-template-columns: 1fr 1fr;
@@ -2362,9 +2396,9 @@ td strong {
     display: none;
   }
   .topbar-actions .button {
-    font-size: 9px;
-    min-height: 28px;
-    padding: 0 9px;
+    font-size: 10px;
+    min-height: 44px;
+    padding: 0 12px;
   }
   .page {
     padding: 28px 20px 20px;
@@ -2462,9 +2496,6 @@ td strong {
   .section-heading p {
     font-size: 10px;
   }
-  .tag.outlined {
-    display: none;
-  }
   .exercise-grid {
     gap: 11px;
     grid-template-columns: 1fr;
@@ -2552,20 +2583,6 @@ td strong {
   .setup-grid > *,
   .setup-panel {
     min-width: 0;
-  }
-  .exercise-tabs {
-    max-width: 100%;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: none;
-  }
-  .exercise-tabs::-webkit-scrollbar {
-    display: none;
-  }
-  .exercise-tabs button {
-    flex: 0 0 auto;
-    min-width: max-content;
-    white-space: nowrap;
   }
   .setup-art {
     height: 200px;

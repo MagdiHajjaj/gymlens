@@ -543,7 +543,7 @@ function recap(session: WorkoutSession, stats: InsightStats) {
     : 'minimum joint angle was unavailable';
   const topFault = stats.faultFrequencies[0];
   const cueText = topFault
-    ? `The most common cue was ${topFault.label} on ${topFault.count} reps (${topFault.percent}%).`
+    ? `The most common cue was ${topFault.label} on ${topFault.count} rep${topFault.count === 1 ? '' : 's'} (${topFault.percent}%).`
     : 'No supported technique cues were detected; that is not proof of perfect form.';
   return `${simulated}${stats.totalReps} ${exercise} reps recorded; ${stats.cleanReps} were clean by supported cues and ${faultCount} cue events were observed. ${angleText}. ${cueText}`;
 }
