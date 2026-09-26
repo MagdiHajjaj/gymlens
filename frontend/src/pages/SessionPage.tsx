@@ -10,7 +10,18 @@ import {
   Info,
   Activity,
 } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
+import {
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  BarChart,
+  Bar,
+  Legend,
+} from 'recharts';
 import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
@@ -119,6 +130,15 @@ export function SessionPage() {
       seconds: Math.max(0, Math.round((Date.parse(m.recorded_at) - Date.parse(session.started_at)) / 1000)),
       angle: m.metric_value,
     }));
+  const faultCodes = observedInsight.stats.faultFrequencies.map((fault) => fault.code);
+  const faultColors = ['#a08958', '#b96f5b', '#6f8f5f', '#6c7fb0', '#9a72a0'];
+  const faultTimeline = session.reps.map((rep) => {
+    const row: Record<string, number> & { rep: number } = { rep: rep.rep_number };
+    for (const code of faultCodes) row[code] = 0;
+    for (const fault of rep.faults_json) row[fault.code] = (row[fault.code] || 0) + 1;
+    return row;
+  });
+  const depthDecay = observedInsight.stats.depthDecay;
   return (
     <div className="page">
       <Link className="back-link" to="/history">
@@ -284,6 +304,79 @@ export function SessionPage() {
               <Sparkles size={15} />
               {busy ? 'Creating insights…' : 'Generate AI insights'}
             </Button>
+          )}
+        </section>
+      </div>
+      <div className="insight-visual-grid">
+        <section className="panel insight-panel">
+          <div className="section-heading">
+            <div>
+              <h2>Fault timeline</h2>
+              <p>Which reps had supported technique cues.</p>
+            </div>
+            <span className="tag">{faultCodes.length || 'No'} cues</span>
+          </div>
+          {faultCodes.length ? (
+            <div className="chart-container compact">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={faultTimeline} margin={{ top: 12, right: 10, bottom: 8, left: -20 }}>
+                  <CartesianGrid strokeDasharray="3 4" vertical={false} stroke="#e7ebe4" />
+                  <XAxis dataKey="rep" tickFormatter={(v) => `Rep ${v}`} tickLine={false} axisLine={false} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                  <Tooltip labelFormatter={(v) => `Rep ${v}`} />
+                  <Legend formatter={(value) => String(value).replaceAll('_', ' ')} />
+                  {faultCodes.map((code, index) => (
+                    <Bar
+                      key={code}
+                      dataKey={code}
+                      stackId="faults"
+                      fill={faultColors[index % faultColors.length]}
+                      radius={[4, 4, 0, 0]}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="empty-inline">
+              <p>
+                No supported technique cues were detected. That is not proof of perfect form; it only
+                reflects the cues this session could measure.
+              </p>
+            </div>
+          )}
+        </section>
+        <section className="panel insight-panel">
+          <div className="section-heading">
+            <div>
+              <h2>Depth / ROM decay</h2>
+              <p>First-third vs last-third average minimum joint angle.</p>
+            </div>
+            <span className="tag">min angle</span>
+          </div>
+          {depthDecay ? (
+            <div className="decay-strip" aria-label="Depth or range decay comparison">
+              <div>
+                <span>First third</span>
+                <strong>{depthDecay.firstAverage}°</strong>
+                <small>Reps {depthDecay.firstReps.join(', ')}</small>
+              </div>
+              <div className="decay-arrow">→</div>
+              <div>
+                <span>Last third</span>
+                <strong>{depthDecay.lastAverage}°</strong>
+                <small>Reps {depthDecay.lastReps.join(', ')}</small>
+              </div>
+              <p className={depthDecay.change >= 5 ? 'decay-warning' : 'small-muted'}>
+                {depthDecay.change >= 0 ? '+' : ''}
+                {depthDecay.change}° change. Higher minimum angle means less captured range.
+              </p>
+            </div>
+          ) : (
+            <div className="empty-inline">
+              <p>Record at least three reps with minimum joint angle data to compare early and late range.</p>
+            </div>
           )}
         </section>
       </div>
