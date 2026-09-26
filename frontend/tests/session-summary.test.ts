@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { summarizeSession, summarizeSet } from '../src/features/coaching/sessionSummary';
-import type { FormFault, WorkoutSession } from '../src/types/workout';
+import type { ExerciseId, FormFault, WorkoutSession } from '../src/types/workout';
 
 const fault = (code: string): FormFault => ({ code, message: code, severity: 'warning' });
 
@@ -66,5 +66,26 @@ it('handles zero reps and curl arm-rep grammar without inventing cues', () => {
 
   expect(summarizeSet(workout, workout.set_ranges![0])).toBe(
     'Set 1 complete. 1 arm rep. No technique cues detected.',
+  );
+});
+
+it('maps newer-exercise fault codes to set and session focus phrases', () => {
+  const workout = session({
+    exercise: 'deadlift' as ExerciseId,
+    total_reps: 2,
+    reps: [
+      { rep_number: 1, completed_at: 'now', metrics_json: {}, faults_json: [fault('insufficient_hinge')] },
+      { rep_number: 2, completed_at: 'now', metrics_json: {}, faults_json: [fault('insufficient_hinge')] },
+    ],
+    set_ranges: [{ set_number: 1, start_rep: 1, end_rep: 2, completed_at: 'now' }],
+  });
+
+  const setSummary = summarizeSet(workout, workout.set_ranges![0]);
+  expect(setSummary).toBe(
+    'Set 1 complete. 2 reps. 2 technique cues. Hinge deeper at the hips next set.',
+  );
+  expect(setSummary.length).toBeLessThanOrEqual(160);
+  expect(summarizeSession(workout)).toBe(
+    'Session complete. 2 reps across 1 set. 2 technique cues. Focus on a deeper hip hinge next session.',
   );
 });

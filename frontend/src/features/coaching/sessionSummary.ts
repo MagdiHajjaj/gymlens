@@ -6,6 +6,14 @@ const SET_FOCUS: Record<string, string> = {
   upper_arm_movement: 'Keep your upper arm steady next set.',
   hip_alignment: 'Keep shoulders, hips, and ankles aligned.',
   limited_range: 'Use a fuller comfortable range next set.',
+  excessive_back_rounding: 'Keep your back flat next set.',
+  insufficient_hinge: 'Hinge deeper at the hips next set.',
+  knee_over_toes: 'Keep your front knee behind your toes next set.',
+  excessive_back_arch: 'Keep your ribs down next set.',
+  incomplete_extension: 'Drive up to a full bridge next set.',
+  incomplete_pull: 'Pull all the way up next set.',
+  torso_rising: 'Keep your torso still next set.',
+  excessive_swing: 'Keep your body still next set.',
 };
 
 const SESSION_FOCUS: Record<string, string> = {
@@ -14,6 +22,14 @@ const SESSION_FOCUS: Record<string, string> = {
   upper_arm_movement: 'Focus on a steady upper arm next session.',
   hip_alignment: 'Focus on shoulder, hip, and ankle alignment.',
   limited_range: 'Focus on a fuller comfortable range next session.',
+  excessive_back_rounding: 'Focus on a flat back next session.',
+  insufficient_hinge: 'Focus on a deeper hip hinge next session.',
+  knee_over_toes: 'Focus on knee position next session.',
+  excessive_back_arch: 'Focus on keeping your ribs down next session.',
+  incomplete_extension: 'Focus on full hip extension next session.',
+  incomplete_pull: 'Focus on a complete pull next session.',
+  torso_rising: 'Focus on a steady torso next session.',
+  excessive_swing: 'Focus on a still body next session.',
 };
 
 const repLabel = (session: WorkoutSession, count: number) => {
