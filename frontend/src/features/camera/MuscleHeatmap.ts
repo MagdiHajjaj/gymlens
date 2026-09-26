@@ -27,6 +27,32 @@ export function drawMuscleHeatmap(
   width: number,
   height: number,
 ) {
+  const drawSegment = (side: number) => {
+    if (!result.trackingValid || (exercise !== 'curl' && side === undefined)) return;
+    const a = landmarks[(exercise === 'squat' ? 23 : 11) + side];
+    const b = landmarks[(exercise === 'squat' ? 25 : 13) + side];
+    if (!a || !b || (a.visibility ?? 0) < 0.6 || (b.visibility ?? 0) < 0.6) return;
+    const dx = (b.x - a.x) * width,
+      dy = (b.y - a.y) * height;
+    const length = Math.hypot(dx, dy);
+    if (length < 4) return;
+    const heat = muscleIntensity(exercise, result);
+    const hue = 48 * (1 - heat);
+    ctx.save();
+    ctx.translate(((a.x + b.x) * width) / 2, ((a.y + b.y) * height) / 2);
+    ctx.rotate(Math.atan2(dy, dx));
+    ctx.scale(length * 0.48, Math.max(10, length * 0.19));
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    gradient.addColorStop(0, `hsla(${hue}, 100%, 56%, 0.85)`);
+    gradient.addColorStop(0.55, `hsla(${hue}, 100%, 50%, 0.55)`);
+    gradient.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
   if (exercise === 'curl' && result.arms) {
     for (const arm of result.arms) {
       if (!arm.trackingValid || arm.angle === undefined) continue;
@@ -47,28 +73,14 @@ export function drawMuscleHeatmap(
     }
     return;
   }
-  if (!result.trackingValid || result.trackedSide === undefined) return;
-  const side = result.trackedSide;
-  const a = landmarks[(exercise === 'squat' ? 23 : 11) + side];
-  const b = landmarks[(exercise === 'squat' ? 25 : 13) + side];
-  if (!a || !b || (a.visibility ?? 0) < 0.6 || (b.visibility ?? 0) < 0.6) return;
-  const dx = (b.x - a.x) * width,
-    dy = (b.y - a.y) * height;
-  const length = Math.hypot(dx, dy);
-  if (length < 4) return;
-  const heat = muscleIntensity(exercise, result);
-  const hue = 48 * (1 - heat);
-  ctx.save();
-  ctx.translate(((a.x + b.x) * width) / 2, ((a.y + b.y) * height) / 2);
-  ctx.rotate(Math.atan2(dy, dx));
-  ctx.scale(length * 0.48, Math.max(10, length * 0.19));
-  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-  gradient.addColorStop(0, `hsla(${hue}, 100%, 56%, 0.85)`);
-  gradient.addColorStop(0.55, `hsla(${hue}, 100%, 50%, 0.55)`);
-  gradient.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
-  ctx.fillStyle = gradient;
-  ctx.beginPath();
-  ctx.arc(0, 0, 1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  if (!result.trackingValid) return;
+
+  if (exercise === 'squat') {
+    for (const side of [0, 1]) {
+      drawSegment(side);
+    }
+    return;
+  }
+  if (result.trackedSide === undefined) return;
+  drawSegment(result.trackedSide);
 }
