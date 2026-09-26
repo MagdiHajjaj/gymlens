@@ -73,6 +73,16 @@ export class FeedbackEngine {
       this.lastRepTotal = Number(repCue.metadata?.totalReps ?? this.lastRepTotal);
       return repCue;
     }
-    return null;
+    return result.repCompleted
+      ? announce(
+          'rep',
+          { text: 'Rep complete. Keep your movement controlled.', kind: 'rep', priority: PRIORITY.rep },
+          5000,
+        )
+      : announce(
+          'ready',
+          { text: 'Ready. Move at a comfortable, controlled pace.', kind: 'setup', priority: PRIORITY.setup },
+          30000,
+        );
   }
 }

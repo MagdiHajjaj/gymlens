@@ -3,7 +3,7 @@ import { VoiceCoach } from '../src/features/coaching/VoiceCoach';
 import { api } from '../src/lib/api';
 import { FeedbackEngine } from '../src/features/coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../src/features/coaching/Phrasebook';
-import type { ExerciseResult } from '../src/types/workout';
+import type { ExerciseId, ExerciseResult } from '../src/types/workout';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -177,4 +177,47 @@ it('prioritizes active faults over simultaneous rep totals', () => {
     { exercise: 'curl', totalReps: 2 },
   );
   expect(cue).toMatchObject({ text: 'Keep your upper arm close to your side.', priority: 100 });
+});
+
+it('returns only warm count phrases for exercises without fault phrases', () => {
+  const phrases = selectedExerciseWarmPhrases('deadlift' as ExerciseId);
+  expect(phrases).toEqual([
+    '1.',
+    '2. Settle into your pace.',
+    '3. Stay controlled.',
+    '4. Keep the rhythm.',
+    '5. Control the return.',
+  ]);
+});
+
+it('announces rep completion for counts outside the spoken-count schedule', () => {
+  const engine = new FeedbackEngine();
+  const completed: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+  };
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 6 })).toBe(
+    'Rep complete. Keep your movement controlled.',
+  );
+});
+
+it('announces readiness while waiting between reps', () => {
+  const engine = new FeedbackEngine();
+  const idle: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'ready',
+    repCompleted: false,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+  };
+  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 0 })).toBe(
+    'Ready. Move at a comfortable, controlled pace.',
+  );
 });
