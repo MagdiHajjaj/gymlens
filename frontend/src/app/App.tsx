@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Shell } from '../components/layout/Shell';
 import { DashboardPage } from '../pages/DashboardPage';
 import { HistoryPage } from '../pages/HistoryPage';
 import { ProfilePage } from '../pages/ProfilePage';
-const WorkoutPage = lazy(() => import('../pages/WorkoutPage').then((m) => ({ default: m.WorkoutPage })));
-const SessionPage = lazy(() => import('../pages/SessionPage').then((m) => ({ default: m.SessionPage })));
+import { lazyRoute } from './lazyRoute';
+const WorkoutPage = lazyRoute(() => import('../pages/WorkoutPage').then((m) => ({ default: m.WorkoutPage })));
+const SessionPage = lazyRoute(() => import('../pages/SessionPage').then((m) => ({ default: m.SessionPage })));
 export function App() {
   return (
     <BrowserRouter>
