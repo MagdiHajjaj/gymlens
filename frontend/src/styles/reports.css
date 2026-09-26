@@ -76,36 +76,78 @@
   margin: 24px 0;
   align-items: start;
 }
-.report-focus {
+.report-coach {
   background: #eaf1df;
   border: 1px solid #cfddc6;
   border-radius: 14px;
   padding: 28px;
 }
-.report-focus h2 {
+.report-coach .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.report-coach .tag.green {
+  margin-left: 8px;
+}
+.report-coach h2 {
   font-size: 26px;
-  margin: 12px 0 16px;
+  margin: 12px 0 14px;
 }
-.report-focus > p {
+.report-coach > p {
   color: #314f35;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.6;
 }
-.report-focus > .report-goal-context {
+.report-coach h3 {
   font-size: 12px;
-  color: #536656;
-  margin-bottom: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 20px 0 4px;
 }
-.report-focus > div {
-  border-top: 1px solid #cad7be;
+.report-coach h3.reflect-pos {
+  color: #3f7348;
+}
+.report-coach h3.reflect-neg {
+  color: #a33f2c;
+}
+.report-coach ul {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #3c5540;
+}
+.report-coach .coach-why {
+  display: block;
+  font-size: 12px;
+  color: #6b7f68;
+  margin-top: 2px;
+}
+.report-coach .next-focus {
   margin-top: 22px;
   padding-top: 18px;
+  border-top: 1px solid #cad7be;
 }
-.report-focus > div strong {
-  font-size: 13px;
+.report-coach .next-focus .eyebrow {
+  font-size: 11px;
 }
-.report-focus > div p {
-  font-size: 13px;
-  margin-top: 6px;
+.report-coach .next-focus > p {
+  font-size: 14px;
+  margin-top: 8px;
+  color: #314f35;
+  line-height: 1.6;
+}
+.report-coach .coach-source-note {
+  font-size: 12px;
+  color: #6b7f68;
+  margin-top: 18px;
+}
+.report-coach .button {
+  margin-top: 14px;
+}
+.report-coach .notice.error {
+  margin-top: 14px;
 }
 .session-report-page .report-cues,
 .session-report-page .report-sets,
@@ -259,15 +301,6 @@
 .report-rep-section .table-scroll {
   margin-top: 18px;
 }
-.report-extra > p,
-.report-extra > .button {
-  margin-top: 18px;
-}
-.report-extra ul {
-  padding-left: 20px;
-  font-size: 14px;
-  line-height: 1.7;
-}
 .report-next-actions {
   display: flex;
   gap: 12px;
@@ -415,7 +448,7 @@
   .session-key-stats p {
     grid-column: 1 / -1;
   }
-  .report-focus {
+  .report-coach {
     padding: 22px;
   }
   .session-report-page .report-cues,
