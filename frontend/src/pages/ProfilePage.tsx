@@ -81,7 +81,7 @@ export function ProfilePage() {
         <div>
           <span className="eyebrow">YOUR TRAINING, PERSONALIZED</span>
           <h1>Athlete profile<span className="green-text">.</span></h1>
-          <p>Set the details Gym Lens uses to understand your goals and progress.</p>
+          <p>Set the details GymLens uses to understand your goals and progress.</p>
         </div>
         <span className="profile-status"><Database size={15} /> Stored in Tiger Data</span>
       </div>

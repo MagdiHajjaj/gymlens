@@ -14,7 +14,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean 
         <h1>Let’s reset your workspace.</h1>
         <p>The app encountered an unexpected problem. Saved sessions remain in your browser.</p>
         <button className="button button-primary" onClick={() => location.assign('/')}>
-          Reload Gym Lens
+          Reload GymLens
         </button>
       </div>
     ) : (

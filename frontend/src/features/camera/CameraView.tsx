@@ -308,7 +308,7 @@ export function CameraView({
               ? 'Keep shoulder, elbow, and wrist in view'
               : 'Side view · keep your full movement in frame'}
         </span>
-        <span>GYM LENS</span>
+        <span>GYMLENS</span>
       </div>
     </div>
   );

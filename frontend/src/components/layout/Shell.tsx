@@ -46,7 +46,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <span className="brand-mark">
             <Dumbbell size={23} />
           </span>
-          gym<span className="brand-light">lens</span>
+          Gym<span className="brand-light">Lens</span>
           <span className="brand-dot">®</span>
         </Link>
         <div className="sidebar-section-label">YOUR TRAINING SPACE</div>
@@ -160,7 +160,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <footer className="footer">
           <span>Made for mindful movement.</span>
           <span>
-            Gym Lens <span className="footer-dot">·</span> Move with intention
+            GymLens <span className="footer-dot">·</span> Move with intention
           </span>
         </footer>
       </div>
