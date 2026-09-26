@@ -1,31 +1,24 @@
 import { test, expect } from '@playwright/test';
 
-test('overview narrows exercises by split and starts the chosen exercise on mobile', async ({ page }) => {
+test('overview narrows exercises by movement chips and starts the chosen movement on mobile', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  const split = page.getByRole('combobox', { name: 'Filter workout split' });
-  const exercise = page.getByRole('combobox', { name: 'Filter exercise' });
   const cards = page.locator('.exercise-card');
   await expect(cards).toHaveCount(10);
-  await split.selectOption('push');
+  await expect(page.getByRole('combobox', { name: 'Filter workout split' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Push (3)' }).click();
   await expect(cards.locator('h3')).toHaveText(['Push-up', 'Overhead press', 'Tricep dips']);
-  await expect(exercise.locator('option')).toHaveText(['All exercises', 'Push-up', 'Overhead press', 'Tricep dips']);
-  await exercise.selectOption('press');
-  await expect(cards).toHaveCount(1);
-  await expect(cards).toHaveAttribute('aria-pressed', 'true');
-  await split.selectOption('legs');
-  await expect(exercise).toHaveValue('all');
+  await page.getByRole('button', { name: 'Legs (4)' }).click();
   await expect(cards.locator('h3')).toHaveText(['Squat', 'Romanian deadlift', 'Lunge', 'Glute bridge']);
-  await expect(page.locator('.selection-bar strong')).toHaveText('Squat');
-  await split.selectOption('pull');
-  await expect(cards.locator('h3')).toHaveText(['Bicep curl', 'Bent-over row', 'Pull-up']);
-  await exercise.selectOption('row');
+  await expect(page.locator('.selection-bar strong')).toHaveText('Legs day');
   await page.getByRole('button', { name: 'Clear filters' }).click();
-  await expect(split).toHaveValue('all');
-  await expect(exercise).toHaveValue('all');
   await expect(cards).toHaveCount(10);
-  await expect(page.locator('.selection-bar strong')).toHaveText('Bent-over row');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.locator('.selection-bar button').click();
-  await expect(page.getByRole('button', { name: 'Bent-over row', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Squat', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });

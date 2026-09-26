@@ -108,7 +108,7 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history filters splits and exercises, excludes legacy demos, and repeats on mobile', async ({
+test('history filters by movement chips, excludes legacy demos, and repeats on mobile', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -120,17 +120,15 @@ test('history filters splits and exercises, excludes legacy demos, and repeats o
   await page.goto('/history');
   await expect(page.getByRole('article')).toHaveCount(2);
   await expect(page.getByRole('combobox', { name: 'Filter session type' })).toHaveCount(0);
-  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
-  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('lunge');
+  await expect(page.getByRole('combobox', { name: 'Filter workout split' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Push', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('pull');
-  await expect(page.getByRole('combobox', { name: 'Filter exercise' })).toHaveValue('all');
-  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
+  await page.getByRole('button', { name: 'Pull', exact: true }).click();
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Bicep curl');
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page.getByRole('article')).toHaveCount(2);
-  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
+  await page.getByRole('button', { name: 'Legs', exact: true }).click();
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Camera workout');
   await expect(page.getByText(/sample data/i)).toHaveCount(0);
