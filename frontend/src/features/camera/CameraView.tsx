@@ -129,13 +129,13 @@ export function CameraView({
             if (state.paused && !video.current.paused) video.current.pause();
             else if (!state.paused && video.current.paused && !video.current.ended) void video.current.play();
           }
-          if (state.paused) {
+          if (state.paused || state.rest) {
             if (!wasPaused) {
               analyzer.reset();
               stabilizer.reset();
               displayResult = undefined;
               feedback.reset();
-              voice.stop();
+              if (state.paused && state.session?.status === 'active') voice.stop();
             }
             wasPaused = true;
             raf = requestAnimationFrame(safeTick);

@@ -1,5 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+test('voice coach announces a set summary, rest countdown, and next-set transition', async ({ page }) => {
+  test.setTimeout(65_000);
+  await page.addInitScript(() => {
+    const spoken: string[] = [];
+    Object.assign(window, { __spoken: spoken });
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {},
+        resume() {},
+        speak(utterance: SpeechSynthesisUtterance) {
+          spoken.push(utterance.text);
+          utterance.dispatchEvent(new Event('start'));
+          setTimeout(() => utterance.dispatchEvent(new Event('end')), 5);
+        },
+      },
+    });
+  });
+  await page.goto('/workout?mode=demo');
+  await page.getByRole('button', { name: 'Enable voice', exact: true }).click();
+  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12_000 });
+  await page.getByRole('button', { name: 'Finish set · rest 30s', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Rest, then go again.' })).toBeVisible();
+  await expect(page.getByRole('timer')).toContainText('30');
+  const repsAtRest = await page.getByTestId('rep-count').textContent();
+  await expect(page.getByRole('dialog', { name: 'Rest, then go again.' })).toBeHidden({ timeout: 35_000 });
+  await expect(page.getByTestId('rep-count')).toHaveText(repsAtRest || '1');
+  const spoken = await page.evaluate(() => (window as typeof window & { __spoken: string[] }).__spoken);
+  expect(spoken).toContain('Set 1 complete. 1 rep. No technique cues detected.');
+  expect(spoken).toContain('Rest 30 seconds.');
+  for (const second of [10, 5, 4, 3, 2, 1]) expect(spoken).toContain(`${second}.`);
+  expect(spoken).toContain('Set 2, go.');
+  await page.getByRole('button', { name: 'End session', exact: true }).click();
+});
+
 test('curl heatmap responds to movement and voice can be enabled and tested', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, 'speechSynthesis', {
@@ -23,7 +59,7 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
     'true',
   );
   await expect(page.locator('.voice-check')).toContainText('Voice ready');
-  await expect(page.getByRole('img', { name: /Biceps.*front and back muscle diagrams/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /biceps.*front and back muscle diagrams/i })).toBeVisible();
   await expect(page.locator('.muscle-panel')).not.toHaveAttribute('data-intensity', '0.00');
   await page.screenshot({ path: 'test-results/curl-heatmap.png', fullPage: true });
   await page.getByRole('button', { name: 'Test voice', exact: true }).click();

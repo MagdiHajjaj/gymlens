@@ -54,6 +54,13 @@ export interface Insight {
   next_focus: string;
   source: 'gemini' | 'statistics';
 }
+export interface WorkoutSetRange {
+  set_number: number;
+  start_rep: number;
+  end_rep: number;
+  completed_at: string;
+  rest_seconds?: number;
+}
 export interface WorkoutSession {
   id: string;
   exercise: ExerciseId;
@@ -64,6 +71,7 @@ export interface WorkoutSession {
   source: 'camera' | 'demo' | 'upload';
   reps: RepEvent[];
   metrics: MetricSample[];
+  set_ranges?: WorkoutSetRange[];
   insight?: Insight | null;
   local?: boolean;
   synced_id?: string;

@@ -52,7 +52,7 @@ export function SessionPage() {
     void api
       .detail(id!)
       .then((s) => {
-        if (!cancelled) setSession(s);
+        if (!cancelled) setSession({ ...s, set_ranges: local?.set_ranges ?? s.set_ranges });
       })
       .catch((e) => {
         if (!cancelled) setError(e.message);
@@ -69,7 +69,7 @@ export function SessionPage() {
     setBusy(true);
     setError('');
     try {
-      const saved = { ...(await api.save(session)), local: false };
+      const saved = { ...(await api.save(session)), set_ranges: session.set_ranges, local: false };
       setSession(saved);
       saveLocal(saved, owner);
     } catch (e) {
