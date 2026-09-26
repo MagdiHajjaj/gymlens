@@ -75,7 +75,7 @@ export function Shell({ children }: { children: ReactNode }) {
             History
           </NavLink>
           {identity.authenticated && (
-            <NavLink to="/profile">
+            <NavLink to="/profile" className="mobile-profile-link">
               <UserRound size={19} />
               Profile
             </NavLink>
@@ -99,6 +99,11 @@ export function Shell({ children }: { children: ReactNode }) {
           <button className="sidebar-utility" onClick={() => setSettings(true)}>
             <Settings2 size={18} /> Settings & connections
           </button>
+          {identity.authenticated && (
+            <Link className="sidebar-utility profile-utility" to="/profile">
+              <UserRound size={18} /> Profile
+            </Link>
+          )}
           <div className="sidebar-profile">
             <div className="avatar">{identity.authenticated ? (profileName || identity.name)[0] : 'G'}</div>
             <Link to={identity.authenticated ? '/profile' : '/'} className="sidebar-profile-copy">

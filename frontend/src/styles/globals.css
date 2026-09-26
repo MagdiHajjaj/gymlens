@@ -221,6 +221,12 @@ nav a.active:after {
   font-size: 10px;
   padding: 25px 3px;
 }
+.profile-utility {
+  padding-top: 0;
+}
+.mobile-profile-link {
+  display: none;
+}
 .sidebar-profile {
   display: flex;
   gap: 10px;
@@ -2209,6 +2215,9 @@ td strong {
   }
   nav a.active:after {
     display: none;
+  }
+  nav .mobile-profile-link {
+    display: flex;
   }
   .main-shell {
     margin-left: 76px;
