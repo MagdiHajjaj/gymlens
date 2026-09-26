@@ -17,7 +17,7 @@ export interface VoiceCue {
   metadata?: Record<string, string | number | boolean>;
 }
 
-export const FAULT_PHRASES: Record<ExerciseId, FormFault[]> = {
+export const FAULT_PHRASES: Partial<Record<ExerciseId, FormFault[]>> = {
   squat: [
     {
       code: 'excessive_forward_lean',

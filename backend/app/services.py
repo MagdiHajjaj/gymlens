@@ -56,6 +56,14 @@ def _cache_audio(text: str, content: bytes):
             _audio.popitem(last=False)
 
 
+def speech_cached(text: str) -> bool:
+    with _lock:
+        cached = text in _audio
+        if cached:
+            _audio.move_to_end(text)
+        return cached
+
+
 def speech(text: str, before_provider: Callable[[], None] | None = None) -> bytes:
     global _voice_down_until
     with _lock:

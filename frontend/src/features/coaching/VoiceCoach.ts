@@ -24,14 +24,17 @@ function voiceCacheKey(text: string): string {
 }
 
 // Keeps ElevenLabs audio in the browser's Cache Storage, so a page reload never pays for it again.
+function canUseVoiceCache(): boolean {
+  return typeof window !== 'undefined' && 'caches' in window;
+}
+
 async function readVoiceCache(text: string): Promise<Blob | undefined> {
-  const store = 'caches' in window ? await caches.open(VOICE_CACHE).catch(() => undefined) : undefined;
+  const store = await caches.open(VOICE_CACHE).catch(() => undefined);
   const hit = await store?.match(voiceCacheKey(text));
   return hit?.blob();
 }
 
 function writeVoiceCache(text: string, blob: Blob): void {
-  if (!('caches' in window)) return;
   void caches
     .open(VOICE_CACHE)
     .then((store) => store.put(voiceCacheKey(text), new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })))
@@ -216,8 +219,10 @@ export class VoiceCoach {
   private async requestCloud(text: string) {
     // Disk first: a stored phrase plays even while the cloud voice is cooling down,
     // and never consumes the provider rate budget.
-    const stored = await readVoiceCache(text);
-    if (stored) return stored;
+    if (canUseVoiceCache()) {
+      const stored = await readVoiceCache(text);
+      if (stored) return stored;
+    }
     const now = Date.now();
     if (now < this.cloudCooldownUntil) throw new Error('Cloud voice is cooling down');
     this.cloudCalls = this.cloudCalls.filter((time) => now - time < CLOUD_WINDOW_MS);
@@ -225,7 +230,7 @@ export class VoiceCoach {
     this.cloudCalls.push(now);
     try {
       const blob = await api.speech(text);
-      writeVoiceCache(text, blob);
+      if (canUseVoiceCache()) writeVoiceCache(text, blob);
       return blob;
     } catch (error) {
       this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
