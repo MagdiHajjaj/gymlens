@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
 import { exercises } from '../exercises/ExerciseRegistry';
@@ -12,7 +12,6 @@ import {
   usePlan,
   type PlanItem,
 } from './planStore';
-import type { ExerciseId } from '../../types/workout';
 
 const formatWeight = (weightKg: number) =>
   weightKg === 0 ? 'Bodyweight' : `${weightKg % 1 === 0 ? weightKg : weightKg.toFixed(1)} kg`;
@@ -64,13 +63,34 @@ function Stepper({
   );
 }
 
-function PlanRow({ item }: { item: PlanItem }) {
+function PlanRow({ item, isFirst, isLast }: { item: PlanItem; isFirst: boolean; isLast: boolean }) {
   const updatePlanItem = usePlan((state) => state.updatePlanItem);
+  const movePlanItem = usePlan((state) => state.movePlanItem);
   const complete = usePlan((state) => state.isExerciseComplete(item.exerciseId));
   const exercise = exercises[item.exerciseId];
 
   return (
     <li className={`plan-row${complete ? ' is-complete' : ''}`}>
+      <div className="plan-row-reorder" role="group" aria-label={`Reorder ${exercise.name}`}>
+        <button
+          type="button"
+          className="plan-row-reorder-button"
+          aria-label={`Move ${exercise.name} up`}
+          disabled={isFirst}
+          onClick={() => movePlanItem(item.exerciseId, -1)}
+        >
+          <ChevronUp size={16} />
+        </button>
+        <button
+          type="button"
+          className="plan-row-reorder-button"
+          aria-label={`Move ${exercise.name} down`}
+          disabled={isLast}
+          onClick={() => movePlanItem(item.exerciseId, 1)}
+        >
+          <ChevronDown size={16} />
+        </button>
+      </div>
       <span className="plan-row-art" aria-hidden="true">
         <ExerciseArt exercise={item.exerciseId} />
       </span>
@@ -121,28 +141,29 @@ function PlanRow({ item }: { item: PlanItem }) {
 }
 
 export function PlanStep({
-  exercises: exerciseIds,
   onContinue,
   onBack,
 }: {
-  exercises: ExerciseId[];
   onContinue: () => void;
   onBack: () => void;
 }) {
   const plan = usePlan((state) => state.plan);
-  const rows = exerciseIds
-    .map((exerciseId) => plan.find((item) => item.exerciseId === exerciseId))
-    .filter((item): item is PlanItem => item !== undefined);
 
   return (
     <div>
       <h2>Plan your session</h2>
       <p className="plan-step-intro">
-        Set a target weight, sets and reps for each exercise. You can adjust between sets.
+        Set a target weight, sets and reps for each exercise. Use the arrows to change the
+        order — exercises run top to bottom. You can adjust between sets.
       </p>
       <ul className="plan-rows" aria-label="Session plan">
-        {rows.map((item) => (
-          <PlanRow key={item.exerciseId} item={item} />
+        {plan.map((item, index) => (
+          <PlanRow
+            key={item.exerciseId}
+            item={item}
+            isFirst={index === 0}
+            isLast={index === plan.length - 1}
+          />
         ))}
       </ul>
       <div className="plan-step-actions">

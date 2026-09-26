@@ -566,6 +566,31 @@
   font-size: 14px;
   color: #5d6d62;
 }
+.plan-row-reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.plan-row-reorder-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #234e38;
+  cursor: pointer;
+  padding: 0;
+}
+.plan-row-reorder-button:hover:not(:disabled) {
+  background: #eef3ea;
+}
+.plan-row-reorder-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
 .plan-row-art {
   width: 64px;
   height: 64px;
