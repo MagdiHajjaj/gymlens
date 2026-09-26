@@ -5,6 +5,7 @@ import { PoseStabilizer } from '../pose/PoseStabilizer';
 import { createAnalyzer } from '../exercises/ExerciseRegistry';
 import { drawSkeleton } from './SkeletonOverlay';
 import { FeedbackEngine } from '../coaching/FeedbackEngine';
+import { selectedExerciseWarmPhrases } from '../coaching/Phrasebook';
 import { VoiceCoach } from '../coaching/VoiceCoach';
 import { useWorkout } from '../workout/workoutStore';
 import { useIdentity } from '../auth/AuthProvider';
@@ -57,6 +58,7 @@ export function CameraView({
     const upload = session.source === 'upload';
     let displayResult: ExerciseResult | undefined;
     let demoLandmarks: PoseFrame['landmarks'] = [];
+    let warmedVoice = false;
     async function start() {
       setError('');
       setVideoEnded(false);
@@ -179,10 +181,20 @@ export function CameraView({
                 lastUi = now;
               }
               if (state.voice) {
-                const message = feedback.next(result, now);
-                if (message)
-                  void voice.speak(message, authenticated && result.trackingValid && result.calibrated);
-              } else feedback.reset();
+                if (authenticated && !warmedVoice) {
+                  warmedVoice = true;
+                  void voice.warmPhrases(selectedExerciseWarmPhrases(session.exercise), true);
+                }
+                const totalReps = useWorkout.getState().session?.total_reps ?? state.session?.total_reps ?? 0;
+                const cue = feedback.nextCue(result, now, { exercise: session.exercise, totalReps });
+                if (cue)
+                  void voice.speak(cue.text, authenticated && result.trackingValid && result.calibrated, {
+                    priority: cue.priority,
+                  });
+              } else {
+                warmedVoice = false;
+                feedback.reset();
+              }
             }
           }
           drawSkeleton(

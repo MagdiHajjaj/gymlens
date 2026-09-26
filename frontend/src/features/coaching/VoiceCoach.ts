@@ -1,54 +1,131 @@
 import { api } from '../../lib/api';
 
+interface SpeakOptions {
+  priority?: number;
+}
+
+interface SpeechRequest {
+  id: number;
+  text: string;
+  authenticated: boolean;
+  priority: number;
+  generation: number;
+  resolve: () => void;
+}
+
+const CLOUD_LIMIT = 12;
+const CLOUD_WINDOW_MS = 60_000;
+const CLOUD_COOLDOWN_MS = 60_000;
+
 const VOICE_CACHE = 'gymlens-voice-v1';
-const CLOUD_BACKOFF_MS = 120_000;
+
+function voiceCacheKey(text: string): string {
+  return `/voice-cache/${encodeURIComponent(text)}`;
+}
 
 // Keeps ElevenLabs audio in the browser's Cache Storage, so a page reload never pays for it again.
-async function cachedSpeech(text: string): Promise<Blob> {
-  const key = `/voice-cache/${encodeURIComponent(text)}`;
-  const store = 'caches' in window ? await caches.open(VOICE_CACHE).catch(() => undefined) : undefined;
-  const hit = await store?.match(key);
-  if (hit) return hit.blob();
-  const blob = await api.speech(text);
-  void store?.put(key, new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })).catch(() => {});
-  return blob;
+function canUseVoiceCache(): boolean {
+  return typeof window !== 'undefined' && 'caches' in window;
 }
+
+async function readVoiceCache(text: string): Promise<Blob | undefined> {
+  const store = await caches.open(VOICE_CACHE).catch(() => undefined);
+  const hit = await store?.match(voiceCacheKey(text));
+  return hit?.blob();
+}
+
+function writeVoiceCache(text: string, blob: Blob): void {
+  void caches
+    .open(VOICE_CACHE)
+    .then((store) => store.put(voiceCacheKey(text), new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })))
+    .catch(() => {});
+}
+
 export class VoiceCoach {
   constructor(private report: (status: string) => void = () => {}) {}
-  private busy = false;
   private generation = 0;
+  private nextId = 0;
+  private active?: SpeechRequest;
+  private pending?: SpeechRequest;
   private audio?: HTMLAudioElement;
   private cancelPlayback?: () => void;
   private cache = new Map<string, Blob>();
-  /** After ElevenLabs fails, use the browser voice until this time instead of retrying every cue. */
-  private cloudPausedUntil = 0;
+  private cloudInflight = new Map<string, Promise<Blob>>();
+  private cloudCalls: number[] = [];
+  private cloudCooldownUntil = 0;
+
   stop() {
     this.generation++;
+    this.pending?.resolve();
+    this.pending = undefined;
     this.cancelPlayback?.();
     this.cancelPlayback = undefined;
     this.audio?.pause();
     this.audio = undefined;
     window.speechSynthesis?.cancel();
-    this.busy = false;
+    this.active?.resolve();
+    this.active = undefined;
   }
-  async speak(text: string, authenticated: boolean) {
-    if (this.busy) return;
-    this.busy = true;
-    this.report('Preparing voice…');
-    const generation = this.generation;
+
+  speak(text: string, authenticated: boolean, options: SpeakOptions = {}) {
+    const request: SpeechRequest = {
+      id: ++this.nextId,
+      text,
+      authenticated,
+      priority: options.priority ?? 0,
+      generation: this.generation,
+      resolve: () => {},
+    };
+    const promise = new Promise<void>((resolve) => {
+      request.resolve = resolve;
+    });
+    if (!this.active) {
+      this.active = request;
+      void this.runActive(request);
+      return promise;
+    }
+    if (!this.pending || request.priority >= this.pending.priority) {
+      this.pending?.resolve();
+      this.pending = request;
+    } else request.resolve();
+    return promise;
+  }
+
+  async warmPhrases(phrases: string[], authenticated: boolean) {
+    if (!authenticated) return false;
+    for (const phrase of phrases) {
+      if (this.cache.has(phrase)) continue;
+      try {
+        await this.fetchCloud(phrase);
+      } catch {
+        this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private async runActive(request: SpeechRequest) {
     try {
-      if (authenticated && Date.now() >= this.cloudPausedUntil) {
-        let blob = this.cache.get(text);
-        if (!blob) {
-          try {
-            blob = await cachedSpeech(text);
-          } catch (e) {
-            this.cloudPausedUntil = Date.now() + CLOUD_BACKOFF_MS;
-            throw e;
-          }
-          this.cache.set(text, blob);
-        }
-        if (generation !== this.generation) return;
+      await this.perform(request);
+    } finally {
+      if (this.active?.id === request.id) this.active = undefined;
+      request.resolve();
+      const next = this.pending;
+      this.pending = undefined;
+      if (next && next.generation === this.generation) {
+        this.active = next;
+        void this.runActive(next);
+      } else next?.resolve();
+    }
+  }
+
+  private async perform(request: SpeechRequest) {
+    this.report('Preparing voice…');
+    try {
+      if (request.authenticated) {
+        const blob = await this.fetchCloud(request.text);
+        if (!this.isCurrent(request)) return;
         const url = URL.createObjectURL(blob);
         try {
           const audio = new Audio(url);
@@ -58,6 +135,7 @@ export class VoiceCoach {
               clearTimeout(timer);
               audio.onended = audio.onerror = audio.onpause = null;
               this.cancelPlayback = undefined;
+              if (this.audio === audio) this.audio = undefined;
               audio.pause();
               if (error) reject(error);
               else resolve();
@@ -70,11 +148,11 @@ export class VoiceCoach {
             void audio
               .play()
               .then(() => {
-                if (generation === this.generation) this.report('Speaking · ElevenLabs');
+                if (this.isCurrent(request)) this.report('Speaking · ElevenLabs');
               })
               .catch(() => finish(new Error('Playback blocked')));
           });
-          if (generation === this.generation) this.report('Voice ready · ElevenLabs');
+          if (this.isCurrent(request)) this.report('Voice ready · ElevenLabs');
         } finally {
           URL.revokeObjectURL(url);
         }
@@ -82,38 +160,85 @@ export class VoiceCoach {
       }
       throw new Error('Use browser voice');
     } catch {
-      if (generation !== this.generation) return;
-      if (!('speechSynthesis' in window)) {
-        this.report('Audio unavailable in this browser. Visual cues remain on.');
-        return;
-      }
-      await new Promise<void>((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        const finish = (status?: string) => {
-          clearTimeout(timer);
-          utterance.onstart = utterance.onend = utterance.onerror = null;
-          this.cancelPlayback = undefined;
-          if (status && generation === this.generation) this.report(status);
-          resolve();
-        };
-        const timer = setTimeout(() => {
-          finish('No audio response. Tap Test voice to retry.');
-          window.speechSynthesis.cancel();
-        }, 15000);
-        this.cancelPlayback = () => finish();
-        utterance.rate = 0.95;
-        utterance.onstart = () => this.report('Speaking · browser voice');
-        utterance.onend = () => {
-          finish('Voice ready · browser');
-        };
-        utterance.onerror = () => {
-          finish('Playback blocked. Tap Test voice to retry.');
-        };
-        window.speechSynthesis.resume();
-        window.speechSynthesis.speak(utterance);
-      });
-    } finally {
-      if (generation === this.generation) this.busy = false;
+      if (!this.isCurrent(request)) return;
+      await this.speakBrowser(request);
     }
+  }
+
+  private async speakBrowser(request: SpeechRequest) {
+    if (!('speechSynthesis' in window)) {
+      this.report('Audio unavailable in this browser. Visual cues remain on.');
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(request.text);
+      const finish = (status?: string) => {
+        clearTimeout(timer);
+        utterance.onstart = utterance.onend = utterance.onerror = null;
+        this.cancelPlayback = undefined;
+        if (status && this.isCurrent(request)) this.report(status);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        finish('No audio response. Tap Test voice to retry.');
+        window.speechSynthesis.cancel();
+      }, 15000);
+      this.cancelPlayback = () => finish();
+      utterance.rate = 0.95;
+      utterance.onstart = () => {
+        if (this.isCurrent(request)) this.report('Speaking · browser voice');
+      };
+      utterance.onend = () => {
+        finish('Voice ready · browser');
+      };
+      utterance.onerror = () => {
+        finish('Playback blocked. Tap Test voice to retry.');
+      };
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  private fetchCloud(text: string): Promise<Blob> {
+    const cached = this.cache.get(text);
+    if (cached) return Promise.resolve(cached);
+    const current = this.cloudInflight.get(text);
+    if (current) return current;
+    const request = this.requestCloud(text)
+      .then((blob) => {
+        this.cache.set(text, blob);
+        return blob;
+      })
+      .finally(() => {
+        if (this.cloudInflight.get(text) === request) this.cloudInflight.delete(text);
+      });
+    this.cloudInflight.set(text, request);
+    return request;
+  }
+
+  private async requestCloud(text: string) {
+    // Disk first: a stored phrase plays even while the cloud voice is cooling down,
+    // and never consumes the provider rate budget.
+    if (canUseVoiceCache()) {
+      const stored = await readVoiceCache(text);
+      if (stored) return stored;
+    }
+    const now = Date.now();
+    if (now < this.cloudCooldownUntil) throw new Error('Cloud voice is cooling down');
+    this.cloudCalls = this.cloudCalls.filter((time) => now - time < CLOUD_WINDOW_MS);
+    if (this.cloudCalls.length >= CLOUD_LIMIT) throw new Error('Cloud voice rate limit reached');
+    this.cloudCalls.push(now);
+    try {
+      const blob = await api.speech(text);
+      if (canUseVoiceCache()) writeVoiceCache(text, blob);
+      return blob;
+    } catch (error) {
+      this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
+      throw error;
+    }
+  }
+
+  private isCurrent(request: SpeechRequest) {
+    return this.active?.id === request.id && request.generation === this.generation;
   }
 }
