@@ -480,7 +480,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       guidance,
     });
     const l = frame.landmarks;
-    const indices = this.exercise.landmarks;
+    const indices = this.exercise.primaryJoints;
     const confidence = (offset: number) =>
       this.fixedSide !== undefined && offset !== this.fixedSide
         ? 0
@@ -539,10 +539,11 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     const bodyInclination = hipVisible ? inclination(p(11), p(23), aspect) : 0;
     if (
       this.id !== 'curl' &&
-      (torso < 0.04 ||
-        ((l[11]?.visibility ?? 0) > 0.6 &&
+      ((hipVisible && torso < 0.04) ||
+      (hipVisible &&
+          (l[11]?.visibility ?? 0) > 0.6 &&
           (l[12]?.visibility ?? 0) > 0.6 &&
-          Math.abs(l[11].x - l[12].x) * aspect > torso * 0.65))
+            Math.abs(l[11].x - l[12].x) * aspect > torso * 0.65))
     ) {
       this.reset();
       return empty('Turn side-on to the camera for this exercise.');
@@ -558,12 +559,18 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     }
     const alignment =
       this.exercise.alignment.mode === 'hipAngle'
-        ? jointAngle(
+        ? [
             p(this.exercise.alignment.joints[0]),
             p(this.exercise.alignment.joints[1]),
             p(this.exercise.alignment.joints[2]),
-            aspect,
-          )
+          ].every((point) => point && (point.visibility ?? 0) >= this.config.visibility)
+          ? jointAngle(
+              p(this.exercise.alignment.joints[0]),
+              p(this.exercise.alignment.joints[1]),
+              p(this.exercise.alignment.joints[2]),
+              aspect,
+            )
+          : 0
         : hipVisible
           ? inclination(
               p(this.exercise.alignment.joints[0]),
@@ -571,7 +578,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
               aspect,
             )
           : 0;
-    if (!Number.isFinite(angle) || !Number.isFinite(alignment)) {
+    if (!Number.isFinite(angle)) {
       this.reset();
       return empty('Move into clear view of the camera.');
     }
@@ -671,12 +678,17 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       this.maximumLean = Math.max(this.maximumLean, torsoAngle);
       for (const check of this.exercise.cycleFaults) {
         let hit = false;
-        if (check.kind === 'alignmentExceeds') hit = torsoAngle > this.config.maximumLean;
-        else if (check.kind === 'alignmentBelow') hit = torsoAngle < this.config.minimumHipAlignment;
+        if (check.kind === 'alignmentExceeds') hit = hipVisible && torsoAngle > this.config.maximumLean;
+        else if (check.kind === 'alignmentBelow') hit = alignment !== 0 && torsoAngle < this.config.minimumHipAlignment;
         else if (check.kind === 'extraAngleExceeds')
           hit = (angles[check.angle] ?? 0) > this.config.maximumArmSwing;
         else if (check.kind === 'kneeOverToes')
-          hit = Math.abs((p(check.knee).x - p(check.ankle).x) * aspect) > check.tolerance;
+          hit =
+            p(check.knee) &&
+            p(check.ankle) &&
+            (p(check.knee).visibility ?? 0) >= this.config.visibility &&
+            (p(check.ankle).visibility ?? 0) >= this.config.visibility &&
+            Math.abs((p(check.knee).x - p(check.ankle).x) * aspect) > check.tolerance;
         if (hit) result.faults.push(fault(check.code, check.message));
       }
       for (const f of result.faults) this.cycleFaults.set(f.code, f);

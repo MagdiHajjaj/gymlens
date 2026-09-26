@@ -122,6 +122,18 @@ it('tracks curl cycles with cropped hips and a wider shoulder view', () => {
   expect(results.every((r) => r.jointAngles.upper_arm_angle === undefined)).toBe(true);
 });
 
+it('keeps the press tracking when only its primary arm joints are visible', () => {
+  const analyzer = new MovementAnalyzer('press');
+  const results = fixture('press').slice(0, 40).map((original) => {
+    const frame = structuredClone(original);
+    frame.landmarks[23].visibility = 0;
+    frame.landmarks[24].visibility = 0;
+    return analyzer.analyze(frame);
+  });
+  expect(results.every((result) => result.trackingValid)).toBe(true);
+  expect(results.at(-1)?.calibrated).toBe(true);
+});
+
 it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
   const analyzer = new MovementAnalyzer('curl');
   const results = fixture('curl').map((original) => {
