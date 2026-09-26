@@ -108,32 +108,39 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history filters by split and exercise on mobile, and repeat keeps the exercise', async ({ page }) => {
+test('history filters splits and exercises, excludes legacy demos, and repeats on mobile', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seed(page, [
     recordedSession,
     { ...recordedSession, id: 'curl-demo', exercise: 'curl', source: 'demo' },
+    { ...recordedSession, id: 'curl-real', exercise: 'curl', source: 'camera' },
   ]);
   await page.goto('/history');
   await expect(page.getByRole('article')).toHaveCount(2);
   await expect(page.getByRole('combobox', { name: 'Filter session type' })).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
-  await expect(page.getByRole('article')).toHaveCount(1);
-  await expect(page.getByRole('article')).toContainText('Camera workout');
   await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('lunge');
   await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear filters' }).click();
-  await expect(page.getByRole('article')).toHaveCount(2);
   await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('pull');
+  await expect(page.getByRole('combobox', { name: 'Filter exercise' })).toHaveValue('all');
   await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
   await expect(page.getByRole('article')).toHaveCount(1);
-  await page.getByRole('link', { name: 'View Bicep curl session' }).click();
-  await expect(page.getByText(/It demonstrates the report/)).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Arm not recorded');
+  await expect(page.getByRole('article')).toContainText('Bicep curl');
+  await page.getByRole('button', { name: 'Clear filters' }).click();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Filter workout split' }).selectOption('legs');
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(page.getByRole('article')).toContainText('Camera workout');
+  await expect(page.getByText(/sample data/i)).toHaveCount(0);
+  expect(
+    await page.evaluate(() => Object.values(localStorage).every((value) => !value.includes('curl-demo'))),
+  ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Repeat this exercise' }).click();
+  await page.getByRole('button', { name: 'Repeat Squat' }).click();
   await expect(page).toHaveURL(/\/workout$/);
-  await expect(page.getByRole('button', { name: 'Bicep curl', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Squat', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

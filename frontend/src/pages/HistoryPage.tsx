@@ -172,7 +172,7 @@ export function HistoryPage() {
                 ? 'Try another workout split or exercise, or clear the filters.'
                 : error
                   ? 'Retry account history to check your saved workouts.'
-                  : 'Complete a workout or try a demo to see your report here.'}
+                  : 'Complete a workout to see your report here.'}
             </p>
             {exercise !== 'all' || split !== 'all' ? (
               <Button
@@ -195,8 +195,7 @@ export function HistoryPage() {
         )}
       </div>
       <p className="report-note">
-        Demo sessions use sample movement and are excluded from training totals. Cue counts reflect recorded
-        checks, not a form score. This browser keeps up to 50 recent sessions.
+        Cue counts reflect recorded checks, not a form score. This browser keeps up to 50 recent workouts.
       </p>
     </div>
   );

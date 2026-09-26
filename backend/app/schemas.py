@@ -39,7 +39,7 @@ class ProfileUpdate(StrictModel):
 class WorkoutCreate(StrictModel):
     id: UUID
     exercise: Exercise
-    source: Literal["camera", "demo", "upload"]
+    source: Literal["camera", "upload"]
     started_at: AwareDatetime
 
 

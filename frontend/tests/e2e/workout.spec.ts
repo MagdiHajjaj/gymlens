@@ -33,7 +33,7 @@ test('voice coach announces a set summary, rest countdown, and next-set transiti
   expect(spoken).toContain('Rest 30 seconds.');
   for (const second of [10, 5, 4, 3, 2, 1]) expect(spoken).toContain(`${second}.`);
   expect(spoken).toContain('Set 2, go.');
-  await page.getByRole('button', { name: 'End session', exact: true }).click();
+  await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
 });
 
 test('curl heatmap responds to movement and voice can be enabled and tested', async ({ page }) => {
@@ -68,33 +68,25 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12000 });
   await expect(page.locator('.arm-tracking > div').nth(0)).toContainText('1 rep');
   await expect(page.locator('.arm-tracking > div').nth(1)).toContainText('1 rep');
-  await page.getByRole('button', { name: 'End session', exact: true }).click();
+  await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
   await expect(page.locator('.session-key-stats')).toContainText('Simultaneous curls count as one rep');
 });
-test('guest demo completes reps, pauses, saves a report and survives reload', async ({ page }) => {
+test('guest demo exits without creating a report or history entry', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /Good form/ })).toBeVisible();
   await page.getByRole('button', { name: 'Try the demo', exact: true }).click();
   await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('2', { timeout: 18000 });
-  await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  await page.waitForTimeout(1200);
-  await expect(page.getByTestId('rep-count')).toHaveText('2');
-  await page.getByRole('button', { name: 'Resume', exact: true }).click();
-  await page.getByRole('button', { name: 'End session', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'What the tracker observed' })).toContainText('Depth cue');
-  await expect(page.getByText(/Saved in this browser/)).toBeVisible();
-  await page.reload();
-  await page.getByText('Explore measurements and individual reps', { exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Individual reps' })).toBeVisible();
-  await page.getByRole('link', { name: 'All sessions' }).click();
-  await expect(page.getByRole('article', { name: 'Squat session' })).toBeVisible();
+  await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
+  await expect(page).toHaveURL(/\/workout$/);
+  await expect(page.getByRole('button', { name: 'Set up camera', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('article')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
 test('camera permission failure provides an actionable demo fallback', async ({ page }) => {
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => {
@@ -106,8 +98,8 @@ test('camera permission failure provides an actionable demo fallback', async ({ 
   await expect(page.getByRole('alert')).toContainText('Camera access was blocked');
   await page.getByRole('button', { name: 'Try landmark demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12000 });
-  await page.getByRole('button', { name: 'End session' }).click();
-  await expect(page.getByText(/synthetic landmark data/)).toBeVisible();
+  await page.getByRole('button', { name: 'Exit demo' }).click();
+  await expect(page).toHaveURL(/\/workout$/);
 });
 test('exercise selection and responsive navigation work without overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -131,18 +123,16 @@ test('local MediaPipe model initializes against a browser test camera', async ({
   await expect(page.locator('video')).toHaveCount(0);
 });
 
-test('leaving an active mobile workout preserves its completed reps', async ({ page }) => {
+test('leaving an active mobile demo discards it without a prompt', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/workout?mode=demo');
   await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12000 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('link', { name: 'History', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'End this workout and leave?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Save and leave', exact: true }).click();
-  await expect(page.getByRole('article', { name: 'Squat session' })).toContainText('1');
-  await page.getByRole('link', { name: 'View Squat session' }).click();
-  await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect(page.getByRole('dialog', { name: 'End this workout and leave?' })).toHaveCount(0);
+  await expect(page.getByRole('article')).toHaveCount(0);
 });
 
 test('camera preview gates start, records no reps, and releases the camera when cancelled', async ({
@@ -217,22 +207,4 @@ test('camera preview gates start, records no reps, and releases the camera when 
       ),
     )
     .toBe(true);
-});
-
-test('cancel leaving keeps a workout open and browser back is guarded', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Try the demo', exact: true }).click();
-  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
-  await page.getByRole('link', { name: 'History', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'End this workout and leave?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Stay in workout' })).toBeFocused();
-  await page.getByRole('button', { name: 'Stay in workout' }).click();
-  await expect(page).toHaveURL(/workout/);
-  await page.goBack();
-  await expect(page.getByRole('dialog', { name: 'End this workout and leave?' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog')).toBeHidden();
-  await expect(page).toHaveURL(/workout/);
-  await page.getByRole('button', { name: 'End session', exact: true }).click();
-  await expect(page).toHaveURL(/session\//);
 });

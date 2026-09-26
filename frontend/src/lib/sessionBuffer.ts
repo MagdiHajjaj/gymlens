@@ -5,21 +5,27 @@ const knownExercises = new Set(Object.keys(exercises));
 export function localSessions(owner: string): WorkoutSession[] {
   try {
     const value = JSON.parse(localStorage.getItem(prefix + owner) || '[]');
-    return Array.isArray(value)
+    const sessions = Array.isArray(value)
       ? value.filter(
           (s) =>
             s &&
             typeof s.id === 'string' &&
+            s.source !== 'demo' &&
             knownExercises.has(s.exercise) &&
             Array.isArray(s.reps) &&
             Array.isArray(s.metrics),
         )
       : [];
+    if (Array.isArray(value) && sessions.length !== value.length) {
+      localStorage.setItem(prefix + owner, JSON.stringify(sessions));
+    }
+    return sessions;
   } catch {
     return [];
   }
 }
 export function saveLocal(session: WorkoutSession, owner: string) {
+  if (session.source === 'demo') return;
   const rows = [session, ...localSessions(owner).filter((s) => s.id !== session.id)].slice(0, 50);
   localStorage.setItem(prefix + owner, JSON.stringify(rows));
 }

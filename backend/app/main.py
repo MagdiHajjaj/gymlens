@@ -90,7 +90,9 @@ def current_user(subject: str = Depends(current_subject), db: Session = Depends(
 
 def owned(session_id: UUID, db: Session, user: User):
     workout = db.scalar(
-        select(Workout).where(Workout.id == str(session_id), Workout.user_id == user.id).with_for_update()
+        select(Workout)
+        .where(Workout.id == str(session_id), Workout.user_id == user.id, Workout.source != "demo")
+        .with_for_update()
     )
     if not workout:
         raise HTTPException(404, "Workout not found")
@@ -232,7 +234,7 @@ def history(
 ):
     rows = db.scalars(
         select(Workout)
-        .where(Workout.user_id == user.id)
+        .where(Workout.user_id == user.id, Workout.source != "demo")
         .order_by(Workout.started_at.desc())
         .offset(offset)
         .limit(limit)
