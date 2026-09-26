@@ -1,5 +1,6 @@
 import { beforeEach, expect, it } from 'vitest';
 import { useWorkout } from '../src/features/workout/workoutStore';
+import { usePlan } from '../src/features/workout/planStore';
 import type { ExerciseResult } from '../src/types/workout';
 
 const completeResult = (faults: ExerciseResult['faults'] = []): ExerciseResult => ({
@@ -24,6 +25,7 @@ beforeEach(() => {
     rest: null,
     currentSetStartRep: 1,
   });
+  usePlan.setState({ plan: [], completedExerciseIds: [] });
 });
 
 it('starts rest only after closing a nonempty real rep range', () => {
@@ -72,4 +74,25 @@ it('resets rest state when beginning a new session', () => {
   expect(useWorkout.getState().rest).toBeNull();
   expect(useWorkout.getState().currentSetStartRep).toBe(1);
   expect(useWorkout.getState().session?.set_ranges).toBeUndefined();
+});
+
+it('marks the exercise complete on the plan when a real session finishes', () => {
+  usePlan.getState().setPlan(['squat', 'pushup']);
+  useWorkout.getState().begin('camera');
+  useWorkout.getState().ingest(completeResult(), 1_000);
+
+  const session = useWorkout.getState().finish();
+
+  expect(session.status).toBe('completed');
+  expect(usePlan.getState().isExerciseComplete('squat')).toBe(true);
+  expect(usePlan.getState().isExerciseComplete('pushup')).toBe(false);
+});
+
+it('does not mark the plan complete for sample-footage demo sessions', () => {
+  usePlan.getState().setPlan(['squat']);
+  useWorkout.getState().begin('demo');
+
+  useWorkout.getState().finish();
+
+  expect(usePlan.getState().completedExerciseIds).toEqual([]);
 });

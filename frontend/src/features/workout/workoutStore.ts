@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ExerciseId, ExerciseResult, WorkoutSession, WorkoutSetRange } from '../../types/workout';
 import { exercisesForMovement, type ExerciseMovement } from '../exercises/ExerciseRegistry';
+import { usePlan } from './planStore';
 
 type RestPreset = 30 | 60 | 90;
 interface WorkoutRest {
@@ -163,6 +164,9 @@ export const useWorkout = create<Store>((set, get) => ({
     const [closed] = closeCurrentSet(current, get().currentSetStartRep, Date.now());
     const session: WorkoutSession = { ...closed, ended_at: new Date().toISOString(), status: 'completed' };
     set({ session, paused: true, rest: null, currentSetStartRep: session.reps.length + 1 });
+    // A finished real session completes the exercise on the plan; sample-footage
+    // demos are not the user's workout, so they never earn a checkmark.
+    if (session.source !== 'demo') usePlan.getState().completeExercise(session.exercise);
     return session;
   },
 }));

@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
 import { CameraView, type CameraReadiness } from '../camera/CameraView';
@@ -34,10 +34,15 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, selectedIds, toggleExercise, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
+  const { selected, select, selectedIds, toggleExercise, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
   const setPlan = usePlan((state) => state.setPlan);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const plan = usePlan((state) => state.plan);
+  const completedExerciseIds = usePlan((state) => state.completedExerciseIds);
+  const hasPlan = plan.length > 0;
+  const reviewRequested = searchParams.get('plan') === 'review';
   const [preview, setPreview] = useState(false);
-  const [planning, setPlanning] = useState(false);
+  const [planning, setPlanning] = useState(() => reviewRequested && hasPlan);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
     cameraReady: false,
@@ -56,12 +61,33 @@ export function WorkoutSetup({
       window.scrollTo(0, 0);
     }
   }, [preview]);
-  const exercise = exercises[selected];
+  // After finishing, /workout?plan=review reopens the plan as an overview: rows show
+  // checkmarks and the side panel previews the next incomplete exercise.
+  const reviewMode = reviewRequested && hasPlan;
+  const nextIncompleteId = plan.find(
+    (item) => !completedExerciseIds.includes(item.exerciseId),
+  )?.exerciseId;
+  const focusId = reviewMode ? (nextIncompleteId ?? selected) : selected;
+  const exercise = exercises[focusId];
+  const doneCount = plan.filter((item) => completedExerciseIds.includes(item.exerciseId)).length;
+  const allComplete = reviewMode && doneCount === plan.length;
   const ready = readiness.cameraReady && readiness.trackingValid && readiness.calibrated;
   const step = preview ? 3 : planning ? 2 : 1;
   const enterPlan = () => {
     setPlan(selectedIds);
     setPlanning(true);
+  };
+  const exitReview = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('plan');
+    setSearchParams(next);
+    setPlanning(false);
+  };
+  const continueReview = () => {
+    if (!nextIncompleteId) return;
+    select(nextIncompleteId);
+    setPlanning(false);
+    setPreview(true);
   };
   const [autoStartRemaining, setAutoStartRemaining] = useState(0);
 
@@ -98,14 +124,24 @@ export function WorkoutSetup({
         <div>
           <span className="eyebrow">YOUR WORKOUT</span>
           <h1 ref={heading} tabIndex={-1}>
-            {planning ? 'Plan your session.' : preview ? 'Find your position.' : 'What are we training today?'}
+            {preview
+              ? 'Find your position.'
+              : reviewMode
+                ? 'Your plan.'
+                : planning
+                  ? 'Plan your session.'
+                  : 'What are we training today?'}
           </h1>
           <p>
-            {planning
-              ? 'Set a target weight and number of sets for each exercise.'
-              : preview
-                ? 'Check your framing before you start. Preview movements are not recorded.'
-                : 'Choose an exercise. We’ll help you get into position and count your reps.'}
+            {preview
+              ? 'Check your framing before you start. Preview movements are not recorded.'
+              : reviewMode
+                ? allComplete
+                  ? 'Every exercise is done. Nice work.'
+                  : `${doneCount} of ${plan.length} complete. Keep going when you’re ready.`
+                : planning
+                  ? 'Set a target weight and number of sets for each exercise.'
+                  : 'Choose an exercise. We’ll help you get into position and count your reps.'}
           </p>
         </div>
         <span className="tag green">
@@ -129,7 +165,15 @@ export function WorkoutSetup({
       <div className="guided-setup-grid">
         <section
           className="panel exercise-picker"
-          aria-label={preview ? 'Camera preview' : planning ? 'Plan your session' : 'Choose exercise'}
+          aria-label={
+            preview
+              ? 'Camera preview'
+              : reviewMode
+                ? 'Your plan'
+                : planning
+                  ? 'Plan your session'
+                  : 'Choose exercise'
+          }
         >
           {preview ? (
             <>
@@ -159,14 +203,31 @@ export function WorkoutSetup({
               </p>
             </>
           ) : planning ? (
-            <PlanStep
-              exercises={selectedIds}
-              onContinue={() => {
-                setPlanning(false);
-                setPreview(true);
-              }}
-              onBack={() => setPlanning(false)}
-            />
+            reviewMode && allComplete ? (
+              <div className="plan-complete">
+                <span className="plan-complete-badge" aria-hidden="true">
+                  <Check size={22} />
+                </span>
+                <h2>Plan complete</h2>
+                <p>You finished every exercise in this session’s plan.</p>
+                <Button variant="secondary" onClick={exitReview}>
+                  Choose another exercise
+                </Button>
+              </div>
+            ) : (
+              <PlanStep
+                exercises={reviewMode ? plan.map((item) => item.exerciseId) : selectedIds}
+                onContinue={
+                  reviewMode
+                    ? continueReview
+                    : () => {
+                        setPlanning(false);
+                        setPreview(true);
+                      }
+                }
+                onBack={reviewMode ? exitReview : () => setPlanning(false)}
+              />
+            )
           ) : (
             <>
               <h2>Choose your exercise</h2>
@@ -203,8 +264,8 @@ export function WorkoutSetup({
 
         <aside className="panel workout-ready-panel">
           <div className={`position-guide ${exercise.color}`}>
-            <ExerciseArt exercise={selected} />
-            <span>{selected === 'curl' ? 'Face the camera' : 'Side view'}</span>
+            <ExerciseArt exercise={focusId} />
+            <span>{focusId === 'curl' ? 'Face the camera' : 'Side view'}</span>
           </div>
           <span className="eyebrow">{preview ? 'POSITION CHECK' : 'YOUR NEXT STEP'}</span>
           <h2>{preview ? 'Get ready to move' : exercise.name}</h2>

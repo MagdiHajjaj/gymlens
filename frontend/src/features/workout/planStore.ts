@@ -35,23 +35,40 @@ export const defaultWeightFor = (exerciseId: ExerciseId): number => DEFAULT_WEIG
 
 interface PlanStore {
   plan: PlanItem[];
-  /** (Re)builds the plan for the given exercises, keeping any edits already made. */
+  /** Exercises marked finished in the current plan, in completion order. */
+  completedExerciseIds: ExerciseId[];
+  /** (Re)builds the plan for the given exercises, keeping any edits already made.
+   *  Completion resets when the exercise list changes (a new plan); rebuilding the
+   *  same list keeps it so returning to the plan step never wipes checkmarks. */
   setPlan: (exerciseIds: ExerciseId[]) => void;
   updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number }) => void;
+  /** Marks an exercise finished. Idempotent; safe for exercises outside the plan. */
+  completeExercise: (exerciseId: ExerciseId) => void;
+  /** True when the exercise was marked finished in the current plan. */
+  isExerciseComplete: (exerciseId: ExerciseId) => boolean;
   clearPlan: () => void;
 }
 
-export const usePlan = create<PlanStore>((set) => ({
+export const usePlan = create<PlanStore>((set, get) => ({
   plan: [],
+  completedExerciseIds: [],
   setPlan: (exerciseIds) =>
-    set((state) => ({
-      plan: exerciseIds.map((exerciseId) => {
-        const existing = state.plan.find((item) => item.exerciseId === exerciseId);
-        return (
-          existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS }
+    set((state) => {
+      const sameExercises =
+        state.plan.length === exerciseIds.length &&
+        exerciseIds.every((exerciseId) =>
+          state.plan.some((item) => item.exerciseId === exerciseId),
         );
-      }),
-    })),
+      return {
+        plan: exerciseIds.map((exerciseId) => {
+          const existing = state.plan.find((item) => item.exerciseId === exerciseId);
+          return (
+            existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS }
+          );
+        }),
+        ...(sameExercises ? {} : { completedExerciseIds: [] }),
+      };
+    }),
   updatePlanItem: (exerciseId, patch) =>
     set((state) => ({
       plan: state.plan.map((item) =>
@@ -68,5 +85,12 @@ export const usePlan = create<PlanStore>((set) => ({
           : item,
       ),
     })),
-  clearPlan: () => set({ plan: [] }),
+  clearPlan: () => set({ plan: [], completedExerciseIds: [] }),
+  completeExercise: (exerciseId) =>
+    set((state) =>
+      state.completedExerciseIds.includes(exerciseId)
+        ? {}
+        : { completedExerciseIds: [...state.completedExerciseIds, exerciseId] },
+    ),
+  isExerciseComplete: (exerciseId) => get().completedExerciseIds.includes(exerciseId),
 }));
