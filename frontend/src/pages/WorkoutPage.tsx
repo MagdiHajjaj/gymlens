@@ -69,6 +69,7 @@ export function WorkoutPage() {
   const [voiceStatus, setVoiceStatus] = useState('Tap Voice on to hear coaching.');
   const [restRemaining, setRestRemaining] = useState(0);
   const leaveDialog = useRef<HTMLDialogElement>(null);
+  const exitDemoDialog = useRef<HTMLDialogElement>(null);
   const [leaveError, setLeaveError] = useState('');
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -85,6 +86,9 @@ export function WorkoutPage() {
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
   const trackedReps = session?.total_reps ?? 0;
+  // The visible clock only runs once tracking has actually started — the
+  // "find your position" calibration window doesn't count as workout time.
+  const trackingStarted = Boolean(session?.tracking_started_at);
   const trackingState = rest
     ? 'rest'
     : paused
@@ -204,10 +208,10 @@ export function WorkoutPage() {
     };
   }, [active, identity.owner]);
   useEffect(() => {
-    if (!active || paused) return;
+    if (!active || paused || !trackingStarted) return;
     const timer = setInterval(() => setElapsed((t) => t + 1), 1000);
     return () => clearInterval(timer);
-  }, [active, paused]);
+  }, [active, paused, trackingStarted]);
   useEffect(() => {
     announcedCountdown.current.clear();
   }, [rest?.ends_at_ms]);
@@ -266,6 +270,14 @@ export function WorkoutPage() {
     // skip the hold-still calibration and start tracking immediately.
     begin(source, { preCalibrated: source === 'camera' });
     setActive(true);
+  }
+  function requestEnd() {
+    // Demo sessions are never saved; confirm before discarding tracked reps.
+    if (session?.source === 'demo' && (session?.total_reps ?? 0) > 0) {
+      exitDemoDialog.current?.showModal();
+      return;
+    }
+    void end();
   }
   async function end() {
     if (saving) return;
@@ -358,6 +370,23 @@ export function WorkoutPage() {
           <Button onClick={saveAndLeave}>Save and leave</Button>
         </div>
       </dialog>
+      <dialog
+        ref={exitDemoDialog}
+        className="workout-leave-dialog"
+        aria-labelledby="exit-demo-title"
+      >
+        <h2 id="exit-demo-title">Exit demo without saving?</h2>
+        <p>
+          You tracked {trackedReps} {trackedReps === 1 ? 'rep' : 'reps'} in this demo. Demo
+          sessions aren&rsquo;t saved to your history.
+        </p>
+        <div className="button-row">
+          <Button autoFocus variant="secondary" onClick={() => exitDemoDialog.current?.close()}>
+            Keep watching
+          </Button>
+          <Button onClick={() => void end()}>Exit demo</Button>
+        </div>
+      </dialog>
       <div className="page-heading compact">
         <div>
           <span className="eyebrow">
@@ -429,7 +458,7 @@ export function WorkoutPage() {
                   <Button onClick={skipRest}>
                     <SkipForward size={16} /> Skip rest
                   </Button>
-                  <Button variant="secondary" onClick={() => void end()} disabled={saving}>
+                  <Button variant="secondary" onClick={requestEnd} disabled={saving}>
                     <Square size={13} fill="currentColor" />{' '}
                     {session?.source === 'demo' ? 'Exit demo' : 'End session'}
                   </Button>
@@ -459,7 +488,7 @@ export function WorkoutPage() {
             </Button>
             <Button
               className="end-button"
-              onClick={() => void end()}
+              onClick={requestEnd}
               disabled={saving || session?.status === 'completed'}
             >
               <Square size={14} fill="currentColor" />{' '}

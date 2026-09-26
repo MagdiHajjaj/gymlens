@@ -137,7 +137,20 @@ export const useWorkout = create<Store>((set, get) => ({
           })),
         ];
       }
-      return { result, session: { ...session, reps, total_reps: reps.length, metrics } };
+      return {
+        result,
+        session: {
+          ...session,
+          reps,
+          total_reps: reps.length,
+          metrics,
+          // The workout clock starts when tracking actually begins — the
+          // "find your position" calibration window doesn't count.
+          tracking_started_at:
+            session.tracking_started_at ??
+            (result.trackingValid && result.calibrated ? completed_at : undefined),
+        },
+      };
     }),
   pause: () => set((s) => ({ paused: !s.paused, result: null })),
   toggleVoice: () => set((s) => ({ voice: !s.voice })),

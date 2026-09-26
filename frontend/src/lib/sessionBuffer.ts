@@ -37,11 +37,15 @@ export function exportSession(session: WorkoutSession) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function duration(session: Pick<WorkoutSession, 'started_at' | 'ended_at'>) {
+export function duration(
+  session: Pick<WorkoutSession, 'started_at' | 'ended_at' | 'tracking_started_at'>,
+) {
+  // The clock starts when tracking begins, not during the calibration window.
+  const start = session.tracking_started_at ?? session.started_at;
   return Math.max(
     0,
     Math.floor(
-      (Date.parse(session.ended_at || new Date().toISOString()) - Date.parse(session.started_at)) / 1000,
+      (Date.parse(session.ended_at || new Date().toISOString()) - Date.parse(start)) / 1000,
     ),
   );
 }
