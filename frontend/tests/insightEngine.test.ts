@@ -209,11 +209,23 @@ describe('goal-oriented insights', () => {
     expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
-  it('strength goal falls back to the fault drill when cues exist', () => {
+  it('strength goal picks a next focus distinct from room-to-grow', () => {
     const insight = generateStatisticsInsight(baseSession(), 'strength');
 
-    expect(insight.next_focus).toContain('slow 3-second descent');
-    expect(insight.next_focus).toContain('3 of 6 reps (50%)');
+    // The fault drill is already the first room-to-grow item, so the focus
+    // must move to a different grounded finding (here: the depth-decay pause).
+    expect(insight.improvements[0]).toContain('slow 3-second descent');
+    expect(insight.next_focus).not.toBe(insight.improvements[0]);
+    expect(insight.next_focus).toContain('pause');
+    expect(insight.evidence.next_focus.why).toContain('19°');
+  });
+
+  it('never repeats a room-to-grow finding as the next focus when alternatives exist', () => {
+    const goalIds = [undefined, 'form', 'strength', 'consistency', 'weight_loss'] as const;
+    for (const goalId of goalIds) {
+      const insight = generateStatisticsInsight(baseSession(), goalId);
+      expect(insight.improvements).not.toContain(insight.next_focus);
+    }
   });
 
   it('consistency goal focuses on the measured clean streak', () => {
