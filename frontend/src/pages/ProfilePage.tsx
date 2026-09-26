@@ -21,6 +21,18 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const totalHeightInches = profile.height_cm === null ? null : profile.height_cm / 2.54;
+  const heightFeet = totalHeightInches === null ? '' : Math.floor(totalHeightInches / 12);
+  const heightInches = totalHeightInches === null ? '' : Number((totalHeightInches % 12).toFixed(1));
+  const weightPounds = profile.weight_kg === null ? '' : Number((profile.weight_kg * 2.2046226218).toFixed(1));
+
+  function setImperialHeight(feet: number | '', inches: number | '') {
+    if (feet === '' && inches === '') {
+      setProfile({ ...profile, height_cm: null });
+      return;
+    }
+    setProfile({ ...profile, height_cm: (Number(feet) * 12 + Number(inches)) * 2.54 });
+  }
 
   useEffect(() => {
     if (!identity.authenticated) return;
@@ -123,15 +135,36 @@ export function ProfilePage() {
                     <option value="imperial">Imperial</option>
                   </select>
                 </div>
+                {profile.preferred_units === 'metric' ? (
+                  <div className="profile-field">
+                    <label htmlFor="height">Height in centimetres</label>
+                    <input id="height" type="number" min="100" max="250" step="0.1" value={profile.height_cm ?? ''}
+                      onChange={(e) => setProfile({ ...profile, height_cm: e.target.value ? Number(e.target.value) : null })} />
+                  </div>
+                ) : (
+                  <div className="profile-field">
+                    <label>Height in feet and inches</label>
+                    <div className="imperial-height">
+                      <label><span>ft</span><input aria-label="Height feet" type="number" min="3" max="8" step="1" value={heightFeet}
+                        onChange={(e) => setImperialHeight(e.target.value ? Number(e.target.value) : '', heightInches)} /></label>
+                      <label><span>in</span><input aria-label="Height inches" type="number" min="0" max="11.9" step="0.1" value={heightInches}
+                        onChange={(e) => setImperialHeight(heightFeet, e.target.value ? Number(e.target.value) : '')} /></label>
+                    </div>
+                  </div>
+                )}
                 <div className="profile-field">
-                  <label htmlFor="height">Height in centimetres</label>
-                  <input id="height" type="number" min="100" max="250" step="0.1" value={profile.height_cm ?? ''}
-                    onChange={(e) => setProfile({ ...profile, height_cm: e.target.value ? Number(e.target.value) : null })} />
-                </div>
-                <div className="profile-field">
-                  <label htmlFor="weight">Weight in kilograms</label>
-                  <input id="weight" type="number" min="30" max="350" step="0.1" value={profile.weight_kg ?? ''}
-                    onChange={(e) => setProfile({ ...profile, weight_kg: e.target.value ? Number(e.target.value) : null })} />
+                  <label htmlFor="weight">Weight in {profile.preferred_units === 'metric' ? 'kilograms' : 'pounds'}</label>
+                  <input id="weight" type="number"
+                    min={profile.preferred_units === 'metric' ? 30 : 66}
+                    max={profile.preferred_units === 'metric' ? 350 : 772}
+                    step="0.1"
+                    value={profile.preferred_units === 'metric' ? (profile.weight_kg ?? '') : weightPounds}
+                    onChange={(e) => setProfile({
+                      ...profile,
+                      weight_kg: e.target.value
+                        ? Number(e.target.value) / (profile.preferred_units === 'metric' ? 1 : 2.2046226218)
+                        : null,
+                    })} />
                 </div>
               </div>
               {error && <div className="notice error" role="alert">{error}</div>}

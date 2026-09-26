@@ -1052,6 +1052,27 @@ img.exercise-art {
   border-color: #7c9a6d;
   outline: 3px solid #dce9d4;
 }
+.imperial-height {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.imperial-height label {
+  position: relative;
+  margin: 0;
+}
+.imperial-height label span {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #899386;
+  font-size: 10px;
+  pointer-events: none;
+}
+.imperial-height input {
+  padding-right: 30px;
+}
 .profile-actions {
   display: flex;
   align-items: center;
