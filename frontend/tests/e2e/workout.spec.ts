@@ -69,8 +69,8 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
   await expect(page.locator('.arm-tracking > div').nth(0)).toContainText('1 rep');
   await expect(page.locator('.arm-tracking > div').nth(1)).toContainText('1 rep');
   await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
-  await expect(page.locator('.session-key-stats')).toContainText('Simultaneous curls count as one rep');
+  await expect(page).toHaveURL(/\/workout$/);
+  await expect(page.getByRole('button', { name: 'Set up camera', exact: true })).toBeVisible();
 });
 test('guest demo exits without creating a report or history entry', async ({ page }) => {
   const errors: string[] = [];

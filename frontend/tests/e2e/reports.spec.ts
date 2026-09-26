@@ -186,3 +186,11 @@ test('failed account save preserves the browser copy and retry confirms account 
   await expect(page.getByRole('alert')).toContainText('recorded findings above remain available');
   await expect(page.locator('.report-focus')).toContainText('2 of 6 detailed reps');
 });
+
+test('bilateral curl reports retain the combined rep count', async ({ page }) => {
+  await seed(page, [{ ...recordedSession, exercise: 'curl', reps: recordedSession.reps.map(rep => ({...rep, metrics_json: {...rep.metrics_json, arm_side: 2}})) }]);
+  await page.goto('/session/grounded-report');
+  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
+  await expect(page.locator('.session-key-stats')).toContainText('Simultaneous curls count as one rep');
+  await expect(page.locator('.session-key-stats dd').first()).toHaveText('6');
+});
