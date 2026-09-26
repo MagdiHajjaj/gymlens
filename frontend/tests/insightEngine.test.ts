@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createAnalyzer } from '../src/features/exercises/ExerciseRegistry';
-import { generateStatisticsInsight } from '../src/features/insights/insightEngine';
+import { generateStatisticsInsight, hasDepthDecaySignal } from '../src/features/insights/insightEngine';
 import type { ExerciseId, PoseFrame, WorkoutSession } from '../src/types/workout';
 
 const fixture = (id: ExerciseId): PoseFrame[] =>
@@ -280,6 +280,34 @@ describe('set breakdown honesty', () => {
     const insight = generateStatisticsInsight(session);
     expect(insight.stats.setBreakdown.map((set) => set.setNumber)).toEqual([1, 2]);
     expect(insight.stats.setBreakdown[0]?.reps).toEqual([1, 2]);
+  });
+});
+
+describe('depth decay signal', () => {
+  const flatSession = () =>
+    baseSession({
+      reps: [92, 92, 92, 92, 92, 92].map((min_angle, index) => ({
+        rep_number: index + 1,
+        completed_at: '2026-01-01T00:00:10.000Z',
+        metrics_json: { min_angle, duration_ms: 2000 },
+        faults_json: [],
+      })),
+    });
+
+  it('treats a 0° change as no signal so the report suppresses the filler chart', () => {
+    const insight = generateStatisticsInsight(flatSession());
+    expect(insight.stats.depthDecay?.change).toBe(0);
+    expect(hasDepthDecaySignal(insight.stats.depthDecay)).toBe(false);
+  });
+
+  it('treats a real change as a signal', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    expect(insight.stats.depthDecay?.change).toBe(19);
+    expect(hasDepthDecaySignal(insight.stats.depthDecay)).toBe(true);
+  });
+
+  it('treats missing decay data as no signal', () => {
+    expect(hasDepthDecaySignal(undefined)).toBe(false);
   });
 });
 

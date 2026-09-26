@@ -232,6 +232,14 @@ function depthDecay(reps: RepEvent[]): DepthDecayStats | undefined {
   };
 }
 
+/**
+ * Whether the depth/ROM comparison carries a real signal. A 0° change is a
+ * filler chart — the report suppresses the comparison strip and says so.
+ */
+export function hasDepthDecaySignal(decay: DepthDecayStats | undefined): decay is DepthDecayStats {
+  return decay !== undefined && decay.change !== 0;
+}
+
 function bestCleanRep(reps: RepEvent[]) {
   const clean = reps
     .map((rep) => ({ rep: rep.rep_number, value: repMinAngle(rep), clean: rep.faults_json.length === 0 }))

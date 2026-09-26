@@ -25,7 +25,7 @@ import {
 import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
-import { generateStatisticsInsight } from '../features/insights/insightEngine';
+import { generateStatisticsInsight, hasDepthDecaySignal } from '../features/insights/insightEngine';
 import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
 import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
@@ -362,7 +362,7 @@ export function SessionPage() {
             </div>
             <span className="tag">min angle</span>
           </div>
-          {depthDecay ? (
+          {hasDepthDecaySignal(depthDecay) ? (
             <div className="decay-strip" aria-label="Depth or range decay comparison">
               <div>
                 <span>First third</span>
@@ -382,7 +382,11 @@ export function SessionPage() {
             </div>
           ) : (
             <div className="empty-inline">
-              <p>Record at least three reps with minimum joint angle data to compare early and late range.</p>
+              <p>
+                {depthDecay
+                  ? 'Range held steady between early and late reps — no measurable change to show.'
+                  : 'Record at least three reps with minimum joint angle data to compare early and late range.'}
+              </p>
             </div>
           )}
         </section>

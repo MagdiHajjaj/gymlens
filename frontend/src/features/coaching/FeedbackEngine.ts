@@ -6,6 +6,29 @@ interface CueContext {
   totalReps: number;
 }
 
+const finiteNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+/**
+ * Rep-completion cue grounded in the rep's measured data: the rep number plus the
+ * measured minimum joint angle when the analyzer recorded one. Never invents a
+ * measurement — without rep data it stays a plain completion callout.
+ */
+export function repCompleteCue(result: ExerciseResult, repNumber: number): string {
+  const label = repNumber > 0 ? `Rep ${repNumber} complete.` : 'Rep complete.';
+  const minAngle = finiteNumber(result.repMetrics?.min_angle);
+  return minAngle === undefined ? label : `${label} Bottom angle ${Math.round(minAngle)} degrees.`;
+}
+
+/**
+ * Idle cue grounded in measured session state: the rep count recorded so far.
+ * Replaces generic motivational filler with what the session actually measured.
+ */
+export function readyCue(completedReps: number): string {
+  if (completedReps <= 0) return 'Ready.';
+  return `Ready. ${completedReps} ${completedReps === 1 ? 'rep' : 'reps'} so far.`;
+}
+
 export class FeedbackEngine {
   private current = '';
   private since = 0;
@@ -73,15 +96,16 @@ export class FeedbackEngine {
       this.lastRepTotal = Number(repCue.metadata?.totalReps ?? this.lastRepTotal);
       return repCue;
     }
+    const repNumber = context && context.totalReps > 0 ? context.totalReps : completedCount;
     return result.repCompleted
       ? announce(
           'rep',
-          { text: 'Rep complete. Keep your movement controlled.', kind: 'rep', priority: PRIORITY.rep },
+          { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep },
           5000,
         )
       : announce(
           'ready',
-          { text: 'Ready. Move at a comfortable, controlled pace.', kind: 'setup', priority: PRIORITY.setup },
+          { text: readyCue(completedCount), kind: 'setup', priority: PRIORITY.setup },
           30000,
         );
   }
