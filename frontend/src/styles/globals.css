@@ -2547,7 +2547,25 @@ td strong {
     font-size: 7px;
   }
   .setup-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setup-grid > *,
+  .setup-panel {
+    min-width: 0;
+  }
+  .exercise-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .exercise-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .exercise-tabs button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
   }
   .setup-art {
     height: 200px;
