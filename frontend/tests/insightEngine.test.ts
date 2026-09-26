@@ -160,7 +160,7 @@ describe('generateStatisticsInsight', () => {
     const insight = generateStatisticsInsight(steady);
 
     expect(insight.next_focus).toContain('add 1 rep');
-    expect(insight.evidence.next_focus.why).toContain('4/4 reps');
+    expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
   it.each<ExerciseId>(['squat', 'curl', 'pushup'])(
@@ -206,21 +206,33 @@ describe('goal-oriented insights', () => {
 
     expect(insight.goalId).toBe('strength');
     expect(insight.next_focus).toContain('add 1 rep');
-    expect(insight.evidence.next_focus.why).toContain('4/4 reps');
+    expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
-  it('strength goal falls back to the fault drill when cues exist', () => {
+  it('strength goal picks a next focus distinct from room-to-grow', () => {
     const insight = generateStatisticsInsight(baseSession(), 'strength');
 
-    expect(insight.next_focus).toContain('slow 3-second descent');
-    expect(insight.next_focus).toContain('3 of 6 reps (50%)');
+    // The fault drill is already the first room-to-grow item, so the focus
+    // must move to a different grounded finding (here: the depth-decay pause).
+    expect(insight.improvements[0]).toContain('slow 3-second descent');
+    expect(insight.next_focus).not.toBe(insight.improvements[0]);
+    expect(insight.next_focus).toContain('pause');
+    expect(insight.evidence.next_focus.why).toContain('19°');
+  });
+
+  it('never repeats a room-to-grow finding as the next focus when alternatives exist', () => {
+    const goalIds = [undefined, 'form', 'strength', 'consistency', 'weight_loss'] as const;
+    for (const goalId of goalIds) {
+      const insight = generateStatisticsInsight(baseSession(), goalId);
+      expect(insight.improvements).not.toContain(insight.next_focus);
+    }
   });
 
   it('consistency goal focuses on the measured clean streak', () => {
     const insight = generateStatisticsInsight(baseSession(), 'consistency');
 
     expect(insight.next_focus).toContain('clean streak was 2 of 6');
-    expect(insight.evidence.next_focus.why).toContain('Longest clean streak: 2 reps');
+    expect(insight.evidence.next_focus.why).toContain('2 clean reps in a row');
   });
 
   it('weight_loss goal cites measured volume without diet or outcome claims', () => {
@@ -296,5 +308,28 @@ describe('depth decay signal', () => {
 
   it('treats missing decay data as no signal', () => {
     expect(hasDepthDecaySignal(undefined)).toBe(false);
+  });
+});
+
+describe('why explanations in plain English', () => {
+  it('never leaks internal metric names in why lines', () => {
+    for (const goal of [undefined, 'strength', 'form', 'consistency', 'weight_loss'] as const) {
+      const insight = generateStatisticsInsight(baseSession(), goal);
+      const whys = [
+        ...insight.evidence.strengths.map((item) => item.why),
+        ...insight.evidence.improvements.map((item) => item.why),
+        insight.evidence.next_focus.why,
+      ];
+      for (const why of whys) {
+        expect(why).not.toMatch(/min_angle|duration_ms/);
+      }
+    }
+  });
+
+  it('describes depth fade in plain words', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    const decay = insight.evidence.improvements.find((item) => item.why.includes('shallower'));
+    expect(decay?.why).toContain('19°');
+    expect(decay?.why).toContain('averaged 94° at your deepest point');
   });
 });

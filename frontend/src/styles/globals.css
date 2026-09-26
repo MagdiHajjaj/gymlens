@@ -2494,8 +2494,9 @@ td strong {
     height: 14px;
   }
   .exercise-image .exercise-art {
-    width: 145%;
-    max-width: none;
+    /* Keep the image inside its container: object-fit: cover plus the
+       per-photo object-position from ExerciseArt handles the framing.
+       (A previous 145% width hack overflowed and clipped photos on phones.) */
   }
   .exercise-info {
     padding: 17px 17px 8px 9px;
@@ -2546,7 +2547,25 @@ td strong {
     font-size: 7px;
   }
   .setup-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setup-grid > *,
+  .setup-panel {
+    min-width: 0;
+  }
+  .exercise-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+  .exercise-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .exercise-tabs button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
   }
   .setup-art {
     height: 200px;
@@ -2796,7 +2815,4 @@ td strong {
 .camera-stage.is-upload video,
 .camera-stage.is-upload canvas {
   transform: none;
-}
-.upload-button {
-  cursor: pointer;
 }

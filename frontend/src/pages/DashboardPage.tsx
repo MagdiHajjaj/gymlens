@@ -14,6 +14,10 @@ import {
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { exercises } from '../features/exercises/ExerciseRegistry';
+
+export function badgeNumber(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}
 import { GOALS, useFitnessGoal } from '../features/goals/goals';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
@@ -52,7 +56,7 @@ export function DashboardPage() {
             <em>intention.</em>
           </h2>
           <p>
-            Real-time feedback. A little encouragement.
+            Point your camera at your workout — we count every rep and coach your form in real time.
             <br />A stronger connection to the way you move.
           </p>
           <div className="button-row">
@@ -163,7 +167,9 @@ export function DashboardPage() {
         <div className="section-heading">
           <div>
             <h2>Find your movement</h2>
-            <p>Three essentials. Thoughtful feedback for each.</p>
+            <p>
+              {Object.keys(exercises).length} movements. Thoughtful feedback for each.
+            </p>
           </div>
           <span className="tag outlined">SIDE-VIEW TRAINING</span>
         </div>
@@ -183,7 +189,7 @@ export function DashboardPage() {
                     {selected === id && <Check size={12} />}
                   </span>
                   <ExerciseArt exercise={id} />
-                  <span className="exercise-number">0{Object.keys(exercises).indexOf(id) + 1}</span>
+                  <span className="exercise-number">{badgeNumber(Object.keys(exercises).indexOf(id))}</span>
                 </div>
                 <div className="exercise-info">
                   <div>
