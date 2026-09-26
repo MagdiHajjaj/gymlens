@@ -48,8 +48,9 @@ interface PlanStore {
    *  list is a fresh plan and resets completion. */
   setPlan: (exerciseIds: ExerciseId[]) => void;
   updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number; reps?: number }) => void;
-  /** Moves a plan row one position up (-1) or down (1). No-op at the edges. */
-  movePlanItem: (exerciseId: ExerciseId, direction: -1 | 1) => void;
+  /** Moves the row at fromIndex to toIndex, shifting the rows between. No-op for
+   *  out-of-range indices. Powers drag-and-drop reordering and keyboard reorder. */
+  reorderPlan: (fromIndex: number, toIndex: number) => void;
   /** Marks an exercise finished. Idempotent; safe for exercises outside the plan. */
   completeExercise: (exerciseId: ExerciseId) => void;
   /** True when the exercise was marked finished in the current plan. */
@@ -101,13 +102,20 @@ export const usePlan = create<PlanStore>((set, get) => ({
           : item,
       ),
     })),
-  movePlanItem: (exerciseId, direction) =>
+  reorderPlan: (fromIndex, toIndex) =>
     set((state) => {
-      const index = state.plan.findIndex((item) => item.exerciseId === exerciseId);
-      const target = index + direction;
-      if (index === -1 || target < 0 || target >= state.plan.length) return {};
+      const count = state.plan.length;
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= count ||
+        toIndex >= count
+      )
+        return {};
       const plan = [...state.plan];
-      [plan[index], plan[target]] = [plan[target], plan[index]];
+      const [moved] = plan.splice(fromIndex, 1);
+      plan.splice(toIndex, 0, moved);
       return { plan };
     }),
   clearPlan: () => set({ plan: [], completedExerciseIds: [] }),

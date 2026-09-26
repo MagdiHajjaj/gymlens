@@ -101,29 +101,44 @@ it('shows a completion checkmark only on finished rows', () => {
   expect(within(pushupRow).queryByText('Completed')).toBeNull();
 });
 
-it('reorders rows with the up/down arrows and disables them at the edges', () => {
+it('reorders rows with the keyboard arrows on the drag handle', () => {
   renderStep();
   const [squatRow] = screen.getAllByRole('listitem');
+  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
 
-  const squatDown = within(squatRow).getByLabelText('Move Squat down') as HTMLButtonElement;
-  const squatUp = within(squatRow).getByLabelText('Move Squat up') as HTMLButtonElement;
-  expect(squatUp.disabled).toBe(true);
-  expect(squatDown.disabled).toBe(false);
-
-  fireEvent.click(squatDown);
+  fireEvent.keyDown(handle, { key: 'ArrowDown' });
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
 
-  // Rows re-render in the new plan order.
-  const [firstRow, secondRow] = screen.getAllByRole('listitem');
-  expect(within(firstRow).getByText('Push-up')).toBeTruthy();
-  expect(within(secondRow).getByText('Squat')).toBeTruthy();
+  const rows = screen.getAllByRole('listitem');
+  expect(within(rows[0]).getByText('Push-up')).toBeTruthy();
 
-  const pushupDown = within(firstRow).getByLabelText('Move Push-up down') as HTMLButtonElement;
-  expect(pushupDown.disabled).toBe(false);
-  const squatDownNow = within(secondRow).getByLabelText('Move Squat down') as HTMLButtonElement;
-  expect(squatDownNow.disabled).toBe(true);
-
-  // Moving back up restores the original order.
-  fireEvent.click(within(secondRow).getByLabelText('Move Squat up'));
+  fireEvent.keyDown(within(rows[1]).getByRole('button', { name: 'Reorder Squat' }), {
+    key: 'ArrowUp',
+  });
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup']);
+
+  // ArrowUp on the first row is a no-op.
+  const reordered = screen.getAllByRole('listitem');
+  fireEvent.keyDown(within(reordered[0]).getByRole('button', { name: 'Reorder Squat' }), {
+    key: 'ArrowUp',
+  });
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup']);
+});
+
+it('drags a row to a new position with pointer events', async () => {
+  renderStep();
+  const [squatRow] = screen.getAllByRole('listitem');
+  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
+
+  fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
+  fireEvent.pointerMove(window, { clientY: 200, pointerId: 1 });
+  // The row lifts while it follows the pointer.
+  expect(squatRow.className).toContain('is-dragging');
+  fireEvent.pointerUp(window, { pointerId: 1 });
+
+  // After the settle animation the new order is committed to the store.
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
+  const [firstRow] = screen.getAllByRole('listitem');
+  expect(within(firstRow).getByText('Push-up')).toBeTruthy();
 });
