@@ -498,3 +498,130 @@
     margin-inline: -4px;
   }
 }
+
+/* Plan your session step */
+.plan-step-intro {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5d6d62;
+}
+.plan-rows {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 0;
+  display: grid;
+  gap: 12px;
+}
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fafbf8;
+}
+.plan-row-art {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  display: block;
+}
+.plan-row-art .exercise-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.plan-row-art .exercise-art-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: #edf0e9;
+  font-size: 10px;
+}
+.plan-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.plan-row-info strong {
+  display: block;
+  font-size: 15px;
+  color: #263c31;
+}
+.plan-row-info small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #5d6d62;
+}
+.plan-row-steppers {
+  display: flex;
+  gap: 18px;
+  flex-shrink: 0;
+}
+.plan-stepper-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6c756e;
+  margin-bottom: 6px;
+}
+.plan-stepper-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.plan-stepper-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: white;
+  color: #234e38;
+  cursor: pointer;
+}
+.plan-stepper-button:hover:not(:disabled) {
+  border-color: #739064;
+  background: #f0f5e9;
+}
+.plan-stepper-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.plan-stepper-value {
+  min-width: 64px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #263c31;
+  font-variant-numeric: tabular-nums;
+}
+.plan-step-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+@media (max-width: 650px) {
+  .plan-row {
+    flex-wrap: wrap;
+  }
+  .plan-row-steppers {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .plan-step-actions .setup-primary {
+    position: static;
+    width: auto;
+    box-shadow: none;
+  }
+}
