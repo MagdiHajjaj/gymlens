@@ -318,21 +318,21 @@ function isCleanAndConsistent(stats: InsightStats) {
 function pauseFocus(decay: DepthDecayStats): InsightEvidenceItem {
   return evidenceText(
     `Hold a controlled pause at your deepest comfortable point for 2 sets; your late reps showed less range than early reps.`,
-    `Depth/range faded ${decay.change}° (${decay.firstAverage}° first-third average → ${decay.lastAverage}° last-third average).`,
+    `Your depth faded ${decay.change}°: early reps averaged ${decay.firstAverage}° at your deepest point, late reps only ${decay.lastAverage}°.`,
   );
 }
 
 function progressionFocus(stats: InsightStats): InsightEvidenceItem {
   return evidenceText(
     `Progress gently next time: add 1 rep or use a slower eccentric while keeping the same clean, consistent range.`,
-    `${stats.cleanReps}/${stats.totalReps} reps had no supported cues and min_angle standard deviation was ${stats.minAngleStdDev ?? 0}°.`,
+    `${stats.cleanReps} of ${stats.totalReps} reps were clean with no technique cues, and your depth varied by only ${stats.minAngleStdDev ?? 0}°.`,
   );
 }
 
 function consistencyFocus(stats: InsightStats): InsightEvidenceItem {
   return evidenceText(
     `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps. Book your next session soon — showing up again is the whole game.`,
-    `Longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}; total recorded reps: ${stats.totalReps}.`,
+    `You strung together ${stats.longestCleanStreak} clean rep${stats.longestCleanStreak === 1 ? '' : 's'} in a row out of ${stats.totalReps} recorded reps.`,
   );
 }
 
@@ -341,21 +341,21 @@ function weightLossFocus(session: WorkoutSession, stats: InsightStats): InsightE
   const compound = COMPOUND_EXERCISES[session.exercise] ?? false;
   return evidenceText(
     `You logged ${stats.totalReps} ${exerciseName} reps. For weight loss, repeat sessions built on full-body compound movements regularly through the week — training frequency matters more than any single workout.`,
-    `${stats.totalReps} measured reps this session; ${exerciseName} is a compound movement: ${compound ? 'yes' : 'no'}.`,
+    `${stats.totalReps} measured reps this session; ${exerciseName} ${compound ? 'is a full-body compound movement' : 'is not a full-body compound movement'}.`,
   );
 }
 
 function tempoFocus(stats: InsightStats): InsightEvidenceItem {
   return evidenceText(
     `Use a steadier tempo: rep duration spread was ${((stats.durationSpreadMs ?? 0) / 1000).toFixed(1)}s from fastest to slowest.`,
-    `duration_ms spread: ${stats.durationSpreadMs}ms across reps with duration measurements.`,
+    `Your rep pace varied by ${((stats.durationSpreadMs ?? 0) / 1000).toFixed(1)}s between your fastest and slowest rep.`,
   );
 }
 
 function repeatabilityFocus(stats: InsightStats): InsightEvidenceItem {
   return evidenceText(
     `Make each rep more repeatable: your minimum joint angle varied by ${stats.minAngleStdDev}° standard deviation.`,
-    `min_angle standard deviation across ${stats.measuredReps} measured reps: ${stats.minAngleStdDev}°.`,
+    `Your depth varied by ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`,
   );
 }
 
@@ -412,7 +412,7 @@ function selectNextFocus(
   if (dedupedImprovements[0]) return dedupedImprovements[0];
   return evidenceText(
     `Set up a clear ${exercise.setup.toLowerCase()} Then move at a steady, comfortable pace.`,
-    'No specific fault, depth-decay, or consistency measurement was available for a narrower focus.',
+    'We did not record enough measurements this session for a more specific focus.',
   );
 }
 
@@ -421,7 +421,7 @@ function faultImprovement(exerciseId: ExerciseId, fault: FaultFrequency, totalRe
   const drill = faultDrills[exerciseId]?.[fault.code] ?? fault.message;
   return evidenceText(
     `${drill} This was the most frequent cue: ${fault.label} on ${fault.count} of ${totalReps} reps (${fault.percent}%), appearing ${timingLabels[fault.timing]}.`,
-    `${fault.label}: reps ${fault.reps.join(', ')}; ${fault.count}/${totalReps} reps (${fault.percent}%).`,
+    `Most frequent technique cue: ${fault.label.toLowerCase()} on reps ${fault.reps.join(', ')} — ${fault.count} of ${totalReps} reps (${fault.percent}%).`,
   );
 }
 
@@ -455,7 +455,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       strengths.push(
         evidenceText(
           `Rep ${stats.bestRep} was your deepest clean rep at ${stats.bestRepMinAngle}° minimum joint angle.`,
-          `Deepest clean rep measured: rep ${stats.bestRep}, min_angle ${stats.bestRepMinAngle}°; lower angles indicate deeper range in the captured movement.`,
+          `Rep ${stats.bestRep} hit ${stats.bestRepMinAngle}° at your deepest point — the smallest angle we measured, meaning your deepest range.`,
         ),
       );
     }
@@ -463,7 +463,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       strengths.push(
         evidenceText(
           `Your depth stayed consistent across measured reps (standard deviation ${stats.minAngleStdDev}°).`,
-          `min_angle standard deviation across ${stats.measuredReps} measured reps: ${stats.minAngleStdDev}°.`,
+          `Your depth varied by just ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`,
         ),
       );
     }
@@ -475,14 +475,14 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
     improvements.push(
       evidenceText(
         `Depth/range faded ${stats.depthDecay.change}° across the session (${stats.depthDecay.firstAverage}° → ${stats.depthDecay.lastAverage}° average minimum joint angle). Add a 3-second pause at the bottom for 2 sets next session.`,
-        `First-third reps ${stats.depthDecay.firstReps.join(', ')} averaged ${stats.depthDecay.firstAverage}°; last-third reps ${stats.depthDecay.lastReps.join(', ')} averaged ${stats.depthDecay.lastAverage}°; change +${stats.depthDecay.change}° (higher minimum angle means less range).`,
+        `Early reps (reps ${stats.depthDecay.firstReps.join(', ')}) averaged ${stats.depthDecay.firstAverage}° at your deepest point; late reps (reps ${stats.depthDecay.lastReps.join(', ')}) averaged ${stats.depthDecay.lastAverage}° — your range got ${stats.depthDecay.change}° shallower.`,
       ),
     );
   } else if (stats.depthDecay && stats.depthDecay.change <= -5) {
     strengths.push(
       evidenceText(
         `Your measured range improved by ${Math.abs(stats.depthDecay.change)}° from early to late reps (${stats.depthDecay.firstAverage}° → ${stats.depthDecay.lastAverage}°).`,
-        `First-third average min_angle ${stats.depthDecay.firstAverage}°; last-third average min_angle ${stats.depthDecay.lastAverage}°; change ${stats.depthDecay.change}°.`,
+        `Early reps averaged ${stats.depthDecay.firstAverage}° at your deepest point, late reps averaged ${stats.depthDecay.lastAverage}° — your range got ${Math.abs(stats.depthDecay.change)}° deeper.`,
       ),
     );
   }
@@ -499,7 +499,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
     improvements.push(
       evidenceText(
         'Keep your tracked joints clearly visible so the report can compare range and tempo next time.',
-        `${stats.totalReps} reps were counted, but 0 reps included min_angle measurements.`,
+        `${stats.totalReps} reps were counted, but we could not measure joint angles on any of them.`,
       ),
     );
   }

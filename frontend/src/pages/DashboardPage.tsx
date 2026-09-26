@@ -56,7 +56,7 @@ export function DashboardPage() {
             <em>intention.</em>
           </h2>
           <p>
-            Real-time feedback. A little encouragement.
+            Point your camera at your workout — we count every rep and coach your form in real time.
             <br />A stronger connection to the way you move.
           </p>
           <div className="button-row">

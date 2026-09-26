@@ -160,7 +160,7 @@ describe('generateStatisticsInsight', () => {
     const insight = generateStatisticsInsight(steady);
 
     expect(insight.next_focus).toContain('add 1 rep');
-    expect(insight.evidence.next_focus.why).toContain('4/4 reps');
+    expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
   it.each<ExerciseId>(['squat', 'curl', 'pushup'])(
@@ -206,7 +206,7 @@ describe('goal-oriented insights', () => {
 
     expect(insight.goalId).toBe('strength');
     expect(insight.next_focus).toContain('add 1 rep');
-    expect(insight.evidence.next_focus.why).toContain('4/4 reps');
+    expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
   it('strength goal picks a next focus distinct from room-to-grow', () => {
@@ -232,7 +232,7 @@ describe('goal-oriented insights', () => {
     const insight = generateStatisticsInsight(baseSession(), 'consistency');
 
     expect(insight.next_focus).toContain('clean streak was 2 of 6');
-    expect(insight.evidence.next_focus.why).toContain('Longest clean streak: 2 reps');
+    expect(insight.evidence.next_focus.why).toContain('2 clean reps in a row');
   });
 
   it('weight_loss goal cites measured volume without diet or outcome claims', () => {
@@ -280,5 +280,28 @@ describe('set breakdown honesty', () => {
     const insight = generateStatisticsInsight(session);
     expect(insight.stats.setBreakdown.map((set) => set.setNumber)).toEqual([1, 2]);
     expect(insight.stats.setBreakdown[0]?.reps).toEqual([1, 2]);
+  });
+});
+
+describe('why explanations in plain English', () => {
+  it('never leaks internal metric names in why lines', () => {
+    for (const goal of [undefined, 'strength', 'form', 'consistency', 'weight_loss'] as const) {
+      const insight = generateStatisticsInsight(baseSession(), goal);
+      const whys = [
+        ...insight.evidence.strengths.map((item) => item.why),
+        ...insight.evidence.improvements.map((item) => item.why),
+        insight.evidence.next_focus.why,
+      ];
+      for (const why of whys) {
+        expect(why).not.toMatch(/min_angle|duration_ms/);
+      }
+    }
+  });
+
+  it('describes depth fade in plain words', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    const decay = insight.evidence.improvements.find((item) => item.why.includes('shallower'));
+    expect(decay?.why).toContain('19°');
+    expect(decay?.why).toContain('averaged 94° at your deepest point');
   });
 });
