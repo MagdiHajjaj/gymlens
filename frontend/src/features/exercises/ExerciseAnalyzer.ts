@@ -539,6 +539,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     const bodyInclination = hipVisible ? inclination(p(11), p(23), aspect) : 0;
     if (
       this.id !== 'curl' &&
+      this.id !== 'press' &&
       ((hipVisible && torso < 0.04) ||
       (hipVisible &&
           (l[11]?.visibility ?? 0) > 0.6 &&

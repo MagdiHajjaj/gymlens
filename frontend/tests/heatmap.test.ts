@@ -80,6 +80,9 @@ it('draws the full overhead press arm path instead of only the upper arm', () =>
   landmarks[11] = { x: 0.45, y: 0.35, z: 0, visibility: 0.9 };
   landmarks[13] = { x: 0.45, y: 0.5, z: 0, visibility: 0.9 };
   landmarks[15] = { x: 0.45, y: 0.65, z: 0, visibility: 0.9 };
+  landmarks[12] = { x: 0.55, y: 0.35, z: 0, visibility: 0.9 };
+  landmarks[14] = { x: 0.55, y: 0.5, z: 0, visibility: 0.9 };
+  landmarks[16] = { x: 0.55, y: 0.65, z: 0, visibility: 0.9 };
   const result: ExerciseResult = {
     phase: 'ready',
     trackingValid: true,
@@ -93,7 +96,7 @@ it('draws the full overhead press arm path instead of only the upper arm', () =>
 
   drawMuscleHeatmap(ctx, landmarks, 'press', result, 800, 600);
 
-  expect(calls.filter((call) => call === 'translate')).toHaveLength(2);
+  expect(calls.filter((call) => call === 'translate')).toHaveLength(4);
 });
 
 it.each([

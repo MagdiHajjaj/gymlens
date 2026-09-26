@@ -127,6 +127,10 @@ export function drawMuscleHeatmap(
     }
     return;
   }
+  if (['pushup', 'press', 'row', 'dips', 'pullup'].includes(exercise)) {
+    for (const side of [0, 1]) drawSegment(side);
+    return;
+  }
   if (result.trackedSide === undefined) return;
   drawSegment(result.trackedSide);
 }

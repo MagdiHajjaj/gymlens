@@ -134,6 +134,18 @@ it('keeps the press tracking when only its primary arm joints are visible', () =
   expect(results.at(-1)?.calibrated).toBe(true);
 });
 
+it('accepts the overhead press starting position when facing the camera', () => {
+  const analyzer = new MovementAnalyzer('press');
+  const results = fixture('press').slice(0, 40).map((original) => {
+    const frame = structuredClone(original);
+    frame.landmarks[12].x = frame.landmarks[11].x + 0.2;
+    frame.landmarks[14].x = frame.landmarks[13].x + 0.2;
+    frame.landmarks[16].x = frame.landmarks[15].x + 0.2;
+    return analyzer.analyze(frame);
+  });
+  expect(results.every((result) => result.trackingValid)).toBe(true);
+});
+
 it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
   const analyzer = new MovementAnalyzer('curl');
   const results = fixture('curl').map((original) => {
@@ -192,6 +204,7 @@ it('does not start a rep from one noisy threshold crossing', () => {
   standing.timestampMs = spike.timestampMs + 50;
   expect(analyzer.analyze(standing).repCompleted).toBe(false);
 });
+
 describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
   '%s live measurements',
   (id) => {
