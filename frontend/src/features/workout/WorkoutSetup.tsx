@@ -23,6 +23,11 @@ import type { ExerciseId } from '../../types/workout';
 
 const AUTO_START_MS = 3000;
 
+/** Calibration instruction shown during camera setup. Single source of truth for the copy. */
+export function calibrationGuidance(calibrate: string): string {
+  return `${calibrate} and hold still for a moment.`;
+}
+
 export function WorkoutSetup({
   demo,
   voiceCoach,
@@ -286,12 +291,12 @@ export function WorkoutSetup({
               <p className={`setup-guidance ${ready ? 'is-ready' : ''}`} role="status">
                 {ready
                   ? 'You’re in position. Start when you’re ready.'
-                  : readiness.guidance || `${exercise.calibrate} and hold still for a moment.`}
+                  : readiness.guidance || calibrationGuidance(exercise.calibrate)}
               </p>
             </>
           ) : (
             <p className="position-tip">
-              <strong>To calibrate:</strong> {exercise.calibrate} and hold still for a moment.
+              <strong>To calibrate:</strong> {calibrationGuidance(exercise.calibrate)}
             </p>
           )}
 
