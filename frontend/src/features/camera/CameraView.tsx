@@ -188,7 +188,7 @@ export function CameraView({
                 const totalReps = useWorkout.getState().session?.total_reps ?? state.session?.total_reps ?? 0;
                 const cue = feedback.nextCue(result, now, { exercise: session.exercise, totalReps });
                 if (cue)
-                  void voice.speak(cue.text, authenticated && result.trackingValid && result.calibrated, {
+                  void voice.speak(cue.text, authenticated, {
                     priority: cue.priority,
                   });
               } else {

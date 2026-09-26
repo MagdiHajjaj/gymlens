@@ -17,30 +17,6 @@ const CLOUD_LIMIT = 12;
 const CLOUD_WINDOW_MS = 60_000;
 const CLOUD_COOLDOWN_MS = 60_000;
 
-const VOICE_CACHE = 'gymlens-voice-v1';
-
-function voiceCacheKey(text: string): string {
-  return `/voice-cache/${encodeURIComponent(text)}`;
-}
-
-// Keeps ElevenLabs audio in the browser's Cache Storage, so a page reload never pays for it again.
-function canUseVoiceCache(): boolean {
-  return typeof window !== 'undefined' && 'caches' in window;
-}
-
-async function readVoiceCache(text: string): Promise<Blob | undefined> {
-  const store = await caches.open(VOICE_CACHE).catch(() => undefined);
-  const hit = await store?.match(voiceCacheKey(text));
-  return hit?.blob();
-}
-
-function writeVoiceCache(text: string, blob: Blob): void {
-  void caches
-    .open(VOICE_CACHE)
-    .then((store) => store.put(voiceCacheKey(text), new Response(blob, { headers: { 'Content-Type': 'audio/mpeg' } })))
-    .catch(() => {});
-}
-
 export class VoiceCoach {
   constructor(private report: (status: string) => void = () => {}) {}
   private generation = 0;
@@ -53,6 +29,7 @@ export class VoiceCoach {
   private cloudInflight = new Map<string, Promise<Blob>>();
   private cloudCalls: number[] = [];
   private cloudCooldownUntil = 0;
+  private voiceMode?: 'cloud' | 'browser';
 
   stop() {
     this.generation++;
@@ -122,45 +99,52 @@ export class VoiceCoach {
 
   private async perform(request: SpeechRequest) {
     this.report('Preparing voice…');
+    if (!request.authenticated || this.voiceMode === 'browser') {
+      this.voiceMode = 'browser';
+      await this.speakBrowser(request);
+      return;
+    }
     try {
-      if (request.authenticated) {
-        const blob = await this.fetchCloud(request.text);
-        if (!this.isCurrent(request)) return;
-        const url = URL.createObjectURL(blob);
-        try {
-          const audio = new Audio(url);
-          this.audio = audio;
-          await new Promise<void>((resolve, reject) => {
-            const finish = (error?: Error) => {
-              clearTimeout(timer);
-              audio.onended = audio.onerror = audio.onpause = null;
-              this.cancelPlayback = undefined;
-              if (this.audio === audio) this.audio = undefined;
-              audio.pause();
-              if (error) reject(error);
-              else resolve();
-            };
-            const timer = setTimeout(() => finish(new Error('Playback timed out')), 15000);
-            this.cancelPlayback = () => finish();
-            audio.onended = () => finish();
-            audio.onerror = () => finish(new Error('Audio playback failed'));
-            audio.onpause = () => finish();
-            void audio
-              .play()
-              .then(() => {
-                if (this.isCurrent(request)) this.report('Speaking · ElevenLabs');
-              })
-              .catch(() => finish(new Error('Playback blocked')));
-          });
-          if (this.isCurrent(request)) this.report('Voice ready · ElevenLabs');
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-        return;
+      const blob = await this.fetchCloud(request.text);
+      if (!this.isCurrent(request)) return;
+      const url = URL.createObjectURL(blob);
+      try {
+        const audio = new Audio(url);
+        this.audio = audio;
+        await new Promise<void>((resolve, reject) => {
+          const finish = (error?: Error) => {
+            clearTimeout(timer);
+            audio.onended = audio.onerror = audio.onpause = null;
+            this.cancelPlayback = undefined;
+            if (this.audio === audio) this.audio = undefined;
+            audio.pause();
+            if (error) reject(error);
+            else resolve();
+          };
+          const timer = setTimeout(() => finish(new Error('Playback timed out')), 15000);
+          this.cancelPlayback = () => finish();
+          audio.onended = () => finish();
+          audio.onerror = () => finish(new Error('Audio playback failed'));
+          audio.onpause = () => finish();
+          void audio
+            .play()
+            .then(() => {
+              this.voiceMode = 'cloud';
+              if (this.isCurrent(request)) this.report('Speaking · ElevenLabs');
+            })
+            .catch(() => finish(new Error('Playback blocked')));
+        });
+        if (this.isCurrent(request)) this.report('Voice ready · ElevenLabs');
+      } finally {
+        URL.revokeObjectURL(url);
       }
-      throw new Error('Use browser voice');
     } catch {
       if (!this.isCurrent(request)) return;
+      if (this.voiceMode === 'cloud') {
+        this.report('ElevenLabs voice unavailable. Visual cues remain on.');
+        return;
+      }
+      this.voiceMode = 'browser';
       await this.speakBrowser(request);
     }
   }
@@ -217,12 +201,6 @@ export class VoiceCoach {
   }
 
   private async requestCloud(text: string) {
-    // Disk first: a stored phrase plays even while the cloud voice is cooling down,
-    // and never consumes the provider rate budget.
-    if (canUseVoiceCache()) {
-      const stored = await readVoiceCache(text);
-      if (stored) return stored;
-    }
     const now = Date.now();
     if (now < this.cloudCooldownUntil) throw new Error('Cloud voice is cooling down');
     this.cloudCalls = this.cloudCalls.filter((time) => now - time < CLOUD_WINDOW_MS);
@@ -230,7 +208,6 @@ export class VoiceCoach {
     this.cloudCalls.push(now);
     try {
       const blob = await api.speech(text);
-      if (canUseVoiceCache()) writeVoiceCache(text, blob);
       return blob;
     } catch (error) {
       this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
