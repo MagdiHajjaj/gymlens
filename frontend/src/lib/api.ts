@@ -47,8 +47,29 @@ async function request<T>(path: string, options: RequestInit = {}, blob = false)
 }
 export const api = {
   profile: () => request<AthleteProfile>('/api/me'),
-  updateProfile: (profile: AthleteProfileInput) =>
-    request<AthleteProfile>('/api/me', { method: 'PATCH', body: JSON.stringify(profile) }),
+  updateProfile: (profile: AthleteProfileInput) => {
+    const {
+      display_name,
+      fitness_goal,
+      experience_level,
+      preferred_units,
+      height_cm,
+      weight_kg,
+      weekly_workout_target,
+    } = profile;
+    return request<AthleteProfile>('/api/me', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        display_name,
+        fitness_goal,
+        experience_level,
+        preferred_units,
+        height_cm,
+        weight_kg,
+        weekly_workout_target,
+      }),
+    });
+  },
   tigerStatus: () =>
     request<{ connected: boolean; database: string; timescale: boolean; continuous_aggregate: boolean }>(
       '/api/platform/tiger',
