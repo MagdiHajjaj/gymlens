@@ -73,3 +73,67 @@ export function ExerciseArt({ exercise, large = false }: { exercise: ExerciseId;
     />
   );
 }
+
+/**
+ * Push/Pull/Legs training split. Mirrors the `movement` taxonomy on
+ * ExerciseRegistry (push: push-up/press/dips, pull: pull-up/row/curl,
+ * legs: squat/deadlift/lunge/glute bridge).
+ */
+export type Movement = 'push' | 'pull' | 'legs';
+
+/** Representative exercise photo for each movement category. */
+const MOVEMENT_EXERCISE: Record<Movement, ExerciseId> = {
+  push: 'pushup',
+  pull: 'pullup',
+  legs: 'squat',
+};
+
+const MOVEMENT_LABELS: Record<Movement, string> = {
+  push: 'Push',
+  pull: 'Pull',
+  legs: 'Legs',
+};
+
+/**
+ * Compact circular category artwork for the dashboard filter chips.
+ * Reuses the exercise photo + tuned object-position focal point of the
+ * category's representative exercise, so crops stay consistent with
+ * ExerciseArt.
+ */
+export function CategoryArt({
+  movement,
+  size = 44,
+  alt,
+}: {
+  movement: Movement;
+  size?: number;
+  alt?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const exercise = MOVEMENT_EXERCISE[movement];
+  const key = exercise as string;
+  const src = exercise ? PHOTOS[key] : undefined;
+  if (!src || failed) {
+    return (
+      <div
+        className="category-art category-art-fallback"
+        style={{ width: size, height: size }}
+        aria-hidden="true"
+      >
+        <span>{MOVEMENT_LABELS[movement] ?? 'Category'}</span>
+      </div>
+    );
+  }
+  return (
+    <img
+      className="category-art"
+      src={src}
+      alt={alt ?? `${MOVEMENT_LABELS[movement]} exercises`}
+      loading="lazy"
+      width={size}
+      height={size}
+      style={{ objectPosition: FOCUS[key] ?? '50% 50%' }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
