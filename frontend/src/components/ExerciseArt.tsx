@@ -14,6 +14,26 @@ const PHOTOS: Record<string, string> = {
   pullup: '/exercises/photos/pull-up.jpg',
 };
 
+/**
+ * Focal point for each photo, as a CSS `object-position` value.
+ * The card banners are wide and short while most photos are portrait,
+ * so `object-fit: cover` crops hard — these keep the person's head and
+ * torso in frame instead of the default dead-center crop.
+ * Tuned against the actual photo files in public/exercises/photos/.
+ */
+const FOCUS: Record<string, string> = {
+  squat: '50% 62%',
+  curl: '50% 50%',
+  pushup: '50% 55%',
+  deadlift: '50% 50%',
+  lunge: '50% 50%',
+  press: '50% 28%',
+  glute_bridge: '50% 50%',
+  row: '50% 45%',
+  dips: '65% 42%',
+  pullup: '50% 55%',
+};
+
 const LABELS: Record<string, string> = {
   squat: 'Squat',
   curl: 'Bicep curl',
@@ -48,6 +68,7 @@ export function ExerciseArt({ exercise, large = false }: { exercise: ExerciseId;
       alt=""
       aria-hidden="true"
       loading="lazy"
+      style={{ objectPosition: FOCUS[key] ?? '50% 50%' }}
       onError={() => setFailed(true)}
     />
   );
