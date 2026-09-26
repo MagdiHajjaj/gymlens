@@ -1,7 +1,6 @@
 import { MovementAnalyzer, type ExerciseAnalyzer } from './ExerciseAnalyzer';
 import type { ExerciseResult, PoseFrame } from '../../types/workout';
 
-const PAIR_WINDOW_MS = 250;
 type CurlRep = { metrics: Record<string, number>; faults: ExerciseResult['faults'] };
 
 /** Each arm has its own calibration and cycle; one arm never borrows the other's state. */
@@ -9,7 +8,7 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
   readonly id = 'curl' as const;
   private analyzers = [new MovementAnalyzer('curl', {}, 0), new MovementAnalyzer('curl', {}, 1)];
   private lastSeen = [-Infinity, -Infinity];
-  private pending: { side: number; at: number; rep: CurlRep }[] = [];
+  private pending: { side: number; rep: CurlRep }[] = [];
   reset() {
     this.analyzers.forEach((analyzer) => analyzer.reset());
     this.lastSeen = [-Infinity, -Infinity];
@@ -50,14 +49,15 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
       if (r.repCompleted)
         this.pending.push({
           side,
-          at: frame.timestampMs,
           rep: { metrics: { ...r.repMetrics, arm_side: side }, faults: r.faults },
         });
     });
     const completedReps: CurlRep[] = [];
-    const left = this.pending.find((rep) => rep.side === 0);
-    const right = this.pending.find((rep) => rep.side === 1);
-    if (left && right && Math.abs(left.at - right.at) <= PAIR_WINDOW_MS) {
+    let leftIndex = this.pending.findIndex((rep) => rep.side === 0);
+    let rightIndex = this.pending.findIndex((rep) => rep.side === 1);
+    while (leftIndex >= 0 && rightIndex >= 0) {
+      const left = this.pending[leftIndex];
+      const right = this.pending[rightIndex];
       const keys = new Set([...Object.keys(left.rep.metrics), ...Object.keys(right.rep.metrics)]);
       const metrics = Object.fromEntries(
         [...keys]
@@ -68,11 +68,10 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
         ...new Map([...left.rep.faults, ...right.rep.faults].map((item) => [item.code, item])).values(),
       ];
       completedReps.push({ metrics: { ...metrics, arm_side: 2 }, faults });
-      this.pending = this.pending.filter((rep) => rep !== left && rep !== right);
+      this.pending = this.pending.filter((_, index) => index !== leftIndex && index !== rightIndex);
+      leftIndex = this.pending.findIndex((rep) => rep.side === 0);
+      rightIndex = this.pending.findIndex((rep) => rep.side === 1);
     }
-    const ready = this.pending.filter((rep) => frame.timestampMs - rep.at > PAIR_WINDOW_MS);
-    completedReps.push(...ready.map((rep) => rep.rep));
-    this.pending = this.pending.filter((rep) => !ready.includes(rep));
     const jointAngles: Record<string, number> = {};
     results.forEach((r, side) => {
       if (r.trackingValid)
@@ -85,12 +84,13 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
     const faults = [
       ...new Map(results.flatMap((r) => r.faults).map((fault) => [fault.code, fault])).values(),
     ];
+    const bothArmsReady = results.every((r) => r.trackingValid && r.calibrated);
     return {
       ...focus,
       jointAngles,
       faults,
       trackingValid: visible.length > 0,
-      calibrated: visible.some((r) => r.calibrated),
+      calibrated: bothArmsReady,
       repCompleted: completedReps.length > 0,
       completedReps,
       arms: results.map((r, side) => ({
@@ -103,10 +103,10 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
       guidance:
         visible.length === 0
           ? 'Keep your shoulders and elbows in view so the tracker can see the movement.'
-          : !visible.some((r) => r.calibrated)
-            ? focus.guidance || 'Lower your arms and pause for a second to start clean.'
-            : visible.length === 1
-              ? 'One arm is visible. Keep both hands in frame to track both sides.'
+          : visible.length < 2
+            ? 'Keep both arms in frame. One-arm curls do not count until both arms complete a rep.'
+            : !bothArmsReady
+              ? focus.guidance || 'Lower both arms and pause for a second to start clean.'
               : 'Both arms are tracked. Curl together or alternate, then lower each arm to finish the rep.',
     };
   }

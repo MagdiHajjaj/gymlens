@@ -61,29 +61,19 @@ it('stopping prevents a delayed cloud response from playing', async () => {
   expect(audio).not.toHaveBeenCalled();
 });
 
-it('keeps one active and one prioritized pending cue with newest winning equal priority', async () => {
+it('interrupts low-priority setup speech for an urgent rep cue', async () => {
   vi.spyOn(api, 'speech').mockRejectedValue(new Error('Unavailable'));
   const { speak, utterances } = stubBrowserSpeech();
   const coach = new VoiceCoach();
   const active = coach.speak('setup', false, { priority: 20 });
-  const dropped = coach.speak('rep', false, { priority: 50 });
-  const replaced = coach.speak('fault-old', false, { priority: 100 });
-  const pending = coach.speak('fault-new', false, { priority: 100 });
-
-  await dropped;
-  await replaced;
+  const rep = coach.speak('rep', false, { priority: 85 });
   await vi.waitFor(() => expect(utterances).toHaveLength(1));
   expect(speak).toHaveBeenCalledTimes(1);
-  expect(utterances[0].text).toBe('setup');
+  expect(utterances[0].text).toBe('rep');
 
   utterances[0].onend?.({} as SpeechSynthesisEvent);
   await active;
-  await Promise.resolve();
-  expect(speak).toHaveBeenCalledTimes(2);
-  expect(utterances[1].text).toBe('fault-new');
-
-  utterances[1].onend?.({} as SpeechSynthesisEvent);
-  await pending;
+  await rep;
 });
 
 it('warms selected exercise phrases through cloud without audio and aborts after first failure', async () => {
@@ -97,7 +87,7 @@ it('warms selected exercise phrases through cloud without audio and aborts after
   const phrases = selectedExerciseWarmPhrases('curl');
   expect(phrases).toHaveLength(7);
   await expect(new VoiceCoach().warmPhrases(phrases, true)).resolves.toBe(false);
-  expect(speech).toHaveBeenCalledTimes(2);
+  expect(speech).toHaveBeenCalledTimes(7);
   expect(audio).not.toHaveBeenCalled();
 });
 

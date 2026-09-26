@@ -94,6 +94,16 @@ export class VoiceCoach {
     const promise = new Promise<void>((resolve) => {
       request.resolve = resolve;
     });
+    if (this.active && request.priority > this.active.priority) {
+      this.pending?.resolve();
+      this.pending = request;
+      this.generation++;
+      request.generation = this.generation;
+      this.active = undefined;
+      this.cancelPlayback?.();
+      this.cancelPlayback = undefined;
+      return promise;
+    }
     if (!this.active) {
       this.active = request;
       void this.runActive(request);
@@ -108,14 +118,20 @@ export class VoiceCoach {
 
   async warmPhrases(phrases: string[], authenticated: boolean) {
     void authenticated;
-    for (const phrase of phrases) {
-      if (this.cache.has(phrase)) continue;
-      try {
-        await this.fetchCloud(phrase);
-      } catch {
-        this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
-        return false;
-      }
+    const unique = [...new Set(phrases)].filter((phrase) => !this.cache.has(phrase));
+    const results = await Promise.all(
+      unique.map(async (phrase) => {
+        try {
+          await this.fetchCloud(phrase);
+          return true;
+        } catch {
+          return false;
+        }
+      }),
+    );
+    if (results.some((result) => !result)) {
+      this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
+      return false;
     }
     return true;
   }

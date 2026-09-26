@@ -3,8 +3,8 @@ import type { ExerciseId, FormFault } from '../../types/workout';
 export const PRIORITY = {
   fault: 100,
   summary: 90,
+  rep: 85,
   transition: 80,
-  rep: 50,
   setup: 20,
 } as const;
 

@@ -19,6 +19,22 @@ it('counts a synchronized two-arm curl once while crediting both arms', () => {
   expect(reps.map((r) => r.rep_number)).toEqual([1, 2, 3]);
 });
 
+it('continues pairing bilateral curls across repeated movement cycles', () => {
+  const analyzer = new CurlAnalyzer();
+  const sequence = frames();
+  const completed = [];
+  const cycleDuration = sequence.at(-1)!.timestampMs + 50;
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    for (const original of sequence) {
+      const frame = structuredClone(original);
+      frame.timestampMs += cycle * cycleDuration;
+      completed.push(...(analyzer.analyze(frame).completedReps ?? []));
+    }
+  }
+  expect(completed).toHaveLength(9);
+  expect(completed.every((rep) => rep.metrics.arm_side === 2)).toBe(true);
+});
+
 it('tracks alternating arms without borrowing the other arm cycle', () => {
   const analyzer = new CurlAnalyzer();
   const sequence = frames();
@@ -32,17 +48,18 @@ it('tracks alternating arms without borrowing the other arm cycle', () => {
       completions.push(...analyzer.analyze(frame).completedReps!);
     }
   }
-  expect(completions.map((r) => r.metrics.arm_side)).toEqual([0, 0, 0, 1, 1, 1]);
+  expect(completions.map((r) => r.metrics.arm_side)).toEqual([2, 2, 2]);
 });
 
-it('keeps counting the visible arm when the other arm is missing', () => {
+it('does not count a complete cycle from only one visible arm', () => {
   const analyzer = new CurlAnalyzer();
   const results = frames().map((frame) => {
     frame.landmarks[16].visibility = 0;
     return analyzer.analyze(frame);
   });
-  expect(results.flatMap((r) => r.completedReps!)).toHaveLength(3);
+  expect(results.flatMap((r) => r.completedReps ?? [])).toHaveLength(0);
   expect(results.every((r) => !r.arms![1].trackingValid)).toBe(true);
+  expect(results.every((r) => !r.calibrated)).toBe(true);
 });
 
 it('does not count a one-arm partial movement as a completed rep', () => {
