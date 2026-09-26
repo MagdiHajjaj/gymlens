@@ -1578,39 +1578,6 @@ img.exercise-art {
   letter-spacing: 1.4px;
   font-size: 7px;
 }
-.camera-framing-guide {
-  position: absolute;
-  inset: 12% 18%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  padding-top: 18px;
-  color: #eff8df;
-  text-align: center;
-  pointer-events: none;
-  z-index: 1;
-}
-.camera-framing-guide strong,
-.camera-framing-guide > span:not(.camera-framing-corners) {
-  padding: 7px 11px;
-  border-radius: 6px;
-  background: #102019bf;
-}
-.camera-framing-guide strong {
-  font-size: 14px;
-}
-.camera-framing-guide > span:not(.camera-framing-corners) {
-  color: #d5e4c1;
-  font-size: 12px;
-}
-.camera-framing-corners {
-  position: absolute;
-  inset: 0;
-  border: 2px solid #d9efb580;
-  border-radius: 18px;
-}
 .camera-message {
   position: absolute;
   inset: 0;

@@ -55,7 +55,6 @@ export function CameraView({
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [videoEnded, setVideoEnded] = useState(false);
-  const [liveReadiness, setLiveReadiness] = useState({ trackingValid: false, calibrated: false, guidance: '' });
   useEffect(() => {
     let disposed = false,
       raf = 0,
@@ -87,7 +86,6 @@ export function CameraView({
         calibrated: false,
         guidance: 'Enable your camera to check your position.',
       });
-      setLiveReadiness({ trackingValid: false, calibrated: false, guidance: 'Step back until your full movement is visible.' });
       setVideoEnded(false);
       setStatus(
         syntheticDemo
@@ -262,11 +260,6 @@ export function CameraView({
               displayResult = { ...result, trackedSide: result.trackedSide ?? displayResult?.trackedSide };
               if (syntheticDemo) demoLandmarks = frame.landmarks;
               if (result.repCompleted || now - lastUi >= 100) {
-                setLiveReadiness({
-                  trackingValid: result.trackingValid,
-                  calibrated: result.calibrated,
-                  guidance: result.guidance,
-                });
                 if (preview) {
                   onReadiness?.({
                     cameraReady: true,
@@ -393,13 +386,6 @@ export function CameraView({
           <ShieldCheck size={13} /> ON-DEVICE
         </span>
       </div>
-      {!preview && status === 'ready' && !error && !videoEnded && !paused && (!liveReadiness.trackingValid || !liveReadiness.calibrated) && (
-        <div className="camera-framing-guide" role="status">
-          <span className="camera-framing-corners" aria-hidden="true" />
-          <strong>{liveReadiness.trackingValid ? 'Hold your starting position' : 'Step back to get in frame'}</strong>
-          <span>{liveReadiness.guidance || 'Keep your whole movement visible.'}</span>
-        </div>
-      )}
       {status !== 'ready' && !error && (
         <div className="camera-message">
           <LoaderCircle className="spin" size={28} />
