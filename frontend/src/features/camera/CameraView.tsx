@@ -276,7 +276,13 @@ export function CameraView({
                   void voice.warmPhrases(selectedExerciseWarmPhrases(session.exercise), true);
                 }
                 const totalReps = useWorkout.getState().session?.total_reps ?? state.session?.total_reps ?? 0;
-                const cue = feedback.nextCue(result, now, { exercise: session.exercise, totalReps });
+                const setStart = useWorkout.getState().currentSetStartRep;
+                const setReps = Math.max(0, totalReps - setStart + 1);
+                const cue = feedback.nextCue(result, now, {
+                  exercise: session.exercise,
+                  totalReps,
+                  setReps,
+                });
                 if (cue)
                   void voice.speak(cue.text, authenticated, {
                     priority: cue.priority,

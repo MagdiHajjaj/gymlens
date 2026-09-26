@@ -76,7 +76,7 @@ it('interrupts low-priority setup speech for an urgent rep cue', async () => {
   await rep;
 });
 
-it('warms selected exercise phrases through cloud without audio and aborts after first failure', async () => {
+it('warms a bounded set of selected exercise phrases without audio', async () => {
   const speech = vi
     .spyOn(api, 'speech')
     .mockResolvedValueOnce(new Blob())
@@ -87,7 +87,7 @@ it('warms selected exercise phrases through cloud without audio and aborts after
   const phrases = selectedExerciseWarmPhrases('curl');
   expect(phrases.length).toBeGreaterThan(7);
   await expect(new VoiceCoach().warmPhrases(phrases, true)).resolves.toBe(false);
-  expect(speech).toHaveBeenCalledTimes(phrases.length);
+  expect(speech).toHaveBeenCalledTimes(4);
   expect(audio).not.toHaveBeenCalled();
 });
 
@@ -106,7 +106,7 @@ it('coalesces overlapping warm requests for the same phrase', async () => {
   await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
 });
 
-it('reuses warmed blobs and stops before a thirteenth cloud request', async () => {
+it('reuses warmed blobs and bounds each background warm-up', async () => {
   const speech = vi.spyOn(api, 'speech').mockResolvedValue(new Blob());
   const coach = new VoiceCoach();
   await expect(coach.warmPhrases(['1.', '2.'], true)).resolves.toBe(true);
@@ -116,8 +116,8 @@ it('reuses warmed blobs and stops before a thirteenth cloud request', async () =
       Array.from({ length: 11 }, (_, index) => `${index + 3}.`),
       true,
     ),
-  ).resolves.toBe(false);
-  expect(speech).toHaveBeenCalledTimes(12);
+  ).resolves.toBe(true);
+  expect(speech).toHaveBeenCalledTimes(6);
 });
 
 it('speaks setup guidance and rep counts independent of feedback cooldowns', () => {
@@ -249,6 +249,22 @@ it('speaks measured movement guidance after a phase remains stable', () => {
   };
   expect(engine.next(moving, 0, { exercise: 'curl', totalReps: 0 })).toBeNull();
   expect(engine.next(moving, 400, { exercise: 'curl', totalReps: 0 })).toBe(moving.guidance);
+});
+
+it('restarts spoken rep numbers at one for the next set', () => {
+  const engine = new FeedbackEngine();
+  const completed: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'ready',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: '',
+  };
+  expect(
+    engine.next(completed, 0, { exercise: 'squat', totalReps: 9, setReps: 1 }),
+  ).toBe('1.');
 });
 
 it('grounds the rep-completion cue in the rep’s measured angle', () => {

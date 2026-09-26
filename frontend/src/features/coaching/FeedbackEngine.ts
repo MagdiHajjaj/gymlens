@@ -4,6 +4,7 @@ import { PRIORITY, repCountCue, type VoiceCue } from './Phrasebook';
 interface CueContext {
   exercise: ExerciseId;
   totalReps: number;
+  setReps?: number;
 }
 
 const finiteNumber = (value: unknown): number | undefined =>
@@ -66,7 +67,7 @@ export class FeedbackEngine {
     const completedCount = result.completedReps?.length ?? (result.repCompleted ? 1 : 0);
     const repCue =
       completedCount > 0 && context && context.totalReps > this.lastRepTotal
-        ? repCountCue(context.totalReps, context.exercise, completedCount)
+        ? repCountCue(context.setReps ?? context.totalReps, context.exercise, completedCount)
         : null;
     if (!result.trackingValid || !result.calibrated) {
       this.current = '';
@@ -115,7 +116,7 @@ export class FeedbackEngine {
     }
     this.current = '';
     if (repCue) {
-      this.lastRepTotal = Number(repCue.metadata?.totalReps ?? this.lastRepTotal);
+      this.lastRepTotal = context?.totalReps ?? this.lastRepTotal;
       return repCue;
     }
     if (!result.repCompleted && context && result.phase !== 'ready') {
@@ -134,7 +135,8 @@ export class FeedbackEngine {
         if (cue) return cue;
       }
     } else this.movementPhase = '';
-    const repNumber = context && context.totalReps > 0 ? context.totalReps : completedCount;
+    const repNumber = context && context.totalReps > 0 ? (context.setReps ?? context.totalReps) : completedCount;
+    if (result.repCompleted && context) this.lastRepTotal = context.totalReps;
     return result.repCompleted
       ? { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep }
       : announce(

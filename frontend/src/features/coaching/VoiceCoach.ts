@@ -117,8 +117,8 @@ export class VoiceCoach {
   }
 
   async warmPhrases(phrases: string[], authenticated: boolean) {
-    void authenticated;
-    const unique = [...new Set(phrases)].filter((phrase) => !this.cache.has(phrase));
+    const limit = authenticated ? 4 : 2;
+    const unique = [...new Set(phrases)].filter((phrase) => !this.cache.has(phrase)).slice(0, limit);
     const results = await Promise.all(
       unique.map(async (phrase) => {
         try {
@@ -130,7 +130,9 @@ export class VoiceCoach {
       }),
     );
     if (results.some((result) => !result)) {
-      this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
+      // Background warming is optional. A failed warm-up must not silence the
+      // next live cue; the live request can retry or fall back to browser speech.
+      this.cloudCooldownUntil = 0;
       return false;
     }
     return true;
@@ -234,10 +236,6 @@ export class VoiceCoach {
       }
     } catch {
       if (!this.isCurrent(request)) return;
-      if (this.voiceMode === 'cloud') {
-        this.report('ElevenLabs voice unavailable. Visual cues remain on.');
-        return;
-      }
       this.voiceMode = 'browser';
       await this.speakBrowser(request);
     }
