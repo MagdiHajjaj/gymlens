@@ -16,6 +16,8 @@ interface SpeechRequest {
 const CLOUD_LIMIT = 12;
 const CLOUD_WINDOW_MS = 60_000;
 const CLOUD_COOLDOWN_MS = 60_000;
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
 
 export class VoiceCoach {
   constructor(private report: (status: string) => void = () => {}) {}
@@ -24,12 +26,31 @@ export class VoiceCoach {
   private active?: SpeechRequest;
   private pending?: SpeechRequest;
   private audio?: HTMLAudioElement;
+  private unlockedAudio?: HTMLAudioElement;
   private cancelPlayback?: () => void;
   private cache = new Map<string, Blob>();
   private cloudInflight = new Map<string, Promise<Blob>>();
   private cloudCalls: number[] = [];
   private cloudCooldownUntil = 0;
   private voiceMode?: 'cloud' | 'browser';
+
+  /** Unlock one reusable media element while a mobile tap still owns user activation. */
+  unlock() {
+    if (this.unlockedAudio || typeof Audio === 'undefined') return;
+    const audio = new Audio(SILENT_WAV);
+    audio.volume = 0;
+    this.unlockedAudio = audio;
+    void audio
+      .play()
+      .then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 1;
+      })
+      .catch(() => {
+        if (this.unlockedAudio === audio) this.unlockedAudio = undefined;
+      });
+  }
 
   stop() {
     this.generation++;
@@ -109,7 +130,10 @@ export class VoiceCoach {
       if (!this.isCurrent(request)) return;
       const url = URL.createObjectURL(blob);
       try {
-        const audio = new Audio(url);
+        const audio = this.unlockedAudio ?? new Audio();
+        audio.src = url;
+        audio.volume = 1;
+        audio.load();
         this.audio = audio;
         await new Promise<void>((resolve, reject) => {
           const finish = (error?: Error) => {

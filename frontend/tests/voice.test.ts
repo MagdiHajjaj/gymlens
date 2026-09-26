@@ -186,6 +186,33 @@ it('warms count and exercise-specific fault phrases for every exercise', () => {
   expect(phrases).toContain('Hinge deeper at the hips within your comfortable range.');
 });
 
+it('unlocks one reusable audio element from the mobile tap', async () => {
+  const audio = {
+    volume: 1,
+    currentTime: 0,
+    play: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn(),
+  };
+  const audioConstructor = vi.fn();
+  class FakeAudio {
+    volume = audio.volume;
+    currentTime = audio.currentTime;
+    play = audio.play;
+    pause = audio.pause;
+    constructor() {
+      audioConstructor();
+    }
+  }
+  vi.stubGlobal('Audio', FakeAudio);
+  const coach = new VoiceCoach();
+  coach.unlock();
+  coach.unlock();
+  expect(audioConstructor).toHaveBeenCalledOnce();
+  expect(audio.play).toHaveBeenCalledOnce();
+  await Promise.resolve();
+  expect(audio.pause).toHaveBeenCalledOnce();
+});
+
 it('announces rep completion for counts outside the spoken-count schedule', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {

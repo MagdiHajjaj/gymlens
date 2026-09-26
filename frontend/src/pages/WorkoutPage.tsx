@@ -74,6 +74,7 @@ export function WorkoutPage() {
 
   function enableVoice() {
     voiceCoach.stop();
+    voiceCoach.unlock();
     toggleVoice();
     if (!voice) {
       void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated, {
@@ -473,6 +474,7 @@ export function WorkoutPage() {
               disabled={paused}
               onClick={() => {
                 voiceCoach.stop();
+                voiceCoach.unlock();
                 if (!voice) toggleVoice();
                 void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated, {
                   priority: PRIORITY.transition,
