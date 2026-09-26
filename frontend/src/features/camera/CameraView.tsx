@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, LoaderCircle, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Camera, CheckCircle2, LoaderCircle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { createPoseEngine } from '../pose/PoseEngine';
 import { PoseStabilizer } from '../pose/PoseStabilizer';
 import { createAnalyzer } from '../exercises/ExerciseRegistry';
@@ -18,7 +18,18 @@ const cameraErrors: Record<string, string> = {
   NotReadableError: 'Your camera is busy or unavailable. Close other apps using it, then try again.',
   OverconstrainedError: 'Your camera does not support this configuration. Try another camera or the demo.',
 };
-export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCoach: VoiceCoach }) {
+export function CameraView({
+  onDemo,
+  voiceCoach,
+  videoFile,
+  onFinish,
+}: {
+  onDemo: () => void;
+  voiceCoach: VoiceCoach;
+  /** An uploaded workout video to analyze instead of the live webcam. */
+  videoFile?: File | null;
+  onFinish?: () => void;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const session = useWorkout((s) => s.session)!;
@@ -27,10 +38,12 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
   const [status, setStatus] = useState('Preparing your session…');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [videoEnded, setVideoEnded] = useState(false);
   useEffect(() => {
     let disposed = false,
       raf = 0,
       stream: MediaStream | undefined,
+      fileUrl: string | undefined,
       engine: Awaited<ReturnType<typeof createPoseEngine>> | undefined;
     let lastTime = -1,
       lastInference = -1,
@@ -41,17 +54,39 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
       feedback = new FeedbackEngine(),
       voice = voiceCoach;
     const demo = session.source === 'demo';
+    const upload = session.source === 'upload';
     let displayResult: ExerciseResult | undefined;
     let demoLandmarks: PoseFrame['landmarks'] = [];
     async function start() {
       setError('');
-      setStatus(demo ? 'Loading landmark replay…' : 'Requesting camera access…');
+      setVideoEnded(false);
+      setStatus(demo ? 'Loading landmark replay…' : upload ? 'Loading your video…' : 'Requesting camera access…');
       let frames: PoseFrame[] = [];
       try {
         if (demo) {
           const response = await fetch(`/exercises/${session.exercise}.json`);
           if (!response.ok) throw new Error('Demo sequence could not load. Refresh and try again.');
           frames = await response.json();
+        } else if (upload) {
+          if (!videoFile) throw new Error('Choose a video file to analyze.');
+          const player = video.current!;
+          fileUrl = URL.createObjectURL(videoFile);
+          player.srcObject = null;
+          player.src = fileUrl;
+          player.loop = false;
+          player.onended = () => setVideoEnded(true);
+          await new Promise<void>((resolve, reject) => {
+            player.onloadeddata = () => resolve();
+            player.onerror = () =>
+              reject(new Error('This video format isn’t supported. Try an MP4 or MOV recorded on your phone.'));
+          });
+          setStatus('Loading the local pose model…');
+          try {
+            engine = await createPoseEngine();
+          } catch {
+            throw new Error('The pose model or WASM could not initialize. Run npm run setup, then refresh.');
+          }
+          if (!disposed) await player.play();
         } else {
           if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
             throw new Error('Camera access needs HTTPS or localhost. You can still use the landmark demo.');
@@ -88,6 +123,10 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
           // The first RAF timestamp can predate setup within the same browser frame.
           const dt = Math.max(0, now - previousTick);
           previousTick = now;
+          if (upload && video.current) {
+            if (state.paused && !video.current.paused) video.current.pause();
+            else if (!state.paused && video.current.paused && !video.current.ended) void video.current.play();
+          }
           if (state.paused) {
             if (!wasPaused) {
               analyzer.reset();
@@ -180,19 +219,30 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
       stream?.getTracks().forEach((t) => t.stop());
       engine?.close();
       voice.stop();
+      if (video.current) {
+        video.current.onended = null;
+        video.current.pause();
+        video.current.removeAttribute('src');
+      }
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
-  }, [session.id, session.exercise, session.source, authenticated, attempt, voiceCoach]);
+  }, [session.id, session.exercise, session.source, authenticated, attempt, voiceCoach, videoFile]);
   return (
     <div
-      className={`camera-stage ${session.source === 'demo' ? 'is-demo' : ''}`}
+      className={`camera-stage ${session.source === 'demo' ? 'is-demo' : ''} ${session.source === 'upload' ? 'is-upload' : ''}`}
       data-status={error ? 'error' : status}
     >
-      <video ref={video} muted playsInline aria-label="Your private webcam feed" />
+      <video
+        ref={video}
+        muted
+        playsInline
+        aria-label={session.source === 'upload' ? 'Your uploaded workout video' : 'Your private webcam feed'}
+      />
       <canvas ref={canvas} aria-label="Movement skeleton overlay" />
       <div className="camera-top">
         <span className="camera-badge">
           <span className="live-dot" />
-          {session.source === 'demo' ? 'LANDMARK REPLAY' : 'LIVE CAMERA'}
+          {session.source === 'demo' ? 'LANDMARK REPLAY' : session.source === 'upload' ? 'VIDEO ANALYSIS' : 'LIVE CAMERA'}
         </span>
         <span className="camera-badge">
           <ShieldCheck size={13} /> ON-DEVICE
@@ -220,6 +270,16 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
           </div>
         </div>
       )}
+      {videoEnded && !error && (
+        <div className="camera-message">
+          <CheckCircle2 size={32} />
+          <h3>Video analyzed.</h3>
+          <p>Every rep has been counted and checked.</p>
+          <div className="button-row">
+            {onFinish && <Button onClick={onFinish}>See my report</Button>}
+          </div>
+        </div>
+      )}
       {paused && !error && (
         <div className="camera-message paused-overlay">
           <h3>Take a breath.</h3>
@@ -230,6 +290,8 @@ export function CameraView({ onDemo, voiceCoach }: { onDemo: () => void; voiceCo
         <span>
           {session.source === 'demo'
             ? 'Synthetic movement · no camera required'
+            : session.source === 'upload'
+              ? 'Uploaded video · analyzed on your device'
             : session.exercise === 'curl'
               ? 'Keep shoulder, elbow, and wrist in view'
               : 'Side view · keep your full movement in frame'}

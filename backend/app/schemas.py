@@ -20,7 +20,7 @@ class StrictModel(BaseModel):
 class WorkoutCreate(StrictModel):
     id: UUID
     exercise: Exercise
-    source: Literal["camera", "demo"]
+    source: Literal["camera", "demo", "upload"]
     started_at: AwareDatetime
 
 

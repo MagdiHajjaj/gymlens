@@ -61,7 +61,7 @@ export interface WorkoutSession {
   ended_at?: string;
   total_reps: number;
   status: 'active' | 'completed';
-  source: 'camera' | 'demo';
+  source: 'camera' | 'demo' | 'upload';
   reps: RepEvent[];
   metrics: MetricSample[];
   insight?: Insight | null;

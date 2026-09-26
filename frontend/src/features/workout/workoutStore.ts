@@ -7,7 +7,7 @@ interface Store {
   paused: boolean;
   voice: boolean;
   select: (id: ExerciseId) => void;
-  begin: (source: 'camera' | 'demo') => void;
+  begin: (source: 'camera' | 'demo' | 'upload') => void;
   ingest: (result: ExerciseResult, timestamp: number) => void;
   pause: () => void;
   toggleVoice: () => void;

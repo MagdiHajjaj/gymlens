@@ -78,6 +78,7 @@ export function HistoryPage() {
                     <td>
                       <strong>{exercises[s.exercise].name}</strong>
                       {s.source === 'demo' && <span className="tag demo-tag">Demo</span>}
+                      {s.source === 'upload' && <span className="tag">Video</span>}
                       {s.status === 'active' && <span className="tag demo-tag">Incomplete</span>}
                     </td>
                     <td>
