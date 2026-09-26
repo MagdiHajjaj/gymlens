@@ -24,6 +24,8 @@ export function drawSkeleton(
   valid: boolean,
   exercise?: ExerciseId,
   result?: ExerciseResult,
+  /** True when the canvas is shown mirrored (live selfie camera), so text is pre-flipped to read correctly. */
+  mirrored = !demo,
 ) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -50,7 +52,7 @@ export function drawSkeleton(
     ctx.lineTo(width * 0.85, height * 0.92);
     ctx.stroke();
   }
-  drawPersonBox(ctx, landmarks, width, height, !demo);
+  drawPersonBox(ctx, landmarks, width, height, mirrored);
   if (exercise && result) drawMuscleHeatmap(ctx, landmarks, exercise, result, width, height);
   ctx.strokeStyle = valid ? '#c5f277' : '#d8dacf';
   ctx.lineWidth = demo ? 8 : 3;

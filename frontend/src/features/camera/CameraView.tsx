@@ -241,6 +241,7 @@ export function CameraView({
             displayResult?.trackingValid ?? false,
             session.exercise,
             displayResult,
+            !demo && !upload,
           );
           raf = requestAnimationFrame(safeTick);
         }
