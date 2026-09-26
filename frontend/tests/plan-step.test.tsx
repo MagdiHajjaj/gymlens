@@ -127,13 +127,31 @@ it('reorders rows with the keyboard arrows on the drag handle', () => {
 
 it('drags a row to a new position with pointer events', async () => {
   renderStep();
-  const [squatRow] = screen.getAllByRole('listitem');
-  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
+  const [squatRow, pushupRow] = screen.getAllByRole('listitem');
+  const list = screen.getByRole('list');
+  // Realistic layout: two 100px rows stacked at the top of the viewport.
+  const rect = (top: number, height = 100) =>
+    ({ top, height, bottom: top + height, left: 0, right: 300, width: 300, x: 0, y: top }) as DOMRect;
+  vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 200));
+  vi.spyOn(squatRow, 'getBoundingClientRect').mockReturnValue(rect(0));
+  vi.spyOn(pushupRow, 'getBoundingClientRect').mockReturnValue(rect(100));
+  Object.defineProperty(list, 'scrollHeight', { value: 200, configurable: true });
 
-  fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
-  fireEvent.pointerMove(window, { clientY: 200, pointerId: 1 });
-  // The row lifts while it follows the pointer.
+  const handle = within(squatRow).getByRole('button', { name: 'Reorder Squat' });
+  fireEvent.pointerDown(handle, { clientY: 50, pointerId: 1 });
+
+  // A small move that doesn't cross a slot yet: the row still follows the cursor.
+  fireEvent.pointerMove(window, { clientY: 80, pointerId: 1 });
   expect(squatRow.className).toContain('is-dragging');
+  expect(squatRow.style.transform).toContain('30px');
+  expect(pushupRow.style.transform).toBe('');
+
+  // Past the second row's midpoint: the sibling slides aside. The dragged row
+  // is clamped inside the 200px list (max 100px of travel for a 100px row).
+  fireEvent.pointerMove(window, { clientY: 170, pointerId: 1 });
+  expect(squatRow.style.transform).toContain('100px');
+  expect(pushupRow.style.transform).toContain('-100px');
+
   fireEvent.pointerUp(window, { pointerId: 1 });
 
   // After the settle animation the new order is committed to the store.
@@ -141,4 +159,6 @@ it('drags a row to a new position with pointer events', async () => {
   expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
   const [firstRow] = screen.getAllByRole('listitem');
   expect(within(firstRow).getByText('Push-up')).toBeTruthy();
+  // Inline drag styles are cleaned up.
+  expect(firstRow.style.transform).toBe('');
 });

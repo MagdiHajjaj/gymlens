@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { ArrowLeft, ArrowRight, Check, GripVertical, Minus, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
@@ -69,28 +70,24 @@ function Stepper({
   );
 }
 
-interface DragInfo {
-  id: ExerciseId;
-  fromIndex: number;
-  toIndex: number;
-  /** Pointer-follow offset while active; target slot offset while settling. */
-  dy: number;
-  /** Height of the dragged row, used to shift the other rows aside. */
-  height: number;
-  /** Past the movement threshold: the row is lifted and following the pointer. */
-  active: boolean;
-  /** Dropped: everything is gliding into its final place. */
-  settling: boolean;
-}
-
 interface Gesture {
   id: ExerciseId;
   fromIndex: number;
   startClientY: number;
   lastClientY: number;
+  listEl: HTMLUListElement;
   /** Row tops relative to the list, in layout order. Measured at drag start. */
   tops: number[];
   heights: number[];
+  /** Row elements in layout order; React keys rows by exerciseId so these nodes survive the reorder. */
+  rows: HTMLLIElement[];
+  /**
+   * Cumulative auto-scroll while this drag is active. Folded into the pointer
+   * delta so the row stays glued under the finger in viewport space while the
+   * page scrolls beneath it — which is what lets the drop target keep
+   * advancing during auto-scroll.
+   */
+  scrollDeltaY: number;
   toIndex: number;
   active: boolean;
   settling: boolean;
@@ -100,14 +97,12 @@ interface Gesture {
 function PlanRow({
   item,
   index,
-  drag,
   onHandlePointerDown,
   onHandleKeyDown,
   registerRow,
 }: {
   item: PlanItem;
   index: number;
-  drag: DragInfo | null;
   onHandlePointerDown: (event: React.PointerEvent, index: number, id: ExerciseId) => void;
   onHandleKeyDown: (event: React.KeyboardEvent, index: number) => void;
   registerRow: (id: ExerciseId, element: HTMLLIElement | null) => void;
@@ -116,30 +111,12 @@ function PlanRow({
   const complete = usePlan((state) => state.isExerciseComplete(item.exerciseId));
   const exercise = exercises[item.exerciseId];
 
-  const isDragged = drag?.id === item.exerciseId;
-  let className = `plan-row${complete ? ' is-complete' : ''}`;
-  let transform: string | undefined;
-  let transition: string | undefined;
-  if (isDragged && drag) {
-    if (drag.active) className += ' is-dragging';
-    transform = `translate3d(0, ${drag.dy}px, 0)${drag.active ? ' scale(1.03)' : ''}`;
-    // While the row follows the pointer it must not lag behind a transition;
-    // when settling, the CSS transition glides it into its slot.
-    if (drag.active) transition = 'none';
-  } else if (drag && (drag.active || drag.settling)) {
-    const { fromIndex, toIndex, height } = drag;
-    if (fromIndex < toIndex && index > fromIndex && index <= toIndex) {
-      transform = `translate3d(0, ${-height}px, 0)`;
-    } else if (fromIndex > toIndex && index >= toIndex && index < fromIndex) {
-      transform = `translate3d(0, ${height}px, 0)`;
-    }
-  }
+  const className = `plan-row${complete ? ' is-complete' : ''}`;
 
   return (
     <li
       ref={(element) => registerRow(item.exerciseId, element)}
       className={className}
-      style={transform ? { transform, transition } : undefined}
     >
       <button
         type="button"
@@ -213,111 +190,163 @@ export function PlanStep({
   const rowRefs = useRef(new Map<ExerciseId, HTMLLIElement>());
   const gesture = useRef<Gesture | null>(null);
   const scrollDirection = useRef(0);
-  const [drag, setDrag] = useState<DragInfo | null>(null);
 
   const registerRow = (id: ExerciseId, element: HTMLLIElement | null) => {
     if (element) rowRefs.current.set(id, element);
     else rowRefs.current.delete(id);
   };
 
-  const stopAutoScroll = () => {
-    const current = gesture.current;
-    if (current) cancelAnimationFrame(current.scrollRaf);
-    scrollDirection.current = 0;
-  };
-
-  const updateTargetIndex = (clientY: number) => {
-    const current = gesture.current;
-    const list = listRef.current;
-    if (!current || !current.active || current.settling || !list) return;
-    const pointerY = clientY - list.getBoundingClientRect().top;
-    let toIndex = current.fromIndex;
-    for (let i = 0; i < current.tops.length; i++) {
-      if (i === current.fromIndex) continue;
-      const midpoint = current.tops[i] + current.heights[i] / 2;
-      if (i < current.fromIndex && pointerY < midpoint) toIndex = Math.min(toIndex, i);
-      if (i > current.fromIndex && pointerY > midpoint) toIndex = Math.max(toIndex, i);
-    }
-    if (toIndex === current.toIndex) return;
-    current.toIndex = toIndex;
-    setDrag({
-      id: current.id,
-      fromIndex: current.fromIndex,
-      toIndex,
-      dy: clientY - current.startClientY,
-      height: current.heights[current.fromIndex],
-      active: true,
-      settling: false,
+  /** Slides the untouched rows aside to open the drop slot. Runs only when the slot changes; the CSS transition animates the shift. */
+  const updateSiblings = (g: Gesture) => {
+    const { fromIndex, toIndex } = g;
+    const shift = g.heights[fromIndex];
+    g.rows.forEach((row, index) => {
+      if (index === fromIndex) return;
+      let dy = 0;
+      if (fromIndex < toIndex && index > fromIndex && index <= toIndex) dy = -shift;
+      else if (fromIndex > toIndex && index >= toIndex && index < fromIndex) dy = shift;
+      row.style.transform = dy === 0 ? '' : `translate3d(0, ${dy}px, 0)`;
     });
   };
 
-  const handlePointerMove = (event: PointerEvent) => {
-    const current = gesture.current;
-    if (!current || current.settling) return;
-    const dy = event.clientY - current.startClientY;
+  /**
+   * One drag frame, written straight to the DOM with no React re-render so the
+   * row tracks the cursor 1:1. The dragged row's transform transition is killed
+   * while active (see startDrag); the siblings keep theirs and glide aside.
+   */
+  const renderFrame = (g: Gesture) => {
+    // Keep the dragged row inside the list so it can't fly off the top/bottom.
+    const minDy = -g.tops[g.fromIndex];
+    const maxDy = g.listEl.scrollHeight - g.tops[g.fromIndex] - g.heights[g.fromIndex];
+    const rawDy = g.lastClientY - g.startClientY + g.scrollDeltaY;
+    const dy = maxDy >= minDy ? Math.min(Math.max(rawDy, minDy), maxDy) : rawDy;
+    g.rows[g.fromIndex].style.transform = `translate3d(0, ${dy}px, 0) scale(1.03)`;
 
-    if (!current.active) {
-      if (Math.abs(dy) < DRAG_THRESHOLD_PX) return;
-      current.active = true;
-      document.body.classList.add('is-reordering');
-      try {
-        navigator.vibrate?.(12);
-      } catch {
-        /* haptics are a nice-to-have */
-      }
-      const tick = () => {
-        const active = gesture.current;
-        if (!active || !active.active || active.settling) return;
-        if (scrollDirection.current !== 0) {
-          window.scrollBy(0, scrollDirection.current * 14);
-          // The list moved under a stationary pointer: re-evaluate the target.
-          updateTargetIndex(active.lastClientY);
-        }
-        active.scrollRaf = requestAnimationFrame(tick);
-      };
-      current.scrollRaf = requestAnimationFrame(tick);
+    // The drop slot follows the dragged row's own center — the slot it
+    // visually covers is the slot it lands in. (The raw pointer can run ahead
+    // of the row when the row is clamped at a list edge, so the pointer alone
+    // would pick the wrong slot there.)
+    const rowCenterY = g.tops[g.fromIndex] + dy + g.heights[g.fromIndex] / 2;
+    let toIndex = g.fromIndex;
+    for (let i = 0; i < g.tops.length; i++) {
+      if (i === g.fromIndex) continue;
+      const midpoint = g.tops[i] + g.heights[i] / 2;
+      if (i < g.fromIndex && rowCenterY <= midpoint) toIndex = Math.min(toIndex, i);
+      if (i > g.fromIndex && rowCenterY >= midpoint) toIndex = Math.max(toIndex, i);
     }
+    if (toIndex !== g.toIndex) {
+      g.toIndex = toIndex;
+      updateSiblings(g);
+    }
+  };
 
-    current.lastClientY = event.clientY;
+  const startDrag = (g: Gesture) => {
+    g.active = true;
+    const dragged = g.rows[g.fromIndex];
+    dragged.classList.add('is-dragging');
+    // While the row follows the pointer it must not lag behind a transition.
+    dragged.style.transition = 'none';
+    document.body.classList.add('is-reordering');
+    try {
+      navigator.vibrate?.(12);
+    } catch {
+      /* haptics are a nice-to-have */
+    }
+    renderFrame(g);
+    const tick = () => {
+      const active = gesture.current;
+      if (!active || !active.active || active.settling) return;
+      if (scrollDirection.current !== 0) {
+        const amount = scrollDirection.current * 14;
+        window.scrollBy(0, amount);
+        // The page moved under a stationary pointer: fold the scroll into the
+        // drag delta so the row stays glued to the finger and the drop target
+        // keeps advancing over the rows scrolling beneath it.
+        active.scrollDeltaY += amount;
+        renderFrame(active);
+      }
+      active.scrollRaf = requestAnimationFrame(tick);
+    };
+    g.scrollRaf = requestAnimationFrame(tick);
+  };
+
+  const handlePointerMove = (event: PointerEvent) => {
+    const g = gesture.current;
+    if (!g || g.settling) return;
+    g.lastClientY = event.clientY;
     scrollDirection.current =
       event.clientY < AUTO_SCROLL_EDGE_PX
         ? -1
         : event.clientY > window.innerHeight - AUTO_SCROLL_EDGE_PX
           ? 1
           : 0;
-
-    updateTargetIndex(event.clientY);
+    if (!g.active) {
+      if (Math.abs(event.clientY - g.startClientY) < DRAG_THRESHOLD_PX) return;
+      startDrag(g);
+      return;
+    }
+    renderFrame(g);
   };
 
-  /** Glides every row into place, then commits the reorder to the store. */
+  /**
+   * Ends the gesture. A real drop uses FLIP: capture where every row is, commit
+   * the new order synchronously, then glide each row from its old visual spot
+   * to its new natural one. A cancel just glides everything back home.
+   */
   const finishGesture = (commit: boolean) => {
-    const current = gesture.current;
-    if (!current) return;
+    const g = gesture.current;
+    if (!g) return;
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
     window.removeEventListener('pointercancel', handlePointerCancel);
-    stopAutoScroll();
-    document.body.classList.remove('is-reordering');
-    if (!current.active) {
+    cancelAnimationFrame(g.scrollRaf);
+    scrollDirection.current = 0;
+    if (!g.active) {
       gesture.current = null;
       return;
     }
-    current.settling = true;
-    const { fromIndex, toIndex, id } = current;
-    const finalIndex = commit ? toIndex : fromIndex;
-    setDrag({
-      id,
-      fromIndex,
-      toIndex: finalIndex,
-      dy: current.tops[finalIndex] - current.tops[fromIndex],
-      height: current.heights[fromIndex],
-      active: false,
-      settling: true,
+    g.settling = true;
+    const { fromIndex, toIndex, rows } = g;
+    const moved = commit && toIndex !== fromIndex;
+
+    if (!moved) {
+      // Restoring the CSS transition animates every row home from where it is.
+      rows.forEach((row) => {
+        row.classList.remove('is-dragging');
+        row.style.transition = '';
+        row.style.transform = '';
+      });
+      window.setTimeout(() => {
+        gesture.current = null;
+        document.body.classList.remove('is-reordering');
+      }, SETTLE_MS);
+      return;
+    }
+
+    const oldTops = rows.map((row) => row.getBoundingClientRect().top);
+    rows.forEach((row) => {
+      row.classList.remove('is-dragging');
+      row.style.transition = 'none';
+      row.style.transform = '';
+    });
+    // Rows are keyed by exerciseId, so these are the same DOM nodes in a new order.
+    flushSync(() => {
+      reorderPlan(fromIndex, toIndex);
+    });
+    rows.forEach((row, i) => {
+      const dy = oldTops[i] - row.getBoundingClientRect().top;
+      if (dy !== 0) row.style.transform = `translate3d(0, ${dy}px, 0)`;
+    });
+    // Force reflow so the browser registers the starting positions…
+    void g.listEl.offsetHeight;
+    // …then release: the CSS transition glides every row into its slot.
+    rows.forEach((row) => {
+      row.style.transition = '';
+      row.style.transform = '';
     });
     window.setTimeout(() => {
       gesture.current = null;
-      setDrag(null);
-      if (commit && toIndex !== fromIndex) reorderPlan(fromIndex, toIndex);
+      document.body.classList.remove('is-reordering');
     }, SETTLE_MS);
   };
 
@@ -336,21 +365,26 @@ export function PlanStep({
     const listTop = list.getBoundingClientRect().top;
     const tops: number[] = [];
     const heights: number[] = [];
+    const rows: HTMLLIElement[] = [];
     plan.forEach((item) => {
       const row = rowRefs.current.get(item.exerciseId);
       if (!row) return;
       const rect = row.getBoundingClientRect();
       tops.push(rect.top - listTop);
       heights.push(rect.height);
+      rows.push(row);
     });
-    if (tops.length !== plan.length) return;
+    if (rows.length !== plan.length) return;
     gesture.current = {
       id,
       fromIndex: index,
       startClientY: event.clientY,
       lastClientY: event.clientY,
+      listEl: list,
       tops,
       heights,
+      rows,
+      scrollDeltaY: 0,
       toIndex: index,
       active: false,
       settling: false,
@@ -382,7 +416,6 @@ export function PlanStep({
             key={item.exerciseId}
             item={item}
             index={index}
-            drag={drag}
             onHandlePointerDown={handleHandlePointerDown}
             onHandleKeyDown={handleHandleKeyDown}
             registerRow={registerRow}
