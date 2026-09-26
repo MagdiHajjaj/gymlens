@@ -26,7 +26,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       const analyzer = new MovementAnalyzer(id);
       const tracker = new PoseStabilizer();
       const results = fixture(id).map((frame) => analyzer.analyze(tracker.update(frame)));
-      expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
+      expect(results.filter((r) => r.repCompleted)).toHaveLength(id === 'press' ? 2 : 3);
     });
   },
 );
@@ -60,11 +60,14 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       const reps = fixture(id)
         .map((f) => analyzer.analyze(f))
         .filter((r) => r.repCompleted);
-      expect(reps).toHaveLength(3);
+      expect(reps).toHaveLength(id === 'press' ? 2 : 3);
       expect(reps[0].faults).toEqual([]);
-      expect(reps[1].faults.map((f) => f.code)).toContain(depthFault[id]);
-      if (formFault[id])
-        expect(reps[2].faults.map((f) => f.code)).toContain(formFault[id]);
+      if (id === 'press') {
+        expect(reps[1].faults.map((f) => f.code)).toContain(formFault[id]);
+      } else {
+        expect(reps[1].faults.map((f) => f.code)).toContain(depthFault[id]);
+        if (formFault[id]) expect(reps[2].faults.map((f) => f.code)).toContain(formFault[id]);
+      }
     });
   it('does not count a partial cycle when starting at the bottom', () => {
     const analyzer = new MovementAnalyzer(id);
@@ -122,7 +125,7 @@ it('tracks curl cycles with cropped hips and a wider shoulder view', () => {
   expect(results.every((r) => r.jointAngles.upper_arm_angle === undefined)).toBe(true);
 });
 
-it('keeps the press tracking when only its primary arm joints are visible', () => {
+it('keeps the press tracking but waits for rack when only overhead arm joints are visible', () => {
   const analyzer = new MovementAnalyzer('press');
   const results = fixture('press').slice(0, 40).map((original) => {
     const frame = structuredClone(original);
@@ -131,10 +134,11 @@ it('keeps the press tracking when only its primary arm joints are visible', () =
     return analyzer.analyze(frame);
   });
   expect(results.every((result) => result.trackingValid)).toBe(true);
-  expect(results.at(-1)?.calibrated).toBe(true);
+  expect(results.at(-1)?.calibrated).toBe(false);
+  expect(results.at(-1)?.guidance).toContain('rack position');
 });
 
-it('accepts the overhead press starting position when facing the camera', () => {
+it('keeps tracking overhead but requires the rack position before calibration', () => {
   const analyzer = new MovementAnalyzer('press');
   const results = fixture('press').slice(0, 40).map((original) => {
     const frame = structuredClone(original);
@@ -144,6 +148,8 @@ it('accepts the overhead press starting position when facing the camera', () => 
     return analyzer.analyze(frame);
   });
   expect(results.every((result) => result.trackingValid)).toBe(true);
+  expect(results.every((result) => !result.calibrated)).toBe(true);
+  expect(results.at(-1)?.guidance).toContain('rack position');
 });
 
 it('calibrates overhead press at the rack position and counts an upward press', () => {
@@ -167,12 +173,12 @@ it('calibrates overhead press at the rack position and counts an upward press', 
   expect(results.at(-1)?.guidance).not.toContain('rack position');
 });
 
-it('accepts a natural overhead lockout below 160 degrees', () => {
+it('starts counting after the press fixture reaches rack instead of calibrating at lockout', () => {
   const analyzer = new MovementAnalyzer('press', { enter: 120, exit: 150, minimumRange: 30 });
   const reps = fixture('press')
     .map((frame) => analyzer.analyze(frame))
     .filter((result) => result.repCompleted);
-  expect(reps).toHaveLength(3);
+  expect(reps).toHaveLength(2);
 });
 
 it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
@@ -276,7 +282,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       let result: ExerciseResult | undefined;
       for (const f of frames.slice(0, 40)) result = analyzer.analyze(f);
       expect(result?.trackingValid).toBe(true);
-      expect(result?.calibrated).toBe(true);
+      expect(result?.calibrated).toBe(id !== 'press');
       expect(Object.keys(result?.jointAngles ?? {}).sort()).toEqual([...expected[id]].sort());
     });
     it('records min angle and duration for every completed rep', () => {
@@ -284,7 +290,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       const reps = fixture(id)
         .map((f) => analyzer.analyze(f))
         .filter((r) => r.repCompleted);
-      expect(reps).toHaveLength(3);
+      expect(reps).toHaveLength(id === 'press' ? 2 : 3);
       for (const rep of reps) {
         expect(rep.repMetrics?.min_angle).toBeGreaterThan(0);
         expect(rep.repMetrics?.duration_ms).toBeGreaterThan(0);

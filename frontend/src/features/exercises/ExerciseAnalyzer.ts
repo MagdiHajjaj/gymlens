@@ -101,10 +101,9 @@ const defaults: Record<ExerciseId, Thresholds> = {
     maximumArmSwing: 25,
     minimumHipAlignment: 155,
   },
-  // Overhead press: primary joint is the elbow. Calibration pose is arms extended
-  // overhead (elbow ~170+), the rack position is ~90. depth 100 flags a shallow
-  // press (a full rack bottoms near 85); the rep counts while
-  // minimum <= exit - minimumRange (115). maximumLean is a proxy for back arch:
+  // Overhead press: primary joint is the elbow. Calibration starts in the rack
+  // position (roughly 85-130 degrees), then a rep presses to lockout and returns
+  // to the rack. maximumLean is a proxy for back arch:
   // a braced press keeps the torso near vertical, so inclination past 30 suggests
   // the ribs flaring and back arching.
   press: {
@@ -333,7 +332,7 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
     alignment: { mode: 'inclination', joints: [11, 23] },
     angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
     extraAngles: [],
-    calibrationGuidance: 'Stand side-on, arms extended overhead.',
+    calibrationGuidance: 'Hold the rack position with your hands near your shoulders and elbows bent.',
     cycleFaults: [
       {
         kind: 'alignmentExceeds',
@@ -431,6 +430,7 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
 const fault = (code: string, message: string): FormFault => ({ code, message, severity: 'warning' });
 export class MovementAnalyzer implements ExerciseAnalyzer {
   private static readonly PHASE_HOLD_MS = 100;
+  private static readonly PRESS_RACK_MAX = 135;
   readonly config: Thresholds;
   private readonly exercise: ExerciseConfig;
   private smoother = new Smoother();
@@ -595,12 +595,10 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         ? 'This looks more like a push-up position. Stand upright for bicep curls, with your elbows beside your torso.'
         : this.id === 'pushup' && !this.armed && bodyInclination < 50
           ? 'Set up in a horizontal plank for push-ups. Keep your shoulders, hips, and ankles in one line.'
-            : !this.armed &&
-              ((this.id === 'press' && angle > this.config.enter) || this.id === 'pullup') &&
-              wrist.y > shoulder.y - 0.04
-            ? this.id === 'press'
-              ? 'Raise your hands overhead and straighten your arms to begin the overhead press.'
-              : 'Start from a dead hang with your hands above your shoulders.'
+            : !this.armed && this.id === 'press' && angle > MovementAnalyzer.PRESS_RACK_MAX
+              ? 'Lower your hands to shoulder height, bend your elbows, and hold the rack position to start.'
+            : !this.armed && this.id === 'pullup' && wrist.y > shoulder.y - 0.04
+              ? 'Start from a dead hang with your hands above your shoulders.'
             : this.id === 'row' && !this.armed && alignment < 25
               ? 'Hinge forward and hold your torso still before starting the row.'
               : null;
@@ -656,21 +654,20 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       trackedSide: this.side,
     };
     if (!this.armed) {
-      const pressRack = this.id === 'press' && value <= this.config.enter;
-      const pressOverhead = this.id === 'press' && value >= this.config.exit;
+      const pressRack = this.id === 'press' && value <= MovementAnalyzer.PRESS_RACK_MAX;
       const naturalStart = this.id !== 'press' && value >= this.config.exit - 10;
-      if (pressRack || pressOverhead || naturalStart) {
+      if (pressRack || naturalStart) {
         if (this.readySince < 0) this.readySince = frame.timestampMs;
         if (frame.timestampMs - this.readySince >= this.config.calibrationMs) {
           this.armed = true;
           this.baseline = value;
-          if (this.id === 'press') this.pressDirection = pressRack ? 'up' : 'down';
+          if (this.id === 'press') this.pressDirection = 'up';
         }
       } else this.readySince = -1;
       result.calibrated = this.armed;
       result.guidance = this.armed
         ? 'Ready. Move at a comfortable, controlled pace.'
-        : this.id === 'press' && value > this.config.enter
+        : this.id === 'press' && value > MovementAnalyzer.PRESS_RACK_MAX
           ? 'Lower your hands to shoulder height and hold the rack position before starting.'
           : this.exercise.calibrationGuidance;
       return result;
