@@ -22,6 +22,7 @@ beforeEach(() => {
     paused: false,
     voice: false,
     restPreset: 30,
+    targetReps: 8,
     rest: null,
     currentSetStartRep: 1,
   });
@@ -95,4 +96,23 @@ it('does not mark the plan complete for sample-footage demo sessions', () => {
   useWorkout.getState().finish();
 
   expect(usePlan.getState().completedExerciseIds).toEqual([]);
+});
+
+it('uses the plan rep target when beginning a session for a planned exercise', () => {
+  usePlan.getState().setPlan(['squat']);
+  usePlan.getState().updatePlanItem('squat', { reps: 12 });
+
+  useWorkout.getState().begin('camera');
+
+  expect(useWorkout.getState().targetReps).toBe(12);
+});
+
+it('keeps the global rep target when the exercise has no plan item', () => {
+  usePlan.getState().setPlan(['pushup']);
+  useWorkout.getState().setTargetReps(15);
+
+  useWorkout.getState().begin('camera');
+
+  expect(useWorkout.getState().session?.exercise).toBe('squat');
+  expect(useWorkout.getState().targetReps).toBe(15);
 });

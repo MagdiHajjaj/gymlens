@@ -6,6 +6,8 @@ export interface PlanItem {
   /** Target weight in kilograms. 0 means bodyweight. */
   weightKg: number;
   sets: number;
+  /** Target reps per set. */
+  reps: number;
 }
 
 /**
@@ -28,6 +30,9 @@ const DEFAULT_WEIGHT_KG: Record<ExerciseId, number> = {
 export const DEFAULT_SETS = 3;
 export const MIN_SETS = 1;
 export const MAX_SETS = 8;
+export const DEFAULT_REPS = 10;
+export const MIN_REPS = 1;
+export const MAX_REPS = 50;
 export const WEIGHT_STEP_KG = 2.5;
 export const MIN_WEIGHT_KG = 0;
 
@@ -41,7 +46,7 @@ interface PlanStore {
    *  Completion resets when the exercise list changes (a new plan); rebuilding the
    *  same list keeps it so returning to the plan step never wipes checkmarks. */
   setPlan: (exerciseIds: ExerciseId[]) => void;
-  updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number }) => void;
+  updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number; reps?: number }) => void;
   /** Marks an exercise finished. Idempotent; safe for exercises outside the plan. */
   completeExercise: (exerciseId: ExerciseId) => void;
   /** True when the exercise was marked finished in the current plan. */
@@ -63,7 +68,7 @@ export const usePlan = create<PlanStore>((set, get) => ({
         plan: exerciseIds.map((exerciseId) => {
           const existing = state.plan.find((item) => item.exerciseId === exerciseId);
           return (
-            existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS }
+            existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS, reps: DEFAULT_REPS }
           );
         }),
         ...(sameExercises ? {} : { completedExerciseIds: [] }),
@@ -80,6 +85,9 @@ export const usePlan = create<PlanStore>((set, get) => ({
                 : {}),
               ...(patch.sets !== undefined
                 ? { sets: Math.min(MAX_SETS, Math.max(MIN_SETS, patch.sets)) }
+                : {}),
+              ...(patch.reps !== undefined
+                ? { reps: Math.min(MAX_REPS, Math.max(MIN_REPS, patch.reps)) }
                 : {}),
             }
           : item,
