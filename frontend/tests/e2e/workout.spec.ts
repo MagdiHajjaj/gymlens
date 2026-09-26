@@ -18,9 +18,9 @@ test('voice coach announces a set summary, rest countdown, and next-set transiti
       },
     });
   });
-  await page.goto('/workout?mode=demo');
+  await page.goto('/workout?mode=demo&synthetic=1');
   await page.getByRole('button', { name: 'Enable voice', exact: true }).click();
-  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Start video demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12_000 });
   await page.getByRole('button', { name: 'Finish set · rest 30s', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Rest, then go again.' })).toBeVisible();
@@ -50,9 +50,9 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
       },
     });
   });
-  await page.goto('/workout?mode=demo');
+  await page.goto('/workout?mode=demo&synthetic=1');
   await page.getByRole('button', { name: 'Bicep curl', exact: true }).click();
-  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Start video demo', exact: true }).click();
   await page.getByRole('button', { name: 'Voice off', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Voice on', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -75,9 +75,10 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
 test('guest demo exits without creating a report or history entry', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
+  await page.goto('/?synthetic=1');
+  await expect(page.getByRole('heading', { name: /Good form/ })).toBeVisible();
   await page.getByRole('button', { name: 'Try the demo', exact: true }).click();
-  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Start video demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('2', { timeout: 18000 });
   await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
   await expect(page).toHaveURL(/\/workout$/);
@@ -93,10 +94,10 @@ test('camera permission failure provides an actionable demo fallback', async ({ 
       throw new DOMException('Denied', 'NotAllowedError');
     };
   });
-  await page.goto('/workout');
+  await page.goto('/workout?synthetic=1');
   await page.getByRole('button', { name: 'Set up camera' }).click();
   await expect(page.getByRole('alert')).toContainText('Camera access was blocked');
-  await page.getByRole('button', { name: 'Try landmark demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Try the video demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12000 });
   await page.getByRole('button', { name: 'Exit demo' }).click();
   await expect(page).toHaveURL(/\/workout$/);
@@ -125,8 +126,8 @@ test('local MediaPipe model initializes against a browser test camera', async ({
 
 test('leaving an active mobile demo discards it without a prompt', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/workout?mode=demo');
-  await page.getByRole('button', { name: 'Start landmark demo', exact: true }).click();
+  await page.goto('/workout?mode=demo&synthetic=1');
+  await page.getByRole('button', { name: 'Start video demo', exact: true }).click();
   await expect(page.getByTestId('rep-count')).toHaveText('1', { timeout: 12000 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('link', { name: 'History', exact: true }).click();

@@ -208,9 +208,9 @@ export function WorkoutSetup({
             </Button>
           ) : demo ? (
             <>
-              <div className="demo-setup-note">Demo mode uses sample movement. You won’t need a camera.</div>
+              <div className="demo-setup-note">Demo mode uses sample footage. You won’t need a camera.</div>
               <Button className="full-width setup-primary" onClick={() => onStart('demo')}>
-                <Play size={18} /> Start landmark demo
+                <Play size={18} /> Start video demo
               </Button>
               <Button variant="ghost" className="full-width" onClick={() => setPreview(true)}>
                 <Camera size={17} /> Use my camera instead
@@ -224,7 +224,7 @@ export function WorkoutSetup({
           <details className="workout-alternatives">
             <summary>Other ways to try a workout</summary>
             <Button variant="secondary" className="full-width" onClick={() => onStart('demo')}>
-              <Play size={16} /> Try landmark demo
+              <Play size={16} /> Try video demo
             </Button>
             <Button variant="secondary" className="full-width" onClick={() => fileInput.current?.click()}>
               <Upload size={16} /> Analyze a video

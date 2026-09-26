@@ -4,6 +4,7 @@ import { createPoseEngine } from '../pose/PoseEngine';
 import { PoseStabilizer } from '../pose/PoseStabilizer';
 import { createAnalyzer } from '../exercises/ExerciseRegistry';
 import { drawSkeleton } from './SkeletonOverlay';
+import { DEMO_CLIPS, DEMO_VIDEO_EXTENSIONS } from './demoClips';
 import { FeedbackEngine } from '../coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../coaching/Phrasebook';
 import { VoiceCoach } from '../coaching/VoiceCoach';
@@ -15,7 +16,7 @@ import type { ExerciseResult, PoseFrame } from '../../types/workout';
 const cameraErrors: Record<string, string> = {
   NotAllowedError:
     'Camera access was blocked. Allow camera access in your browser’s address bar, then try again.',
-  NotFoundError: 'No camera was found. Connect a webcam or try the landmark demo.',
+  NotFoundError: 'No camera was found. Connect a webcam or try the video demo.',
   NotReadableError: 'Your camera is busy or unavailable. Close other apps using it, then try again.',
   OverconstrainedError: 'Your camera does not support this configuration. Try another camera or the demo.',
 };
@@ -70,6 +71,10 @@ export function CameraView({
       voice = voiceCoach;
     const demo = session.source === 'demo';
     const upload = session.source === 'upload';
+    // ?synthetic=1 keeps the deterministic landmark replay for e2e tests.
+    // Real users get the video demo: sample footage with live pose analysis.
+    const syntheticDemo =
+      demo && new URLSearchParams(window.location.search).get('synthetic') === '1';
     let displayResult: ExerciseResult | undefined;
     let demoLandmarks: PoseFrame['landmarks'] = [];
     let warmedVoice = false;
@@ -83,14 +88,47 @@ export function CameraView({
       });
       setVideoEnded(false);
       setStatus(
-        demo ? 'Loading landmark replay…' : upload ? 'Loading your video…' : 'Requesting camera access…',
+        syntheticDemo
+          ? 'Loading landmark replay…'
+          : demo
+            ? 'Loading demo video…'
+            : upload
+              ? 'Loading your video…'
+              : 'Requesting camera access…',
       );
       let frames: PoseFrame[] = [];
       try {
-        if (demo) {
+        if (syntheticDemo) {
           const response = await fetch(`/exercises/${session.exercise}.json`);
           if (!response.ok) throw new Error('Demo sequence could not load. Refresh and try again.');
           frames = await response.json();
+        } else if (demo) {
+          const player = video.current!;
+          fileUrl = '';
+          player.srcObject = null;
+          const ext = DEMO_VIDEO_EXTENSIONS[session.exercise] ?? 'mp4';
+          player.src = `/exercises/videos/${session.exercise}.${ext}`;
+          player.loop = false;
+          const clip = DEMO_CLIPS[session.exercise];
+          await new Promise<void>((resolve, reject) => {
+            player.onloadeddata = () => resolve();
+            player.onerror = () =>
+              reject(new Error('The demo video could not load. Check your connection and try again.'));
+          });
+          if (clip) {
+            try {
+              player.currentTime = clip.start;
+            } catch {
+              /* some browsers need a tick before seeking; the RAF loop corrects it */
+            }
+          }
+          setStatus('Loading the local pose model…');
+          try {
+            engine = await createPoseEngine();
+          } catch {
+            throw new Error('The pose model or WASM could not initialize. Run npm run setup, then refresh.');
+          }
+          if (!disposed) await player.play();
         } else if (upload) {
           if (!videoFile) throw new Error('Choose a video file to analyze.');
           const player = video.current!;
@@ -115,7 +153,7 @@ export function CameraView({
           if (!disposed) await player.play();
         } else {
           if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
-            throw new Error('Camera access needs HTTPS or localhost. You can still use the landmark demo.');
+            throw new Error('Camera access needs HTTPS or localhost. You can still try the video demo.');
           stream = await navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 960 }, height: { ideal: 720 }, facingMode: 'user' },
             audio: false,
@@ -131,7 +169,7 @@ export function CameraView({
             engine = await createPoseEngine();
           } catch {
             throw new Error(
-              'The pose model or WASM could not initialize. Run npm run setup, refresh, or use the landmark demo.',
+              'The pose model or WASM could not initialize. Run npm run setup, refresh, or try the video demo.',
             );
           }
         }
@@ -155,7 +193,7 @@ export function CameraView({
           // The first RAF timestamp can predate setup within the same browser frame.
           const dt = Math.max(0, now - previousTick);
           previousTick = now;
-          if (upload && video.current) {
+          if ((upload || demo) && video.current) {
             if (state.paused && !video.current.paused) video.current.pause();
             else if (!state.paused && video.current.paused && !video.current.ended) void video.current.play();
           }
@@ -174,10 +212,20 @@ export function CameraView({
           wasPaused = false;
           if (!state.voice) voice.stop();
           demoTime += dt;
+          if (demo && !syntheticDemo && video.current && video.current.readyState >= 1) {
+            // Loop the good segment of the stock clip (skip dead intros/outros).
+            const clip = DEMO_CLIPS[session.exercise];
+            const start = clip?.start ?? 0;
+            const end = clip?.end ?? video.current.duration;
+            if (!video.current.seeking && Number.isFinite(end) && end > start) {
+              const t = video.current.currentTime;
+              if (t >= end || t < start) video.current.currentTime = start;
+            }
+          }
           if (now - lastInference >= 50) {
             lastInference = now;
             let frame: PoseFrame | undefined;
-            if (demo) {
+            if (syntheticDemo) {
               const sequenceTime = demoTime % (frames[frames.length - 1].timestampMs + 50);
               const index = Math.min(frames.length - 1, Math.floor(sequenceTime / 50));
               frame = { ...frames[index], timestampMs: now };
@@ -202,10 +250,10 @@ export function CameraView({
                 canvas.current!.height = video.current.videoHeight;
             }
             if (frame) {
-              const measured = demo ? frame : stabilizer.update(frame);
+              const measured = syntheticDemo ? frame : stabilizer.update(frame);
               const result = analyzer.analyze(measured);
               displayResult = { ...result, trackedSide: result.trackedSide ?? displayResult?.trackedSide };
-              if (demo) demoLandmarks = frame.landmarks;
+              if (syntheticDemo) demoLandmarks = frame.landmarks;
               if (result.repCompleted || now - lastUi >= 100) {
                 if (preview) {
                   onReadiness?.({
@@ -236,8 +284,8 @@ export function CameraView({
           }
           drawSkeleton(
             canvas.current!,
-            demo ? demoLandmarks : stabilizer.render(now),
-            demo,
+            syntheticDemo ? demoLandmarks : stabilizer.render(now),
+            syntheticDemo,
             displayResult?.trackingValid ?? false,
             session.exercise,
             displayResult,
@@ -249,7 +297,7 @@ export function CameraView({
           try {
             tick(now);
           } catch {
-            setError('Pose tracking stopped unexpectedly. Retry the camera or use the landmark demo.');
+            setError('Pose tracking stopped unexpectedly. Retry the camera or try the video demo.');
             onReadiness?.({
               cameraReady: false,
               trackingValid: false,
@@ -309,7 +357,13 @@ export function CameraView({
         ref={video}
         muted
         playsInline
-        aria-label={session.source === 'upload' ? 'Your uploaded workout video' : 'Your private webcam feed'}
+        aria-label={
+          session.source === 'upload'
+            ? 'Your uploaded workout video'
+            : session.source === 'demo'
+              ? 'Sample exercise video'
+              : 'Your private webcam feed'
+        }
       />
       <canvas ref={canvas} aria-label="Movement skeleton overlay" />
       <div className="camera-top">
@@ -318,7 +372,7 @@ export function CameraView({
           {preview
             ? 'CAMERA PREVIEW'
             : session.source === 'demo'
-              ? 'LANDMARK REPLAY'
+              ? 'VIDEO DEMO'
               : session.source === 'upload'
                 ? 'VIDEO ANALYSIS'
                 : 'LIVE CAMERA'}
@@ -344,7 +398,7 @@ export function CameraView({
               <RotateCcw size={16} /> Try again
             </Button>
             <Button variant="secondary" onClick={onDemo}>
-              Try landmark demo
+              Try the video demo
             </Button>
           </div>
         </div>
@@ -366,7 +420,7 @@ export function CameraView({
       <div className="camera-bottom">
         <span>
           {session.source === 'demo'
-            ? 'Synthetic movement · no camera required'
+            ? 'Sample footage · analyzed on your device'
             : session.source === 'upload'
               ? 'Uploaded video · analyzed on your device'
               : session.exercise === 'curl'
