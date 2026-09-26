@@ -2,7 +2,7 @@ import { beforeEach, expect, it } from 'vitest';
 import { usePlan, MAX_SETS, MIN_SETS, MIN_WEIGHT_KG } from '../src/features/workout/planStore';
 
 beforeEach(() => {
-  usePlan.setState({ plan: [] });
+  usePlan.setState({ plan: [], completedExerciseIds: [] });
 });
 
 it('builds plan rows with sensible defaults per exercise', () => {
@@ -48,6 +48,34 @@ it('ignores patches for exercises not in the plan and clears cleanly', () => {
   usePlan.getState().updatePlanItem('press', { weightKg: 30 });
   expect(usePlan.getState().plan).toEqual([{ exerciseId: 'lunge', weightKg: 10, sets: 3 }]);
 
+  usePlan.getState().completeExercise('lunge');
   usePlan.getState().clearPlan();
   expect(usePlan.getState().plan).toEqual([]);
+  expect(usePlan.getState().completedExerciseIds).toEqual([]);
+});
+
+it('marks exercises complete idempotently', () => {
+  usePlan.getState().setPlan(['squat', 'pushup']);
+
+  expect(usePlan.getState().isExerciseComplete('squat')).toBe(false);
+
+  usePlan.getState().completeExercise('squat');
+  usePlan.getState().completeExercise('squat');
+
+  expect(usePlan.getState().completedExerciseIds).toEqual(['squat']);
+  expect(usePlan.getState().isExerciseComplete('squat')).toBe(true);
+  expect(usePlan.getState().isExerciseComplete('pushup')).toBe(false);
+});
+
+it('keeps completion when the same plan is rebuilt, resets it for a new plan', () => {
+  usePlan.getState().setPlan(['squat', 'pushup']);
+  usePlan.getState().completeExercise('squat');
+
+  // Rebuilding the identical list (e.g. reopening the plan step) keeps checkmarks.
+  usePlan.getState().setPlan(['pushup', 'squat']);
+  expect(usePlan.getState().isExerciseComplete('squat')).toBe(true);
+
+  // A different exercise list is a fresh plan: completion starts over.
+  usePlan.getState().setPlan(['squat', 'deadlift']);
+  expect(usePlan.getState().completedExerciseIds).toEqual([]);
 });

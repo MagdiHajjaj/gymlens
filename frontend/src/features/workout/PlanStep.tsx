@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Minus, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
 import { exercises } from '../exercises/ExerciseRegistry';
@@ -64,16 +64,22 @@ function Stepper({
 
 function PlanRow({ item }: { item: PlanItem }) {
   const updatePlanItem = usePlan((state) => state.updatePlanItem);
+  const complete = usePlan((state) => state.isExerciseComplete(item.exerciseId));
   const exercise = exercises[item.exerciseId];
 
   return (
-    <li className="plan-row">
+    <li className={`plan-row${complete ? ' is-complete' : ''}`}>
       <span className="plan-row-art" aria-hidden="true">
         <ExerciseArt exercise={item.exerciseId} />
       </span>
       <div className="plan-row-info">
         <strong>{exercise.name}</strong>
         <small>{exercise.muscles}</small>
+        {complete && (
+          <span className="plan-row-complete-badge">
+            <Check size={14} aria-hidden="true" /> Completed
+          </span>
+        )}
       </div>
       <div className="plan-row-steppers">
         <Stepper

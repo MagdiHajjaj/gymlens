@@ -13,6 +13,7 @@ import {
   primaryJoint,
 } from '../features/insights/sessionReport';
 import { useWorkout } from '../features/workout/workoutStore';
+import { usePlan } from '../features/workout/planStore';
 import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
 import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
@@ -23,6 +24,7 @@ export function SessionPage() {
   const { authenticated, owner } = useIdentity();
   const navigate = useNavigate();
   const select = useWorkout((state) => state.select);
+  const hasPlan = usePlan((state) => state.plan.length > 0);
   const { goal } = useFitnessGoal();
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -594,6 +596,13 @@ export function SessionPage() {
         <Button onClick={repeat}>
           <Repeat2 size={18} /> Repeat this exercise
         </Button>
+        {hasPlan && (
+          <Button asChild variant="secondary">
+            <Link to="/workout?plan=review">
+              Back to plan <ArrowRight size={17} />
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="secondary">
           <Link to="/history">
             View history <ArrowRight size={17} />

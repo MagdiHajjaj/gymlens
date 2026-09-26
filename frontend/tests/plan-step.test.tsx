@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  usePlan.setState({ plan: [] });
+  usePlan.setState({ plan: [], completedExerciseIds: [] });
   usePlan.getState().setPlan(['squat', 'pushup']);
 });
 
@@ -73,4 +73,15 @@ it('calls onContinue and onBack from its action buttons', () => {
   expect(onContinue).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Back' }));
   expect(onBack).toHaveBeenCalledTimes(1);
+});
+
+it('shows a completion checkmark only on finished rows', () => {
+  usePlan.getState().completeExercise('squat');
+  renderStep();
+
+  const [squatRow, pushupRow] = screen.getAllByRole('listitem');
+  expect(squatRow.className).toContain('is-complete');
+  expect(within(squatRow).getByText('Completed')).toBeTruthy();
+  expect(pushupRow.className).not.toContain('is-complete');
+  expect(within(pushupRow).queryByText('Completed')).toBeNull();
 });
