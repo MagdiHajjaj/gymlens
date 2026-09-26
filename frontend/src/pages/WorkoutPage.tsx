@@ -28,6 +28,7 @@ import { useWorkout } from '../features/workout/workoutStore';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exportSession, saveLocal, timeLabel } from '../lib/sessionBuffer';
+import { formatMetricName, formatMetricValue, trackingStatusText } from '../features/camera/measurementDisplay';
 import { api } from '../lib/api';
 import type { ExerciseId, WorkoutSession } from '../types/workout';
 
@@ -67,6 +68,8 @@ export function WorkoutPage() {
   const announcedCountdown = useRef(new Set<number>());
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
+  const trackedReps = session?.total_reps ?? 0;
+  const measurements = Object.entries(result?.jointAngles || {});
 
   function enableVoice() {
     voiceCoach.stop();
@@ -551,7 +554,9 @@ export function WorkoutPage() {
                     ? 'Get into frame.'
                     : cue
                       ? 'One small fix.'
-                      : 'You’ve got this.'}
+                      : trackedReps > 0
+                        ? `${trackedReps} ${trackedReps === 1 ? 'rep' : 'reps'} tracked`
+                        : 'Tracking your form.'}
             </h3>
             <p>
               {rest
@@ -573,18 +578,18 @@ export function WorkoutPage() {
           <MuscleDiagram exercise={selected} result={result} paused={paused || Boolean(rest)} />
           <section className="panel metrics-panel">
             <span className="eyebrow">LIVE MEASUREMENTS</span>
-            {Object.entries(result?.jointAngles || {}).map(([key, value]) => (
+            {measurements.map(([key, value]) => (
               <div className="measurement" key={key}>
-                <span>{key.replaceAll('_', ' ')}</span>
-                <strong>{value}°</strong>
+                <span>{formatMetricName(key)}</span>
+                <strong>{formatMetricValue(value)}</strong>
               </div>
             ))}
-            {!Object.keys(result?.jointAngles || {}).length && (
+            {!measurements.length && (
               <p className="small-muted">Joint angles appear when tracking is ready.</p>
             )}
             <div className="tracking-status">
               {result?.trackingValid ? <Check size={14} /> : <ScanLine size={14} />}{' '}
-              {result?.trackingValid ? 'Required landmarks visible' : 'Waiting for clear landmarks'}
+              {trackingStatusText(Boolean(result?.trackingValid))}
             </div>
           </section>
         </aside>

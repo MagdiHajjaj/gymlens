@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VoiceCoach } from '../src/features/coaching/VoiceCoach';
 import { api } from '../src/lib/api';
-import { FeedbackEngine } from '../src/features/coaching/FeedbackEngine';
+import { FeedbackEngine, readyCue, repCompleteCue } from '../src/features/coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../src/features/coaching/Phrasebook';
 import type { ExerciseId, ExerciseResult } from '../src/types/workout';
 
@@ -201,9 +201,55 @@ it('announces rep completion for counts outside the spoken-count schedule', () =
     faults: [],
     guidance: 'Keep your movement steady and controlled.',
   };
-  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 6 })).toBe(
-    'Rep complete. Keep your movement controlled.',
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 6 })).toBe('Rep 6 complete.');
+});
+
+it('grounds the rep-completion cue in the rep’s measured angle', () => {
+  const engine = new FeedbackEngine();
+  const completed: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    repMetrics: { min_angle: 92, duration_ms: 2100 },
+  };
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 7 })).toBe(
+    'Rep 7 complete. Bottom angle 92 degrees.',
   );
+});
+
+it('never invents an angle when the completed rep has no measurements', () => {
+  const engine = new FeedbackEngine();
+  const completed: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    repMetrics: { min_angle: NaN },
+  };
+  const cue = engine.next(completed, 0, { exercise: 'squat', totalReps: 7 });
+  expect(cue).toBe('Rep 7 complete.');
+  expect(cue).not.toContain('degrees');
+});
+
+it('repCompleteCue falls back to a plain callout without a rep number or metrics', () => {
+  const result = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: '',
+  } as ExerciseResult;
+  expect(repCompleteCue(result, 0)).toBe('Rep complete.');
+  expect(repCompleteCue(result, 4)).toBe('Rep 4 complete.');
 });
 
 it('announces readiness while waiting between reps', () => {
@@ -217,7 +263,31 @@ it('announces readiness while waiting between reps', () => {
     faults: [],
     guidance: 'Keep your movement steady and controlled.',
   };
-  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 0 })).toBe(
-    'Ready. Move at a comfortable, controlled pace.',
-  );
+  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 0 })).toBe('Ready.');
+});
+
+it('grounds the idle cue in the measured rep count', () => {
+  const engine = new FeedbackEngine();
+  const idle: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'ready',
+    repCompleted: false,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    completedReps: [
+      { metrics: {}, faults: [] },
+      { metrics: {}, faults: [] },
+    ],
+  };
+  // First call announces the rep-count milestone; the follow-up falls through to the idle cue.
+  engine.next(idle, 0, { exercise: 'squat', totalReps: 2 });
+  expect(engine.next(idle, 60_000, { exercise: 'squat', totalReps: 2 })).toBe('Ready. 2 reps so far.');
+});
+
+it('readyCue uses singular and plural rep counts', () => {
+  expect(readyCue(0)).toBe('Ready.');
+  expect(readyCue(1)).toBe('Ready. 1 rep so far.');
+  expect(readyCue(7)).toBe('Ready. 7 reps so far.');
 });
