@@ -8,6 +8,10 @@ const PHOTOS: Record<string, string> = {
   deadlift: '/exercises/photos/deadlift.jpg',
   lunge: '/exercises/photos/lunge.jpg',
   press: '/exercises/photos/press.jpg',
+  glute_bridge: '/exercises/photos/glute-bridge.jpg',
+  row: '/exercises/photos/bent-over-row.jpg',
+  dips: '/exercises/photos/tricep-dips.jpg',
+  pullup: '/exercises/photos/pull-up.jpg',
 };
 
 const LABELS: Record<string, string> = {
