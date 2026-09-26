@@ -711,6 +711,18 @@ nav a.active:after {
   background: #eae8ee;
   color: #8a849d;
 }
+.sky {
+  background: #dfe9f2;
+  color: #5b7a94;
+}
+.mint {
+  background: #e2efe4;
+  color: #5f8570;
+}
+.rose {
+  background: #f3e2e4;
+  color: #9d6b74;
+}
 .exercise-art {
   width: 100%;
   height: 100%;

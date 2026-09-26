@@ -29,7 +29,7 @@ import { generateStatisticsInsight } from '../features/insights/insightEngine';
 import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
 import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
-import type { WorkoutSession } from '../types/workout';
+import type { ExerciseId, WorkoutSession } from '../types/workout';
 export function SessionPage() {
   const { id } = useParams();
   const { authenticated, owner } = useIdentity();
@@ -124,8 +124,14 @@ export function SessionPage() {
       </div>
     );
   const faulty = session.reps.filter((r) => r.faults_json.length > 0).length;
+<<<<<<< HEAD
   const observedInsight = generateStatisticsInsight(session, goal?.id);
-  const primary = session.exercise === 'squat' ? 'knee_angle' : 'elbow_angle';
+  const primaryMetrics: Partial<Record<ExerciseId, string>> = {
+    squat: 'knee_angle',
+    lunge: 'knee_angle',
+    deadlift: 'hip_angle',
+  };
+  const primary = primaryMetrics[session.exercise] ?? 'elbow_angle';
   const chart = session.metrics
     .filter((m) => m.metric_name === primary)
     .map((m) => ({

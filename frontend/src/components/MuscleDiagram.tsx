@@ -18,6 +18,21 @@ const muscles: Record<ExerciseId, { primary: string[]; secondary: string[]; labe
     secondary: ['core'],
     label: 'Chest · Triceps · Shoulders',
   },
+  deadlift: {
+    primary: ['hamstrings', 'glutes', 'back'],
+    secondary: ['core', 'forearms'],
+    label: 'Hamstrings · Glutes · Back',
+  },
+  lunge: {
+    primary: ['quads', 'glutes', 'core'],
+    secondary: ['hamstrings', 'calves'],
+    label: 'Quads · Glutes · Core',
+  },
+  press: {
+    primary: ['shoulders', 'triceps', 'core'],
+    secondary: ['chest'],
+    label: 'Shoulders · Triceps · Core',
+  },
 };
 
 const activeMuscles = (exercise: ExerciseId, result: ExerciseResult | null) => {

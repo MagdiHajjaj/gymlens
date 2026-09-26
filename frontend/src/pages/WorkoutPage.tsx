@@ -172,7 +172,7 @@ export function WorkoutPage() {
                 <div>
                   <h3>Hold your starting position</h3>
                   <p>
-                    Let the tracker find your joints. Extend your {selected === 'squat' ? 'legs' : 'arms'}{' '}
+                    Let the tracker find your joints. Extend your {exercise.category === 'LOWER BODY' ? 'legs' : 'arms'}{' '}
                     briefly to calibrate.
                   </p>
                 </div>
@@ -310,7 +310,9 @@ export function WorkoutPage() {
                           : 'Lowering'
                         : selected === 'curl'
                           ? 'Lowering'
-                          : 'Returning'}
+                          : selected === 'press'
+                            ? 'Pressing'
+                            : 'Returning'}
             </div>
           </section>
           <section className="coach-panel">

@@ -18,25 +18,45 @@ describe('joint geometry', () => {
     expect(jointAngle(p(0, 0), p(0, 1), p(0.5, 0), 2)).toBeCloseTo(45);
   });
 });
-describe.each<ExerciseId>(['squat', 'curl', 'pushup'])('%s recorded synthetic movement', (id) => {
-  it('preserves full-cycle counts through camera position smoothing', () => {
-    const analyzer = new MovementAnalyzer(id);
-    const tracker = new PoseStabilizer();
-    const results = fixture(id).map((frame) => analyzer.analyze(tracker.update(frame)));
-    expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
-  });
-  it('counts exactly three full cycles, including the shallow cycle with a cue', () => {
-    const analyzer = new MovementAnalyzer(id);
-    const reps = fixture(id)
-      .map((f) => analyzer.analyze(f))
-      .filter((r) => r.repCompleted);
-    expect(reps).toHaveLength(3);
-    expect(reps[0].faults).toEqual([]);
-    expect(reps[1].faults.map((f) => f.code)).toContain(
-      id === 'squat' ? 'insufficient_depth' : 'limited_range',
-    );
-    if (id === 'squat') expect(reps[2].faults.map((f) => f.code)).toContain('excessive_forward_lean');
-  });
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+  '%s preserves full-cycle counts through camera position smoothing',
+  (id) => {
+    it('counts three full cycles via the stabilizer', () => {
+      const analyzer = new MovementAnalyzer(id);
+      const tracker = new PoseStabilizer();
+      const results = fixture(id).map((frame) => analyzer.analyze(tracker.update(frame)));
+      expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
+    });
+  },
+);
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+  '%s recorded synthetic movement',
+  (id) => {
+    const depthFault: Record<ExerciseId, string> = {
+      squat: 'insufficient_depth',
+      curl: 'limited_range',
+      pushup: 'limited_range',
+      deadlift: 'insufficient_hinge',
+      lunge: 'insufficient_depth',
+      press: 'limited_range',
+    };
+    const formFault: Partial<Record<ExerciseId, string>> = {
+      squat: 'excessive_forward_lean',
+      deadlift: 'excessive_back_rounding',
+      lunge: 'knee_over_toes',
+      press: 'excessive_back_arch',
+    };
+    it('counts exactly three full cycles, including the shallow cycle with a cue', () => {
+      const analyzer = new MovementAnalyzer(id);
+      const reps = fixture(id)
+        .map((f) => analyzer.analyze(f))
+        .filter((r) => r.repCompleted);
+      expect(reps).toHaveLength(3);
+      expect(reps[0].faults).toEqual([]);
+      expect(reps[1].faults.map((f) => f.code)).toContain(depthFault[id]);
+      if (formFault[id])
+        expect(reps[2].faults.map((f) => f.code)).toContain(formFault[id]);
+    });
   it('does not count a partial cycle when starting at the bottom', () => {
     const analyzer = new MovementAnalyzer(id);
     const results = fixture(id)
@@ -131,6 +151,40 @@ it('rejects a front-facing squat during calibration', () => {
   frame.landmarks[12].x = frame.landmarks[11].x + 0.4;
   expect(analyzer.analyze(frame).trackingValid).toBe(false);
 });
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+  '%s live measurements',
+  (id) => {
+    const expected: Record<ExerciseId, string[]> = {
+      squat: ['knee_angle', 'torso_lean'],
+      curl: ['elbow_angle', 'torso_lean', 'upper_arm_angle'],
+      pushup: ['elbow_angle', 'hip_alignment'],
+      deadlift: ['hip_angle', 'torso_lean'],
+      lunge: ['knee_angle', 'torso_lean'],
+      press: ['elbow_angle', 'torso_lean'],
+    };
+    it('reports the configured joint-angle measurements once calibrated', () => {
+      const analyzer = new MovementAnalyzer(id);
+      const frames = fixture(id);
+      let result: ExerciseResult | undefined;
+      for (const f of frames.slice(0, 40)) result = analyzer.analyze(f);
+      expect(result?.trackingValid).toBe(true);
+      expect(result?.calibrated).toBe(true);
+      expect(Object.keys(result?.jointAngles ?? {}).sort()).toEqual([...expected[id]].sort());
+    });
+    it('records min angle and duration for every completed rep', () => {
+      const analyzer = new MovementAnalyzer(id);
+      const reps = fixture(id)
+        .map((f) => analyzer.analyze(f))
+        .filter((r) => r.repCompleted);
+      expect(reps).toHaveLength(3);
+      for (const rep of reps) {
+        expect(rep.repMetrics?.min_angle).toBeGreaterThan(0);
+        expect(rep.repMetrics?.duration_ms).toBeGreaterThan(0);
+      }
+      if (id === 'deadlift') expect(reps[0].repMetrics?.max_torso_lean).toBeGreaterThan(0);
+    });
+  },
+);
 
 it('detects supported curl upper-arm movement and push-up hip alignment cues', () => {
   for (const id of ['curl', 'pushup'] as const) {

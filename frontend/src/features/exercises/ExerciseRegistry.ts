@@ -30,6 +30,36 @@ export const exercises = {
     checks: 'Range & hip alignment',
     color: 'lavender',
   },
+  deadlift: {
+    name: 'Romanian deadlift',
+    category: 'LOWER BODY',
+    subtitle: 'Hinge with control',
+    muscles: 'Hamstrings · Glutes · Back',
+    setup:
+      'Stand side-on, 2–3 metres from your camera. Start tall, then hinge at the hips keeping your back flat.',
+    checks: 'Hinge depth & back position',
+    color: 'sky',
+  },
+  lunge: {
+    name: 'Lunge',
+    category: 'LOWER BODY',
+    subtitle: 'Own every step down',
+    muscles: 'Quads · Glutes · Core',
+    setup:
+      'Stand side-on, 2–3 metres from your camera. Step forward and lower until your front thigh is near parallel.',
+    checks: 'Depth & knee position',
+    color: 'mint',
+  },
+  press: {
+    name: 'Overhead press',
+    category: 'UPPER BODY',
+    subtitle: 'Press with a braced core',
+    muscles: 'Shoulders · Triceps · Core',
+    setup:
+      'Stand side-on with your full arm path visible. Begin with your arms extended overhead.',
+    checks: 'Range & back position',
+    color: 'rose',
+  },
 } as const;
 export const createAnalyzer = (id: ExerciseId) =>
   id === 'curl' ? new CurlAnalyzer() : new MovementAnalyzer(id);
