@@ -86,10 +86,13 @@ export const useWorkout = create<Store>((set, get) => ({
   },
   begin: (source) => {
     lastMetric = 0;
+    const selectedId = get().selected;
+    // A planned exercise brings its own rep target; otherwise the global target stands.
+    const planItem = usePlan.getState().plan.find((item) => item.exerciseId === selectedId);
     set({
       session: {
         id: crypto.randomUUID(),
-        exercise: get().selected,
+        exercise: selectedId,
         source,
         started_at: new Date().toISOString(),
         total_reps: 0,
@@ -98,6 +101,7 @@ export const useWorkout = create<Store>((set, get) => ({
         metrics: [],
         local: true,
       },
+      targetReps: planItem ? planItem.reps : get().targetReps,
       result: null,
       paused: false,
       rest: null,

@@ -21,6 +21,7 @@ import { PRIORITY, selectedExerciseWarmPhrases } from '../features/coaching/Phra
 import { summarizeSession, summarizeSet } from '../features/coaching/sessionSummary';
 import { MuscleDiagram } from '../components/MuscleDiagram';
 import { useWorkout } from '../features/workout/workoutStore';
+import { usePlan } from '../features/workout/planStore';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exportSession, saveLocal, timeLabel } from '../lib/sessionBuffer';
@@ -135,6 +136,20 @@ export function WorkoutPage() {
     const range = startRest(Date.now());
     const current = useWorkout.getState().session;
     if (!range || !current) return;
+    // Closing the final planned set ends the exercise: bank the session and
+    // advance to the plan review instead of starting another rest.
+    const planItem = usePlan.getState().plan.find((item) => item.exerciseId === current.exercise);
+    const finalPlannedSet =
+      planItem !== undefined && range.set_number >= planItem.sets && current.source !== 'demo';
+    if (finalPlannedSet) {
+      if (voice) {
+        void voiceCoach.speak('Exercise complete. Nice work.', identity.authenticated, {
+          priority: PRIORITY.summary,
+        });
+      }
+      void end();
+      return;
+    }
     setRestRemaining(restPreset);
     if (voice) {
       void voiceCoach.speak(summarizeSet(current, range), identity.authenticated, {
@@ -287,7 +302,10 @@ export function WorkoutPage() {
     await spokenSummary;
     setActive(false);
     setSaving(false);
-    navigate(`/session/${completed.id}`);
+    // With a session plan, land on the plan review (checkmarks + next exercise)
+    // instead of the session report; it also covers the fully-complete state.
+    const hasPlan = usePlan.getState().plan.length > 0;
+    navigate(hasPlan ? '/workout?plan=review' : `/session/${completed.id}`);
   }
   const exercise = exercises[selected];
   if (!active)
@@ -374,8 +392,8 @@ export function WorkoutPage() {
               onFinish={() => void end()}
             />
             <div className="mobile-rep-overlay" aria-hidden="true">
-              <strong>{session?.total_reps || 0}</strong>
-              <span>reps</span>
+              <strong>{currentSetReps}</strong>
+              <span>set reps</span>
             </div>
             {rest && (
               <div
@@ -457,11 +475,13 @@ export function WorkoutPage() {
         </div>
         <aside className="live-sidebar">
           <section className="panel rep-panel">
-            <span className="eyebrow">TOTAL REPS</span>
+            <span className="eyebrow">REPS THIS SET</span>
             <strong className="rep-number" data-testid="rep-count">
-              {session?.total_reps || 0}
+              {currentSetReps}
             </strong>
-            <span className="rep-label">completed reps</span>
+            <span className="rep-label">
+              {trackedReps} {trackedReps === 1 ? 'total rep' : 'total reps'}
+            </span>
             <span className="set-progress">
               {rest
                 ? `Rest after set ${rest.completed_set}`

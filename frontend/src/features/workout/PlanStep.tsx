@@ -3,7 +3,9 @@ import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
 import { exercises } from '../exercises/ExerciseRegistry';
 import {
+  MAX_REPS,
   MAX_SETS,
+  MIN_REPS,
   MIN_SETS,
   MIN_WEIGHT_KG,
   WEIGHT_STEP_KG,
@@ -104,6 +106,15 @@ function PlanRow({ item }: { item: PlanItem }) {
           onDecrement={() => updatePlanItem(item.exerciseId, { sets: item.sets - 1 })}
           onIncrement={() => updatePlanItem(item.exerciseId, { sets: item.sets + 1 })}
         />
+        <Stepper
+          label="Reps"
+          value={`${item.reps} ${item.reps === 1 ? 'rep' : 'reps'}`}
+          display={String(item.reps)}
+          decrementDisabled={item.reps <= MIN_REPS}
+          incrementDisabled={item.reps >= MAX_REPS}
+          onDecrement={() => updatePlanItem(item.exerciseId, { reps: item.reps - 1 })}
+          onIncrement={() => updatePlanItem(item.exerciseId, { reps: item.reps + 1 })}
+        />
       </div>
     </li>
   );
@@ -127,7 +138,7 @@ export function PlanStep({
     <div>
       <h2>Plan your session</h2>
       <p className="plan-step-intro">
-        Set a target weight and number of sets for each exercise. You can adjust between sets.
+        Set a target weight, sets and reps for each exercise. You can adjust between sets.
       </p>
       <ul className="plan-rows" aria-label="Session plan">
         {rows.map((item) => (

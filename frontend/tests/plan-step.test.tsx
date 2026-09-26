@@ -30,9 +30,10 @@ it('renders one row per exercise with defaults', () => {
   expect(within(rows[1]).getByText('Push-up').textContent).toBe('Push-up');
   expect(within(rows[0]).getByLabelText('Weight: 20 kg')).toBeTruthy();
   expect(within(rows[1]).getByLabelText('Weight: Bodyweight')).toBeTruthy();
+  expect(within(rows[0]).getByLabelText('Reps: 10 reps')).toBeTruthy();
 });
 
-it('weight and sets steppers update the store', () => {
+it('weight, sets and reps steppers update the store', () => {
   renderStep();
   const [squatRow] = screen.getAllByRole('listitem');
 
@@ -45,6 +46,11 @@ it('weight and sets steppers update the store', () => {
   fireEvent.click(within(squatRow).getByLabelText('Increase Sets'));
   fireEvent.click(within(squatRow).getByLabelText('Increase Sets'));
   expect(usePlan.getState().plan[0]).toMatchObject({ sets: 5 });
+
+  fireEvent.click(within(squatRow).getByLabelText('Increase Reps'));
+  fireEvent.click(within(squatRow).getByLabelText('Increase Reps'));
+  expect(usePlan.getState().plan[0]).toMatchObject({ reps: 12 });
+  expect(within(squatRow).getByLabelText('Reps: 12 reps')).toBeTruthy();
 });
 
 it('clamps steppers at their bounds', () => {
@@ -62,6 +68,16 @@ it('clamps steppers at their bounds', () => {
   fireEvent.click(decreaseSets);
   expect(usePlan.getState().plan[1].sets).toBe(1);
   expect(decreaseSets.disabled).toBe(true);
+
+  const decreaseReps = within(pushupRow).getByLabelText('Decrease Reps') as HTMLButtonElement;
+  for (let i = 0; i < 12; i++) fireEvent.click(decreaseReps);
+  expect(usePlan.getState().plan[1].reps).toBe(1);
+  expect(decreaseReps.disabled).toBe(true);
+
+  const increaseReps = within(pushupRow).getByLabelText('Increase Reps') as HTMLButtonElement;
+  for (let i = 0; i < 60; i++) fireEvent.click(increaseReps);
+  expect(usePlan.getState().plan[1].reps).toBe(50);
+  expect(increaseReps.disabled).toBe(true);
 });
 
 it('calls onContinue and onBack from its action buttons', () => {

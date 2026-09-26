@@ -140,7 +140,7 @@ export function WorkoutSetup({
                   ? 'Every exercise is done. Nice work.'
                   : `${doneCount} of ${plan.length} complete. Keep going when you’re ready.`
                 : planning
-                  ? 'Set a target weight and number of sets for each exercise.'
+                  ? 'Set a target weight, sets and reps for each exercise.'
                   : 'Choose an exercise. We’ll help you get into position and count your reps.'}
           </p>
         </div>
