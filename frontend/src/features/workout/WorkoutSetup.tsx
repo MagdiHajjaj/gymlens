@@ -17,6 +17,8 @@ import { CameraView, type CameraReadiness } from '../camera/CameraView';
 import { VoiceCoach } from '../coaching/VoiceCoach';
 import { exercises } from '../exercises/ExerciseRegistry';
 import { useWorkout } from './workoutStore';
+import { usePlan } from './planStore';
+import { PlanStep } from './PlanStep';
 import type { ExerciseId } from '../../types/workout';
 
 const AUTO_START_MS = 3000;
@@ -32,8 +34,10 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, select, selectedIds, toggleExercise, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
+  const { selected, selectedIds, toggleExercise, voice, restPreset, setRestPreset, targetReps, setTargetReps } = useWorkout();
+  const setPlan = usePlan((state) => state.setPlan);
   const [preview, setPreview] = useState(false);
+  const [planning, setPlanning] = useState(false);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
     cameraReady: false,
@@ -54,7 +58,11 @@ export function WorkoutSetup({
   }, [preview]);
   const exercise = exercises[selected];
   const ready = readiness.cameraReady && readiness.trackingValid && readiness.calibrated;
-  const step = preview ? (ready ? 3 : 2) : 1;
+  const step = preview ? 3 : planning ? 2 : 1;
+  const enterPlan = () => {
+    setPlan(selectedIds);
+    setPlanning(true);
+  };
   const [autoStartRemaining, setAutoStartRemaining] = useState(0);
 
   useEffect(() => {
@@ -90,12 +98,14 @@ export function WorkoutSetup({
         <div>
           <span className="eyebrow">YOUR WORKOUT</span>
           <h1 ref={heading} tabIndex={-1}>
-            {preview ? 'Find your position.' : 'What are we training today?'}
+            {planning ? 'Plan your session.' : preview ? 'Find your position.' : 'What are we training today?'}
           </h1>
           <p>
-            {preview
-              ? 'Check your framing before you start. Preview movements are not recorded.'
-              : 'Choose an exercise. We’ll help you get into position and count your reps.'}
+            {planning
+              ? 'Set a target weight and number of sets for each exercise.'
+              : preview
+                ? 'Check your framing before you start. Preview movements are not recorded.'
+                : 'Choose an exercise. We’ll help you get into position and count your reps.'}
           </p>
         </div>
         <span className="tag green">
@@ -104,7 +114,7 @@ export function WorkoutSetup({
       </div>
 
       <ol className="workout-stepper" aria-label="Workout setup progress">
-        {['Choose exercise', 'Set up camera', 'Start workout'].map((label, index) => (
+        {['Choose exercise', 'Plan your session', 'Set up camera'].map((label, index) => (
           <li
             key={label}
             className={index + 1 <= step ? 'is-current' : ''}
@@ -119,13 +129,20 @@ export function WorkoutSetup({
       <div className="guided-setup-grid">
         <section
           className="panel exercise-picker"
-          aria-label={preview ? 'Camera preview' : 'Choose exercise'}
+          aria-label={preview ? 'Camera preview' : planning ? 'Plan your session' : 'Choose exercise'}
         >
           {preview ? (
             <>
               <div className="section-heading">
                 <h2>{exercise.name}</h2>
-                <Button variant="ghost" size="small" onClick={() => setPreview(false)}>
+                <Button
+                  variant="ghost"
+                  size="small"
+                  onClick={() => {
+                    setPreview(false);
+                    setPlanning(false);
+                  }}
+                >
                   <ArrowLeft size={16} /> Change exercise
                 </Button>
               </div>
@@ -141,6 +158,15 @@ export function WorkoutSetup({
                   : 'Your workout starts automatically when your position is ready.'}
               </p>
             </>
+          ) : planning ? (
+            <PlanStep
+              exercises={selectedIds}
+              onContinue={() => {
+                setPlanning(false);
+                setPreview(true);
+              }}
+              onBack={() => setPlanning(false)}
+            />
           ) : (
             <>
               <h2>Choose your exercise</h2>
@@ -249,19 +275,19 @@ export function WorkoutSetup({
             <Button className="full-width setup-primary" disabled={!ready} onClick={() => onStart('camera')}>
               <Play size={18} /> {autoStartRemaining > 0 ? `Start now (${autoStartRemaining})` : 'Start workout'}
             </Button>
-          ) : demo ? (
+          ) : planning ? null : demo ? (
             <>
               <div className="demo-setup-note">Demo mode uses sample footage. You won’t need a camera.</div>
               <Button className="full-width setup-primary" onClick={() => onStart('demo')}>
                 <Play size={18} /> Start video demo
               </Button>
-              <Button variant="ghost" className="full-width" onClick={() => setPreview(true)}>
+              <Button variant="ghost" className="full-width" onClick={enterPlan}>
                 <Camera size={17} /> Use my camera instead
               </Button>
             </>
           ) : (
-            <Button className="full-width setup-primary" onClick={() => setPreview(true)}>
-              <Camera size={18} /> Set up camera <ArrowRight size={17} />
+            <Button className="full-width setup-primary" onClick={enterPlan}>
+              Plan your session <ArrowRight size={17} />
             </Button>
           )}
           <details className="workout-alternatives">
