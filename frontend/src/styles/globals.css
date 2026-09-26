@@ -715,6 +715,22 @@ nav a.active:after {
   width: 100%;
   height: 100%;
 }
+img.exercise-art {
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+}
+.exercise-art-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef2ec;
+  color: #5f8570;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+}
 .exercise-category {
   position: absolute;
   top: 13px;
