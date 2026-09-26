@@ -33,6 +33,26 @@ const muscles: Record<ExerciseId, { primary: string[]; secondary: string[]; labe
     secondary: ['chest'],
     label: 'Shoulders · Triceps · Core',
   },
+  glute_bridge: {
+    primary: ['glutes', 'hamstrings', 'core'],
+    secondary: ['quads'],
+    label: 'Glutes · Hamstrings · Core',
+  },
+  row: {
+    primary: ['back', 'biceps', 'shoulders'],
+    secondary: ['core', 'forearms'],
+    label: 'Back · Biceps · Shoulders',
+  },
+  dips: {
+    primary: ['triceps', 'chest', 'shoulders'],
+    secondary: ['core'],
+    label: 'Triceps · Chest · Shoulders',
+  },
+  pullup: {
+    primary: ['back', 'biceps', 'shoulders'],
+    secondary: ['core', 'forearms'],
+    label: 'Back · Biceps · Shoulders',
+  },
 };
 
 const activeMuscles = (exercise: ExerciseId, result: ExerciseResult | null) => {

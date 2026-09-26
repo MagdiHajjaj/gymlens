@@ -1,4 +1,4 @@
-export type ExerciseId = 'squat' | 'curl' | 'pushup' | 'deadlift' | 'lunge' | 'press';
+export type ExerciseId = 'squat' | 'curl' | 'pushup' | 'deadlift' | 'lunge' | 'press' | 'glute_bridge' | 'row' | 'dips' | 'pullup';
 export type MovementPhase = 'ready' | 'eccentric' | 'concentric';
 export interface Landmark {
   x: number;

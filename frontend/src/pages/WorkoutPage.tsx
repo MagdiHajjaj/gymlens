@@ -172,8 +172,7 @@ export function WorkoutPage() {
                 <div>
                   <h3>Hold your starting position</h3>
                   <p>
-                    Let the tracker find your joints. Extend your {exercise.category === 'LOWER BODY' ? 'legs' : 'arms'}{' '}
-                    briefly to calibrate.
+                    Let the tracker find your joints. {exercise.calibrate} briefly to calibrate.
                   </p>
                 </div>
               </li>

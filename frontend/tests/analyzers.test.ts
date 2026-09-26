@@ -18,7 +18,7 @@ describe('joint geometry', () => {
     expect(jointAngle(p(0, 0), p(0, 1), p(0.5, 0), 2)).toBeCloseTo(45);
   });
 });
-describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
   '%s preserves full-cycle counts through camera position smoothing',
   (id) => {
     it('counts three full cycles via the stabilizer', () => {
@@ -29,7 +29,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
     });
   },
 );
-describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
   '%s recorded synthetic movement',
   (id) => {
     const depthFault: Record<ExerciseId, string> = {
@@ -39,12 +39,20 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       deadlift: 'insufficient_hinge',
       lunge: 'insufficient_depth',
       press: 'limited_range',
+      glute_bridge: 'incomplete_extension',
+      row: 'incomplete_pull',
+      dips: 'insufficient_depth',
+      pullup: 'incomplete_pull',
     };
     const formFault: Partial<Record<ExerciseId, string>> = {
       squat: 'excessive_forward_lean',
       deadlift: 'excessive_back_rounding',
       lunge: 'knee_over_toes',
       press: 'excessive_back_arch',
+      glute_bridge: 'excessive_back_arch',
+      row: 'torso_rising',
+      dips: 'excessive_forward_lean',
+      pullup: 'excessive_swing',
     };
     it('counts exactly three full cycles, including the shallow cycle with a cue', () => {
       const analyzer = new MovementAnalyzer(id);
@@ -151,7 +159,7 @@ it('rejects a front-facing squat during calibration', () => {
   frame.landmarks[12].x = frame.landmarks[11].x + 0.4;
   expect(analyzer.analyze(frame).trackingValid).toBe(false);
 });
-describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press'])(
+describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'press', 'glute_bridge', 'row', 'dips', 'pullup'])(
   '%s live measurements',
   (id) => {
     const expected: Record<ExerciseId, string[]> = {
@@ -161,6 +169,10 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       deadlift: ['hip_angle', 'torso_lean'],
       lunge: ['knee_angle', 'torso_lean'],
       press: ['elbow_angle', 'torso_lean'],
+      glute_bridge: ['hip_angle', 'torso_lean'],
+      row: ['elbow_angle', 'torso_lean'],
+      dips: ['elbow_angle', 'torso_lean'],
+      pullup: ['elbow_angle', 'torso_lean'],
     };
     it('reports the configured joint-angle measurements once calibrated', () => {
       const analyzer = new MovementAnalyzer(id);
