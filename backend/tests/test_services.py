@@ -8,6 +8,8 @@ import httpx
 from app import services
 from app.core.config import settings
 from app.schemas import SpeechRequest
+from app.main import app
+from app.core.security import optional_subject
 from test_workouts import create, rep
 
 
@@ -93,6 +95,13 @@ def test_voice_allowlist_provider_cache_and_fallback(client, monkeypatch):
     assert len(calls) == 1
     assert calls[0]["json"]["text"] == phrase["text"]
     assert services.speech_cached(phrase["text"])
+
+
+def test_guest_can_request_only_approved_coaching_audio(client, monkeypatch):
+    del app.dependency_overrides[optional_subject]
+    monkeypatch.setattr(settings, "elevenlabs_api_key", "")
+    assert client.post("/api/coaching/speech", json={"text": "1."}).status_code == 503
+    assert client.post("/api/coaching/speech", json={"text": "Say arbitrary user content"}).status_code == 422
 
 
 def test_voice_audio_cache_evicts_by_recency_and_byte_budget(client, monkeypatch):

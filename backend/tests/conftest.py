@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.core.database import Base, get_db
-from app.core.security import current_subject
+from app.core.security import current_subject, optional_subject
 from app import services
 
 
@@ -21,6 +21,7 @@ def client(tmp_path):
 
     app.dependency_overrides[get_db] = db
     app.dependency_overrides[current_subject] = lambda: "auth0|alice"
+    app.dependency_overrides[optional_subject] = lambda: "auth0|alice"
     services._requests.clear()
     services._audio.clear()
     services._voice_down_until = 0.0

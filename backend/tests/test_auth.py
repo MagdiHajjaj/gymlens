@@ -25,7 +25,6 @@ def test_all_api_routes_require_authentication(client):
         ("POST", f"/api/workouts/{sid}/reps/batch"),
         ("POST", f"/api/workouts/{sid}/metrics/batch"),
         ("POST", f"/api/workouts/{sid}/insights"),
-        ("POST", "/api/coaching/speech"),
     ]
     for method, path in endpoints:
         assert client.request(method, path, json={}).status_code == 401
