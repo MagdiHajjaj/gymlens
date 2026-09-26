@@ -71,6 +71,7 @@ export function WorkoutPage() {
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       active &&
+      session?.source !== 'demo' &&
       (session?.status === 'active' || Boolean(error && unsaved)) &&
       currentLocation.pathname !== nextLocation.pathname,
   );
@@ -217,14 +218,14 @@ export function WorkoutPage() {
     return () => clearInterval(timer);
   }, [completeRest, identity.authenticated, rest, voice, voiceCoach]);
   useEffect(() => {
-    if (!active || (session?.status !== 'active' && !(error && unsaved))) return;
+    if (!active || session?.source === 'demo' || (session?.status !== 'active' && !(error && unsaved))) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [active, session?.status, error, unsaved]);
+  }, [active, session?.source, session?.status, error, unsaved]);
   useEffect(() => {
     if (!result?.faults.length) return;
     setCue(result.faults[0].message);
@@ -245,6 +246,13 @@ export function WorkoutPage() {
     setError('');
     voiceCoach.stop();
     const completed = finish();
+    if (completed.source === 'demo') {
+      setUnsaved(null);
+      setActive(false);
+      setSaving(false);
+      navigate('/workout');
+      return;
+    }
     setUnsaved(completed);
     const spokenSummary = voice
       ? voiceCoach.speak(summarizeSession(completed), identity.authenticated, {
@@ -382,7 +390,8 @@ export function WorkoutPage() {
                     <SkipForward size={16} /> Skip rest
                   </Button>
                   <Button variant="secondary" onClick={() => void end()} disabled={saving}>
-                    <Square size={13} fill="currentColor" /> End session
+                    <Square size={13} fill="currentColor" />{' '}
+                    {session?.source === 'demo' ? 'Exit demo' : 'End session'}
                   </Button>
                 </div>
               </div>
@@ -413,7 +422,8 @@ export function WorkoutPage() {
               onClick={() => void end()}
               disabled={saving || session?.status === 'completed'}
             >
-              <Square size={14} fill="currentColor" /> {saving ? 'Saving session…' : 'End session'}
+              <Square size={14} fill="currentColor" />{' '}
+              {session?.source === 'demo' ? 'Exit demo' : saving ? 'Saving session…' : 'End session'}
             </Button>
           </div>
           <div className="voice-check" role="status">

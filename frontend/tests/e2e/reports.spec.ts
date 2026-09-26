@@ -108,28 +108,25 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history filters real workouts and demos on mobile, and repeat keeps the exercise', async ({ page }) => {
+test('history excludes legacy demos on mobile and repeat keeps the exercise', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await seed(page, [
     recordedSession,
     { ...recordedSession, id: 'curl-demo', exercise: 'curl', source: 'demo' },
   ]);
   await page.goto('/history');
-  await expect(page.getByRole('article')).toHaveCount(2);
-  await page.getByRole('combobox', { name: 'Filter session type' }).selectOption('workouts');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Camera workout');
-  await page.getByRole('combobox', { name: 'Filter exercise' }).selectOption('curl');
-  await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear filters' }).click();
-  await page.getByRole('combobox', { name: 'Filter session type' }).selectOption('demo');
-  await page.getByRole('link', { name: 'View Bicep curl session' }).click();
-  await expect(page.getByText(/It demonstrates the report/)).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Arm not recorded');
+  await expect(page.getByText(/sample data/i)).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      Object.values(localStorage).every((value) => !value.includes('curl-demo')),
+    ),
+  ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.getByRole('button', { name: 'Repeat this exercise' }).click();
+  await page.getByRole('button', { name: 'Repeat Squat' }).click();
   await expect(page).toHaveURL(/\/workout$/);
-  await expect(page.getByRole('button', { name: 'Bicep curl', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Squat', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

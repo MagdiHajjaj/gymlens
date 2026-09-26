@@ -19,7 +19,7 @@ export function HistoryPage() {
     .filter(
       (session) =>
         (exercise === 'all' || session.exercise === exercise) &&
-        (source === 'all' || (source === 'workouts' ? session.source !== 'demo' : session.source === source)),
+        (source === 'all' || session.source === source),
     )
     .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
 
@@ -65,10 +65,8 @@ export function HistoryPage() {
             onChange={(event) => setSource(event.target.value)}
           >
             <option value="all">All sessions</option>
-            <option value="workouts">Workouts only</option>
             <option value="camera">Camera workouts</option>
             <option value="upload">Video analysis</option>
-            <option value="demo">Demos only</option>
           </select>
         </label>
         <p role="status">
@@ -191,7 +189,7 @@ export function HistoryPage() {
                 ? 'Try another exercise or session type, or clear the filters.'
                 : error
                   ? 'Retry account history to check your saved workouts.'
-                  : 'Complete a workout or try a demo to see your report here.'}
+                  : 'Complete a workout to see your report here.'}
             </p>
             {exercise !== 'all' || source !== 'all' ? (
               <Button
@@ -214,8 +212,7 @@ export function HistoryPage() {
         )}
       </div>
       <p className="report-note">
-        Demo sessions use sample movement and are excluded from training totals. Cue counts reflect recorded
-        checks, not a form score. This browser keeps up to 50 recent sessions.
+        Cue counts reflect recorded checks, not a form score. This browser keeps up to 50 recent workouts.
       </p>
     </div>
   );

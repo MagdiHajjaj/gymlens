@@ -11,6 +11,18 @@ def create(client):
     return payload
 
 
+def test_demo_sessions_are_not_persisted(client):
+    payload = {
+        "id": str(uuid4()),
+        "exercise": "squat",
+        "source": "demo",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    response = client.post("/api/workouts", json=payload)
+    assert response.status_code == 422
+    assert client.get("/api/workouts").json() == []
+
+
 def rep(number=1):
     return {
         "rep_number": number,

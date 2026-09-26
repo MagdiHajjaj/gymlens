@@ -28,7 +28,9 @@ export function useSessions() {
         remote.push(...page);
       } while (page.length === 50 && remote.length < 1000);
       const merged = new Map<string, WorkoutHistoryEntry>(local.map((s) => [s.id, s]));
-      remote.forEach((s) => merged.set(s.id, { ...merged.get(s.id), ...s, local: false }));
+      remote
+        .filter((s) => s.source !== 'demo')
+        .forEach((s) => merged.set(s.id, { ...merged.get(s.id), ...s, local: false }));
       if (!cancelled)
         setSessions([...merged.values()].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)));
     })()
