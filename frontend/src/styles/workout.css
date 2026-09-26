@@ -661,7 +661,17 @@
   }
   .plan-row-steppers {
     width: 100%;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .plan-stepper {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
+    width: 100%;
+  }
+  .plan-stepper-label {
+    margin-bottom: 0;
   }
   .plan-step-actions .setup-primary {
     position: static;
