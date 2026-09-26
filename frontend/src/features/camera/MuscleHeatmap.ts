@@ -29,8 +29,8 @@ export function drawMuscleHeatmap(
 ) {
   const drawSegment = (side: number) => {
     if (!result.trackingValid || (exercise !== 'curl' && side === undefined)) return;
-    const a = landmarks[(exercise === 'squat' ? 23 : 11) + side];
-    const b = landmarks[(exercise === 'squat' ? 25 : 13) + side];
+    const a = landmarks[(exercise === 'squat' || exercise === 'lunge' ? 23 : 11) + side];
+    const b = landmarks[(exercise === 'squat' || exercise === 'lunge' ? 25 : 13) + side];
     if (!a || !b || (a.visibility ?? 0) < 0.6 || (b.visibility ?? 0) < 0.6) return;
     const dx = (b.x - a.x) * width,
       dy = (b.y - a.y) * height;
@@ -75,7 +75,7 @@ export function drawMuscleHeatmap(
   }
   if (!result.trackingValid) return;
 
-  if (exercise === 'squat') {
+  if (exercise === 'squat' || exercise === 'lunge') {
     for (const side of [0, 1]) {
       drawSegment(side);
     }

@@ -63,10 +63,217 @@ const defaults: Record<ExerciseId, Thresholds> = {
     maximumArmSwing: 25,
     minimumHipAlignment: 155,
   },
+  // Romanian deadlift: primary joint is the hip. Standing hip angle is ~170-175,
+  // a full hinge reaches ~90-100. depth 105 flags a shallow hinge; the rep still
+  // counts while minimum <= exit - minimumRange (140). maximumLean is a proxy for
+  // back rounding: a braced hinge keeps the torso at or above ~parallel, so torso
+  // inclination past 80 suggests loss of neutral spine.
+  deadlift: {
+    visibility: 0.6,
+    enter: 150,
+    exit: 165,
+    depth: 105,
+    minimumRange: 25,
+    reversal: 8,
+    minimumMs: 900,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 80,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 155,
+  },
+  // Lunge: primary joint is the front knee, same ranges as the squat. depth 100
+  // flags a shallow lunge. kneeOverToes tolerance is normalized x * aspect: a
+  // vertical front shin keeps |knee.x - ankle.x| near zero; 0.06 allows natural
+  // forward travel while flagging the knee clearly passing the toes.
+  lunge: {
+    visibility: 0.6,
+    enter: 150,
+    exit: 165,
+    depth: 100,
+    minimumRange: 25,
+    reversal: 8,
+    minimumMs: 900,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 40,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 155,
+  },
+  // Overhead press: primary joint is the elbow. Calibration pose is arms extended
+  // overhead (elbow ~170+), the rack position is ~90. depth 100 flags a shallow
+  // press (a full rack bottoms near 85); the rep counts while
+  // minimum <= exit - minimumRange (115). maximumLean is a proxy for back arch:
+  // a braced press keeps the torso near vertical, so inclination past 30 suggests
+  // the ribs flaring and back arching.
+  press: {
+    visibility: 0.6,
+    enter: 140,
+    exit: 160,
+    depth: 100,
+    minimumRange: 45,
+    reversal: 8,
+    minimumMs: 700,
+    maximumMs: 15000,
+    calibrationMs: 600,
+    maximumLean: 30,
+    maximumArmSwing: 25,
+    minimumHipAlignment: 155,
+  },
+};
+export type CycleFaultCheck =
+  // smoothed alignment value exceeds maximumLean
+  | { kind: 'alignmentExceeds'; code: string; message: string }
+  // smoothed alignment value drops below minimumHipAlignment
+  | { kind: 'alignmentBelow'; code: string; message: string }
+  // a named extra angle exceeds maximumArmSwing
+  | { kind: 'extraAngleExceeds'; code: string; message: string; angle: string }
+  // |knee.x - ankle.x| * aspect exceeds tolerance (side-view shin tracking)
+  | { kind: 'kneeOverToes'; code: string; message: string; knee: number; ankle: number; tolerance: number };
+export interface ExerciseConfig {
+  landmarks: number[];
+  primaryJoints: [number, number, number];
+  /** when true, refine the 2D primary angle with world-landmark 3D angle if available */
+  refinePrimary3D?: boolean;
+  alignment: { mode: 'inclination'; joints: [number, number] } | { mode: 'hipAngle'; joints: [number, number, number] };
+  angleNames: { primary: string; alignment: string };
+  extraAngles: { name: string; joints: [number, number, number]; smoothKey: string; requiresHip?: boolean }[];
+  calibrationGuidance: string;
+  cycleFaults: CycleFaultCheck[];
+  depthFault: { code: string; message: string };
+  trackMaxLean: boolean;
+}
+const configs: Record<ExerciseId, ExerciseConfig> = {
+  squat: {
+    landmarks: [11, 23, 25, 27],
+    primaryJoints: [23, 25, 27],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'knee_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Stand side-on with your joints extended.',
+    cycleFaults: [
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_forward_lean',
+        message: 'Keep your chest a little more upright.',
+      },
+    ],
+    depthFault: {
+      code: 'insufficient_depth',
+      message: 'Try a little more depth within your comfortable range.',
+    },
+    trackMaxLean: true,
+  },
+  curl: {
+    landmarks: [11, 13, 15],
+    primaryJoints: [11, 13, 15],
+    refinePrimary3D: true,
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
+    extraAngles: [{ name: 'upper_arm_angle', joints: [23, 11, 13], smoothKey: 'arm', requiresHip: true }],
+    calibrationGuidance: 'Lower your hand until your arm is comfortably straight. Hold briefly to start.',
+    cycleFaults: [
+      {
+        kind: 'extraAngleExceeds',
+        code: 'upper_arm_movement',
+        message: 'Keep your upper arm close to your side.',
+        angle: 'upper_arm_angle',
+      },
+    ],
+    depthFault: {
+      code: 'limited_range',
+      message: 'Try a fuller range of motion at a comfortable pace.',
+    },
+    trackMaxLean: false,
+  },
+  pushup: {
+    landmarks: [11, 13, 15, 23, 27],
+    primaryJoints: [11, 13, 15],
+    alignment: { mode: 'hipAngle', joints: [11, 23, 27] },
+    angleNames: { primary: 'elbow_angle', alignment: 'hip_alignment' },
+    extraAngles: [],
+    calibrationGuidance: 'Hold a side-on plank with arms extended.',
+    cycleFaults: [
+      {
+        kind: 'alignmentBelow',
+        code: 'hip_alignment',
+        message: 'Keep your shoulders, hips, and ankles in line.',
+      },
+    ],
+    depthFault: {
+      code: 'limited_range',
+      message: 'Try a fuller range of motion at a comfortable pace.',
+    },
+    trackMaxLean: false,
+  },
+  deadlift: {
+    landmarks: [11, 23, 25, 27],
+    primaryJoints: [11, 23, 25],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'hip_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Stand side-on, then hinge at the hips with a flat back.',
+    cycleFaults: [
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_back_rounding',
+        message: 'Keep your back flat — hinge at the hips, chest proud.',
+      },
+    ],
+    depthFault: {
+      code: 'insufficient_hinge',
+      message: 'Hinge deeper at the hips within your comfortable range.',
+    },
+    trackMaxLean: true,
+  },
+  lunge: {
+    landmarks: [11, 23, 25, 27],
+    primaryJoints: [23, 25, 27],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'knee_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Stand side-on with your joints extended.',
+    cycleFaults: [
+      {
+        kind: 'kneeOverToes',
+        code: 'knee_over_toes',
+        message: 'Keep your front knee behind your toes.',
+        knee: 25,
+        ankle: 27,
+        tolerance: 0.06,
+      },
+    ],
+    depthFault: {
+      code: 'insufficient_depth',
+      message: 'Try a little more depth within your comfortable range.',
+    },
+    trackMaxLean: false,
+  },
+  press: {
+    landmarks: [11, 13, 15, 23],
+    primaryJoints: [11, 13, 15],
+    alignment: { mode: 'inclination', joints: [11, 23] },
+    angleNames: { primary: 'elbow_angle', alignment: 'torso_lean' },
+    extraAngles: [],
+    calibrationGuidance: 'Stand side-on, arms extended overhead.',
+    cycleFaults: [
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_back_arch',
+        message: "Keep your ribs down — don't arch your back.",
+      },
+    ],
+    depthFault: {
+      code: 'limited_range',
+      message: 'Try a fuller range of motion at a comfortable pace.',
+    },
+    trackMaxLean: false,
+  },
 };
 const fault = (code: string, message: string): FormFault => ({ code, message, severity: 'warning' });
 export class MovementAnalyzer implements ExerciseAnalyzer {
   readonly config: Thresholds;
+  private readonly exercise: ExerciseConfig;
   private smoother = new Smoother();
   private previousTime = -1;
   private side = -1;
@@ -84,6 +291,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     private readonly fixedSide?: number,
   ) {
     this.config = { ...defaults[id], ...options };
+    this.exercise = configs[id];
   }
   reset() {
     this.smoother.reset();
@@ -108,8 +316,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       guidance,
     });
     const l = frame.landmarks;
-    const indices =
-      this.id === 'squat' ? [11, 23, 25, 27] : this.id === 'curl' ? [11, 13, 15] : [11, 13, 15, 23, 27];
+    const indices = this.exercise.landmarks;
     const confidence = (offset: number) =>
       this.fixedSide !== undefined && offset !== this.fixedSide
         ? 0
@@ -175,20 +382,29 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       this.reset();
       return empty('Turn side-on to the camera for this exercise.');
     }
-    let angle =
-      this.id === 'squat' ? jointAngle(p(23), p(25), p(27), aspect) : jointAngle(p(11), p(13), p(15), aspect);
-    if (this.id === 'curl' && frame.worldLandmarks) {
-      const world = [11, 13, 15].map((i) => frame.worldLandmarks![i + this.side]);
+    const [a0, a1, a2] = this.exercise.primaryJoints;
+    let angle = jointAngle(p(a0), p(a1), p(a2), aspect);
+    if (this.exercise.refinePrimary3D && frame.worldLandmarks) {
+      const world = this.exercise.primaryJoints.map((i) => frame.worldLandmarks![i + this.side]);
       if (world.every((point) => point && [point.x, point.y, point.z].every(Number.isFinite))) {
         const spatial = jointAngle3D(world[0], world[1], world[2]);
         if (Number.isFinite(spatial)) angle = spatial;
       }
     }
     const alignment =
-      this.id === 'pushup'
-        ? jointAngle(p(11), p(23), p(27), aspect)
+      this.exercise.alignment.mode === 'hipAngle'
+        ? jointAngle(
+            p(this.exercise.alignment.joints[0]),
+            p(this.exercise.alignment.joints[1]),
+            p(this.exercise.alignment.joints[2]),
+            aspect,
+          )
         : hipVisible
-          ? inclination(p(11), p(23), aspect)
+          ? inclination(
+              p(this.exercise.alignment.joints[0]),
+              p(this.exercise.alignment.joints[1]),
+              aspect,
+            )
           : 0;
     if (!Number.isFinite(angle) || !Number.isFinite(alignment)) {
       this.reset();
@@ -199,14 +415,21 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     const value = this.smoother.update('primary', angle, dt);
     const torsoAngle = this.smoother.update('alignment', alignment, dt);
     const angles: Record<string, number> = {
-      [this.id === 'squat' ? 'knee_angle' : 'elbow_angle']: Math.round(value),
-      [this.id === 'pushup' ? 'hip_alignment' : 'torso_lean']: Math.round(torsoAngle),
+      [this.exercise.angleNames.primary]: Math.round(value),
+      [this.exercise.angleNames.alignment]: Math.round(torsoAngle),
     };
-    if (this.id === 'curl' && !hipVisible) delete angles.torso_lean;
-    if (this.id === 'curl' && hipVisible)
-      angles.upper_arm_angle = Math.round(
-        this.smoother.update('arm', jointAngle(p(23), p(11), p(13), aspect), dt),
+    for (const extra of this.exercise.extraAngles) {
+      if (extra.requiresHip && !hipVisible) continue;
+      angles[extra.name] = Math.round(
+        this.smoother.update(
+          extra.smoothKey,
+          jointAngle(p(extra.joints[0]), p(extra.joints[1]), p(extra.joints[2]), aspect),
+          dt,
+        ),
       );
+    }
+    if (this.exercise.alignment.mode === 'inclination' && !hipVisible)
+      delete angles[this.exercise.angleNames.alignment];
     const result: ExerciseResult = {
       phase: this.phase,
       trackingValid: true,
@@ -225,11 +448,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       result.calibrated = this.armed;
       result.guidance = this.armed
         ? 'Ready. Move at a comfortable, controlled pace.'
-        : this.id === 'curl'
-          ? 'Lower your hand until your arm is comfortably straight. Hold briefly to start.'
-          : this.id === 'pushup'
-            ? 'Hold a side-on plank with arms extended.'
-            : 'Stand side-on with your joints extended.';
+        : this.exercise.calibrationGuidance;
       return result;
     }
     result.guidance = 'Keep your movement steady and controlled.';
@@ -243,12 +462,16 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     if (this.phase !== 'ready') {
       this.minimum = Math.min(this.minimum, value);
       this.maximumLean = Math.max(this.maximumLean, torsoAngle);
-      if (this.id === 'squat' && torsoAngle > this.config.maximumLean)
-        result.faults.push(fault('excessive_forward_lean', 'Keep your chest a little more upright.'));
-      if (this.id === 'curl' && angles.upper_arm_angle > this.config.maximumArmSwing)
-        result.faults.push(fault('upper_arm_movement', 'Keep your upper arm close to your side.'));
-      if (this.id === 'pushup' && torsoAngle < this.config.minimumHipAlignment)
-        result.faults.push(fault('hip_alignment', 'Keep your shoulders, hips, and ankles in line.'));
+      for (const check of this.exercise.cycleFaults) {
+        let hit = false;
+        if (check.kind === 'alignmentExceeds') hit = torsoAngle > this.config.maximumLean;
+        else if (check.kind === 'alignmentBelow') hit = torsoAngle < this.config.minimumHipAlignment;
+        else if (check.kind === 'extraAngleExceeds')
+          hit = (angles[check.angle] ?? 0) > this.config.maximumArmSwing;
+        else if (check.kind === 'kneeOverToes')
+          hit = Math.abs((p(check.knee).x - p(check.ankle).x) * aspect) > check.tolerance;
+        if (hit) result.faults.push(fault(check.code, check.message));
+      }
       for (const f of result.faults) this.cycleFaults.set(f.code, f);
       if (value > this.minimum + this.config.reversal) this.phase = 'concentric';
       if (frame.timestampMs - this.started > this.config.maximumMs) {
@@ -261,19 +484,14 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
           this.minimum <= this.config.exit - this.config.minimumRange;
         if (result.repCompleted) {
           if (this.minimum > this.config.depth) {
-            const f = fault(
-              this.id === 'squat' ? 'insufficient_depth' : 'limited_range',
-              this.id === 'squat'
-                ? 'Try a little more depth within your comfortable range.'
-                : 'Try a fuller range of motion at a comfortable pace.',
-            );
+            const f = fault(this.exercise.depthFault.code, this.exercise.depthFault.message);
             this.cycleFaults.set(f.code, f);
           }
           result.faults = [...this.cycleFaults.values()];
           result.repMetrics = {
             min_angle: Math.round(this.minimum),
             duration_ms: Math.round(frame.timestampMs - this.started),
-            ...(this.id === 'squat' ? { max_torso_lean: Math.round(this.maximumLean) } : {}),
+            ...(this.exercise.trackMaxLean ? { max_torso_lean: Math.round(this.maximumLean) } : {}),
           };
         }
         this.phase = 'ready';

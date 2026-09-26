@@ -3,10 +3,11 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
-Exercise = Literal["squat", "curl", "pushup"]
-MetricName = Literal["knee_angle", "elbow_angle", "left_elbow_angle", "right_elbow_angle", "torso_lean", "hip_alignment", "upper_arm_angle"]
+Exercise = Literal["squat", "curl", "pushup", "deadlift", "lunge", "press"]
+MetricName = Literal["knee_angle", "elbow_angle", "left_elbow_angle", "right_elbow_angle", "torso_lean", "hip_alignment", "upper_arm_angle", "hip_angle"]
 FaultCode = Literal[
-    "insufficient_depth", "excessive_forward_lean", "upper_arm_movement", "hip_alignment", "limited_range"
+    "insufficient_depth", "excessive_forward_lean", "upper_arm_movement", "hip_alignment", "limited_range",
+    "insufficient_hinge", "excessive_back_rounding", "knee_over_toes", "excessive_back_arch",
 ]
 
 

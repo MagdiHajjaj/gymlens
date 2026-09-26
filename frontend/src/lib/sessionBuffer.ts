@@ -1,5 +1,7 @@
 import type { WorkoutSession } from '../types/workout';
+import { exercises } from '../features/exercises/ExerciseRegistry';
 const prefix = 'gym-lens:v1:sessions:';
+const knownExercises = new Set(Object.keys(exercises));
 export function localSessions(owner: string): WorkoutSession[] {
   try {
     const value = JSON.parse(localStorage.getItem(prefix + owner) || '[]');
@@ -8,7 +10,7 @@ export function localSessions(owner: string): WorkoutSession[] {
           (s) =>
             s &&
             typeof s.id === 'string' &&
-            ['squat', 'curl', 'pushup'].includes(s.exercise) &&
+            knownExercises.has(s.exercise) &&
             Array.isArray(s.reps) &&
             Array.isArray(s.metrics),
         )
