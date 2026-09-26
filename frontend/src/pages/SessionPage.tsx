@@ -124,7 +124,6 @@ export function SessionPage() {
       </div>
     );
   const faulty = session.reps.filter((r) => r.faults_json.length > 0).length;
-<<<<<<< HEAD
   const observedInsight = generateStatisticsInsight(session, goal?.id);
   const primaryMetrics: Partial<Record<ExerciseId, string>> = {
     squat: 'knee_angle',

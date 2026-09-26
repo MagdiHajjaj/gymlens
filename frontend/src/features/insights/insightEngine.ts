@@ -81,6 +81,24 @@ const faultDrills: Record<ExerciseId, Record<string, string>> = {
     limited_range: 'Use a controlled lower-and-return tempo through a consistent comfortable range.',
     hip_alignment: 'Start each rep from a straight plank line and reset if your hips drift.',
   },
+  deadlift: {
+    excessive_back_rounding:
+      'Hinge with a long spine and practice the hip-hinge pattern at light load, keeping your back flat through each rep.',
+    insufficient_hinge:
+      'Push your hips back further on each rep until you feel a comfortable hamstring stretch before standing.',
+  },
+  lunge: {
+    knee_over_toes:
+      'Take a slightly longer stance and lower straight down, keeping your front knee tracking over your ankle.',
+    insufficient_depth:
+      'Lower until both knees approach comfortable right angles while keeping your torso tall.',
+  },
+  press: {
+    excessive_back_arch:
+      'Brace your core and squeeze your glutes to keep your ribs down while pressing overhead.',
+    limited_range:
+      'Press through a full comfortable overhead path and control the lowering phase of each rep.',
+  },
 };
 
 const round = (value: number, places = 0) => {
