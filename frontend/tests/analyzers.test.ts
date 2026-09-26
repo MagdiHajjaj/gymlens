@@ -167,6 +167,14 @@ it('calibrates overhead press at the rack position and counts an upward press', 
   expect(results.at(-1)?.guidance).not.toContain('rack position');
 });
 
+it('accepts a natural overhead lockout below 160 degrees', () => {
+  const analyzer = new MovementAnalyzer('press', { enter: 120, exit: 150, minimumRange: 30 });
+  const reps = fixture('press')
+    .map((frame) => analyzer.analyze(frame))
+    .filter((result) => result.repCompleted);
+  expect(reps).toHaveLength(3);
+});
+
 it('counts curls returning to 155 degrees without requiring elbow lockout', () => {
   const analyzer = new MovementAnalyzer('curl');
   const results = fixture('curl').map((original) => {

@@ -108,10 +108,10 @@ const defaults: Record<ExerciseId, Thresholds> = {
   // the ribs flaring and back arching.
   press: {
     visibility: 0.6,
-    enter: 140,
-    exit: 160,
+    enter: 120,
+    exit: 150,
     depth: 100,
-    minimumRange: 45,
+    minimumRange: 30,
     reversal: 8,
     minimumMs: 700,
     maximumMs: 15000,
