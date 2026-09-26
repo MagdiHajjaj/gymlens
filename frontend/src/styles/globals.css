@@ -2462,3 +2462,42 @@ td strong {
     max-height: none;
   }
 }
+.goal-panel {
+  margin: 23px 0;
+}
+.goal-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.goal-option {
+  text-align: left;
+  background: #fcfdf7;
+  border: 1px solid #e3e6d9;
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: inherit;
+  color: inherit;
+}
+.goal-option strong {
+  font-size: 13px;
+  color: #31533d;
+}
+.goal-option.selected {
+  border-color: #527744;
+  background: #eef4e6;
+  box-shadow: 0 0 0 1px #527744;
+}
+.goal-option:focus-visible {
+  outline: 2px solid #527744;
+  outline-offset: 2px;
+}
+@media (max-width: 860px) {
+  .goal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

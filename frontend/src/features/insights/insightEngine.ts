@@ -1,4 +1,5 @@
 import { exercises } from '../exercises/ExerciseRegistry';
+import type { GoalId } from '../goals/goals';
 import type { ExerciseId, FormFault, Insight, RepEvent, WorkoutSession } from '../../types/workout';
 
 export interface InsightEvidenceItem {
@@ -51,6 +52,7 @@ export interface InsightStats {
 
 export interface GroundedInsight extends Insight {
   source: 'statistics';
+  goalId: GoalId | null;
   evidence: {
     strengths: InsightEvidenceItem[];
     improvements: InsightEvidenceItem[];
@@ -105,9 +107,14 @@ function finiteMetric(rep: RepEvent, key: string) {
   return Number.isFinite(value) ? value : undefined;
 }
 
+function setNumberRaw(rep: RepEvent) {
+  return (
+    finiteMetric(rep, 'set_number') ?? finiteMetric(rep, 'set') ?? finiteMetric(rep, 'set_index')
+  );
+}
+
 function setNumber(rep: RepEvent) {
-  const raw =
-    finiteMetric(rep, 'set_number') ?? finiteMetric(rep, 'set') ?? finiteMetric(rep, 'set_index');
+  const raw = setNumberRaw(rep);
   return raw === undefined ? 1 : Math.max(1, Math.round(raw));
 }
 
@@ -201,6 +208,8 @@ function durationStats(reps: RepEvent[]) {
 }
 
 function buildSetBreakdown(reps: RepEvent[]): SetBreakdown[] {
+  // Don't fabricate a single-set breakdown when the session carries no set metadata.
+  if (!reps.some((rep) => setNumberRaw(rep) !== undefined)) return [];
   const groups = new Map<number, RepEvent[]>();
   for (const rep of reps) {
     const key = setNumber(rep);
@@ -250,15 +259,98 @@ function evidenceText(text: string, why: string): InsightEvidenceItem {
   return { text, why };
 }
 
+// Exercises whose primary movement recruits multiple large muscle groups.
+const COMPOUND_EXERCISES: Partial<Record<ExerciseId, boolean>> = {
+  squat: true,
+  pushup: true,
+};
+
+function isCleanAndConsistent(stats: InsightStats) {
+  return (
+    stats.totalReps > 0 &&
+    stats.cleanReps === stats.totalReps &&
+    (stats.minAngleStdDev ?? 99) <= 6
+  );
+}
+
+function pauseFocus(decay: DepthDecayStats): InsightEvidenceItem {
+  return evidenceText(
+    `Hold a controlled pause at your deepest comfortable point for 2 sets; your late reps showed less range than early reps.`,
+    `Depth/range faded ${decay.change}° (${decay.firstAverage}° first-third average → ${decay.lastAverage}° last-third average).`,
+  );
+}
+
+function progressionFocus(stats: InsightStats): InsightEvidenceItem {
+  return evidenceText(
+    `Progress gently next time: add 1 rep or use a slower eccentric while keeping the same clean, consistent range.`,
+    `${stats.cleanReps}/${stats.totalReps} reps had no supported cues and min_angle standard deviation was ${stats.minAngleStdDev ?? 0}°.`,
+  );
+}
+
+function consistencyFocus(stats: InsightStats): InsightEvidenceItem {
+  return evidenceText(
+    `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps. Book your next session soon — showing up again is the whole game.`,
+    `Longest clean streak: ${stats.longestCleanStreak} reps; total recorded reps: ${stats.totalReps}.`,
+  );
+}
+
+function weightLossFocus(session: WorkoutSession, stats: InsightStats): InsightEvidenceItem {
+  const exerciseName = exercises[session.exercise].name.toLowerCase();
+  const compound = COMPOUND_EXERCISES[session.exercise] ?? false;
+  return evidenceText(
+    `You logged ${stats.totalReps} ${exerciseName} reps. For weight loss, repeat sessions built on full-body compound movements regularly through the week — training frequency matters more than any single workout.`,
+    `${stats.totalReps} measured reps this session; ${exerciseName} is a compound movement: ${compound ? 'yes' : 'no'}.`,
+  );
+}
+
+interface FocusParts {
+  topFault?: FaultFrequency;
+  decay?: DepthDecayStats;
+  dedupedImprovements: InsightEvidenceItem[];
+  exercise: { name: string; setup: string };
+}
+
+/**
+ * The goal reorders which grounded finding becomes the next-session focus.
+ * 'form' (and no goal) keeps the original fault-first behavior exactly.
+ */
+function selectNextFocus(
+  session: WorkoutSession,
+  stats: InsightStats,
+  goalId: GoalId | null | undefined,
+  parts: FocusParts,
+): InsightEvidenceItem {
+  const { topFault, decay, dedupedImprovements, exercise } = parts;
+  if (goalId === 'strength') {
+    if (isCleanAndConsistent(stats)) return progressionFocus(stats);
+    if (topFault) return faultImprovement(session.exercise, topFault, stats.totalReps);
+    if (decay && decay.change >= 5) return pauseFocus(decay);
+  } else if (goalId === 'consistency') {
+    if (stats.totalReps > 0) return consistencyFocus(stats);
+  } else if (goalId === 'weight_loss') {
+    if (stats.totalReps > 0) return weightLossFocus(session, stats);
+  } else {
+    if (topFault) return faultImprovement(session.exercise, topFault, stats.totalReps);
+    if (decay && decay.change >= 5) return pauseFocus(decay);
+    if (isCleanAndConsistent(stats)) return progressionFocus(stats);
+  }
+  if (dedupedImprovements[0]) return dedupedImprovements[0];
+  return evidenceText(
+    `Set up a clear ${exercise.setup.toLowerCase()} Then move at a steady, comfortable pace.`,
+    'No specific fault, depth-decay, or consistency measurement was available for a narrower focus.',
+  );
+}
+
 function faultImprovement(exerciseId: ExerciseId, fault: FaultFrequency, totalReps: number) {
-  const drill = faultDrills[exerciseId][fault.code] ?? fault.message;
+  // Optional chaining: exercises without drill entries fall back to the measured cue message.
+  const drill = faultDrills[exerciseId]?.[fault.code] ?? fault.message;
   return evidenceText(
     `${drill} This was the most frequent cue: ${fault.label} on ${fault.count} of ${totalReps} reps (${fault.percent}%), appearing ${timingLabels[fault.timing]}.`,
     `${fault.label}: reps ${fault.reps.join(', ')}; ${fault.count}/${totalReps} reps (${fault.percent}%).`,
   );
 }
 
-function buildEvidence(session: WorkoutSession, stats: InsightStats) {
+function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: GoalId | null) {
   const exercise = exercises[session.exercise];
   const strengths: InsightEvidenceItem[] = [];
   const improvements: InsightEvidenceItem[] = [];
@@ -351,28 +443,12 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats) {
     .filter((item, index, rows) => rows.findIndex((row) => row.text === item.text) === index)
     .slice(0, 4);
 
-  let nextFocus: InsightEvidenceItem;
-  const decay = stats.depthDecay;
-  if (topFault) {
-    nextFocus = faultImprovement(session.exercise, topFault, stats.totalReps);
-  } else if (decay && decay.change >= 5) {
-    nextFocus = evidenceText(
-      `Hold a controlled pause at your deepest comfortable point for 2 sets; your late reps showed less range than early reps.`,
-      `Depth/range faded ${decay.change}° (${decay.firstAverage}° first-third average → ${decay.lastAverage}° last-third average).`,
-    );
-  } else if (stats.totalReps > 0 && stats.cleanReps === stats.totalReps && (stats.minAngleStdDev ?? 99) <= 6) {
-    nextFocus = evidenceText(
-      `Progress gently next time: add 1 rep or use a slower eccentric while keeping the same clean, consistent range.`,
-      `${stats.cleanReps}/${stats.totalReps} reps had no supported cues and min_angle standard deviation was ${stats.minAngleStdDev ?? 0}°.`,
-    );
-  } else if (dedupedImprovements[0]) {
-    nextFocus = dedupedImprovements[0];
-  } else {
-    nextFocus = evidenceText(
-      `Set up a clear ${exercise.setup.toLowerCase()} Then move at a steady, comfortable pace.`,
-      'No specific fault, depth-decay, or consistency measurement was available for a narrower focus.',
-    );
-  }
+  const nextFocus = selectNextFocus(session, stats, goalId, {
+    topFault,
+    decay: stats.depthDecay,
+    dedupedImprovements,
+    exercise,
+  });
 
   return {
     strengths: strengths.slice(0, 5),
@@ -398,15 +474,19 @@ function recap(session: WorkoutSession, stats: InsightStats) {
   return `${simulated}${stats.totalReps} ${exercise} reps recorded; ${stats.cleanReps} were clean by supported cues and ${faultCount} cue events were observed. ${angleText}. ${cueText}`;
 }
 
-export function generateStatisticsInsight(session: WorkoutSession): GroundedInsight {
+export function generateStatisticsInsight(
+  session: WorkoutSession,
+  goalId?: GoalId | null,
+): GroundedInsight {
   const stats = buildStats(session);
-  const evidence = buildEvidence(session, stats);
+  const evidence = buildEvidence(session, stats, goalId);
   return {
     recap: recap(session, stats),
     strengths: evidence.strengths.map((item) => item.text),
     improvements: evidence.improvements.map((item) => item.text),
     next_focus: evidence.next_focus.text,
     source: 'statistics',
+    goalId: goalId ?? null,
     evidence,
     stats,
   };

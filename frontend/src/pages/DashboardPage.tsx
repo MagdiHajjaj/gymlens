@@ -14,6 +14,7 @@ import {
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { exercises } from '../features/exercises/ExerciseRegistry';
+import { GOALS, useFitnessGoal } from '../features/goals/goals';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
@@ -23,6 +24,7 @@ export function DashboardPage() {
   const selected = useWorkout((s) => s.selected);
   const select = useWorkout((s) => s.select);
   const { sessions, error } = useSessions();
+  const { goalId, goal, setGoalId } = useFitnessGoal();
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
   return (
@@ -132,6 +134,29 @@ export function DashboardPage() {
             </strong>
           </div>
           <MoveUpRight size={15} />
+        </div>
+      </section>
+      <section className="panel goal-panel">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">TRAIN WITH INTENT</span>
+            <h2>Your training goal</h2>
+            <p>Session insights adapt to what you are working toward.</p>
+          </div>
+          {goal && <span className="tag green">{goal.name}</span>}
+        </div>
+        <div className="goal-grid">
+          {GOALS.map((option) => (
+            <button
+              key={option.id}
+              className={`goal-option ${goalId === option.id ? 'selected' : ''}`}
+              onClick={() => setGoalId(goalId === option.id ? null : option.id)}
+              aria-pressed={goalId === option.id}
+            >
+              <strong>{option.name}</strong>
+              <span className="small-muted">{option.description}</span>
+            </button>
+          ))}
         </div>
       </section>
       <section>
