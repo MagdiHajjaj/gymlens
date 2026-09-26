@@ -16,7 +16,6 @@ beforeEach(() => {
 const renderStep = (handlers: { onContinue?: () => void; onBack?: () => void } = {}) =>
   render(
     <PlanStep
-      exercises={['squat', 'pushup']}
       onContinue={handlers.onContinue ?? (() => {})}
       onBack={handlers.onBack ?? (() => {})}
     />,
@@ -100,4 +99,31 @@ it('shows a completion checkmark only on finished rows', () => {
   expect(within(squatRow).getByText('Completed')).toBeTruthy();
   expect(pushupRow.className).not.toContain('is-complete');
   expect(within(pushupRow).queryByText('Completed')).toBeNull();
+});
+
+it('reorders rows with the up/down arrows and disables them at the edges', () => {
+  renderStep();
+  const [squatRow] = screen.getAllByRole('listitem');
+
+  const squatDown = within(squatRow).getByLabelText('Move Squat down') as HTMLButtonElement;
+  const squatUp = within(squatRow).getByLabelText('Move Squat up') as HTMLButtonElement;
+  expect(squatUp.disabled).toBe(true);
+  expect(squatDown.disabled).toBe(false);
+
+  fireEvent.click(squatDown);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat']);
+
+  // Rows re-render in the new plan order.
+  const [firstRow, secondRow] = screen.getAllByRole('listitem');
+  expect(within(firstRow).getByText('Push-up')).toBeTruthy();
+  expect(within(secondRow).getByText('Squat')).toBeTruthy();
+
+  const pushupDown = within(firstRow).getByLabelText('Move Push-up down') as HTMLButtonElement;
+  expect(pushupDown.disabled).toBe(false);
+  const squatDownNow = within(secondRow).getByLabelText('Move Squat down') as HTMLButtonElement;
+  expect(squatDownNow.disabled).toBe(true);
+
+  // Moving back up restores the original order.
+  fireEvent.click(within(secondRow).getByLabelText('Move Squat up'));
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup']);
 });

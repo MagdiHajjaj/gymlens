@@ -36,17 +36,15 @@ export function DashboardPage() {
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
   const selectedIds = useWorkout((s) => s.selectedIds);
   const toggleExercise = useWorkout((s) => s.toggleExercise);
-  const selectMovement = useWorkout((s) => s.selectMovement);
   const { sessions, error } = useSessions();
   const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
   const exerciseIds = Object.keys(exercises) as ExerciseId[];
   const visibleExercises = exerciseIds.filter(
     (id) => movementFilter === null || exercises[id].movement === movementFilter,
   );
+  // Split chips only filter the visible exercises; they never change the selection.
   const applyMovementChip = (movement: ExerciseMovement | null) => {
     setMovementFilter(movement);
-    if (movement === null) return; // keep the current selection, just clear the filter
-    selectMovement(movement);
   };
   const selectedNames = selectedIds.map((id) => exercises[id].name);
   const barTitle =

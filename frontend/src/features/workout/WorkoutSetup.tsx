@@ -215,7 +215,6 @@ export function WorkoutSetup({
               </div>
             ) : (
               <PlanStep
-                exercises={reviewMode ? plan.map((item) => item.exerciseId) : selectedIds}
                 onContinue={
                   reviewMode
                     ? continueReview

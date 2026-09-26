@@ -97,3 +97,34 @@ it('keeps completion when the same plan is rebuilt, resets it for a new plan', (
   usePlan.getState().setPlan(['squat', 'deadlift']);
   expect(usePlan.getState().completedExerciseIds).toEqual([]);
 });
+
+it('moves plan rows up and down, ignoring moves past the edges', () => {
+  usePlan.getState().setPlan(['squat', 'pushup', 'curl']);
+  const { movePlanItem } = usePlan.getState();
+
+  movePlanItem('pushup', -1);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['pushup', 'squat', 'curl']);
+
+  movePlanItem('pushup', 1);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
+
+  // Edge moves are no-ops.
+  movePlanItem('squat', -1);
+  movePlanItem('curl', 1);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
+
+  // Unknown exercises are ignored.
+  movePlanItem('press', 1);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['squat', 'pushup', 'curl']);
+});
+
+it('preserves a custom row order when the same plan is rebuilt', () => {
+  usePlan.getState().setPlan(['squat', 'pushup', 'curl']);
+  usePlan.getState().updatePlanItem('curl', { weightKg: 15 });
+  usePlan.getState().movePlanItem('curl', -1);
+  usePlan.getState().movePlanItem('curl', -1);
+
+  usePlan.getState().setPlan(['pushup', 'squat', 'curl']);
+  expect(usePlan.getState().plan.map((item) => item.exerciseId)).toEqual(['curl', 'squat', 'pushup']);
+  expect(usePlan.getState().plan[0]).toMatchObject({ exerciseId: 'curl', weightKg: 15 });
+});

@@ -43,10 +43,13 @@ interface PlanStore {
   /** Exercises marked finished in the current plan, in completion order. */
   completedExerciseIds: ExerciseId[];
   /** (Re)builds the plan for the given exercises, keeping any edits already made.
-   *  Completion resets when the exercise list changes (a new plan); rebuilding the
-   *  same list keeps it so returning to the plan step never wipes checkmarks. */
+   *  When the exercise set is unchanged the current row order is preserved, so
+   *  re-entering the plan step never undoes a custom order; a different exercise
+   *  list is a fresh plan and resets completion. */
   setPlan: (exerciseIds: ExerciseId[]) => void;
   updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number; reps?: number }) => void;
+  /** Moves a plan row one position up (-1) or down (1). No-op at the edges. */
+  movePlanItem: (exerciseId: ExerciseId, direction: -1 | 1) => void;
   /** Marks an exercise finished. Idempotent; safe for exercises outside the plan. */
   completeExercise: (exerciseId: ExerciseId) => void;
   /** True when the exercise was marked finished in the current plan. */
@@ -64,8 +67,13 @@ export const usePlan = create<PlanStore>((set, get) => ({
         exerciseIds.every((exerciseId) =>
           state.plan.some((item) => item.exerciseId === exerciseId),
         );
+      // Same exercises: keep the current row order (a custom order survives
+      // re-entering the plan step). New list: follow the given order.
+      const orderedIds = sameExercises
+        ? state.plan.map((item) => item.exerciseId)
+        : exerciseIds;
       return {
-        plan: exerciseIds.map((exerciseId) => {
+        plan: orderedIds.map((exerciseId) => {
           const existing = state.plan.find((item) => item.exerciseId === exerciseId);
           return (
             existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS, reps: DEFAULT_REPS }
@@ -93,6 +101,15 @@ export const usePlan = create<PlanStore>((set, get) => ({
           : item,
       ),
     })),
+  movePlanItem: (exerciseId, direction) =>
+    set((state) => {
+      const index = state.plan.findIndex((item) => item.exerciseId === exerciseId);
+      const target = index + direction;
+      if (index === -1 || target < 0 || target >= state.plan.length) return {};
+      const plan = [...state.plan];
+      [plan[index], plan[target]] = [plan[target], plan[index]];
+      return { plan };
+    }),
   clearPlan: () => set({ plan: [], completedExerciseIds: [] }),
   completeExercise: (exerciseId) =>
     set((state) =>
