@@ -58,7 +58,6 @@ export function WorkoutSetup({
   useEffect(() => {
     if (preview) {
       heading.current?.focus({ preventScroll: true });
-      window.scrollTo(0, 0);
     }
   }, [preview]);
   // After finishing, /workout?plan=review reopens the plan as an overview: rows show
