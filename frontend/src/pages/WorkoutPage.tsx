@@ -65,6 +65,7 @@ export function WorkoutPage() {
   const [voiceStatus, setVoiceStatus] = useState('Tap Voice on to hear coaching.');
   const [restRemaining, setRestRemaining] = useState(0);
   const announcedCountdown = useRef(new Set<number>());
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
 
@@ -332,33 +333,42 @@ export function WorkoutPage() {
               {search.get('mode') === 'demo' ? 'Start landmark demo' : 'Enable camera & start'}
               <ArrowRight size={17} />
             </Button>
-            <label className="button button-secondary full-width upload-button">
+            <Button
+              className="full-width"
+              variant="secondary"
+              onClick={() => uploadInputRef.current?.click()}
+            >
               <Upload size={18} /> Upload a workout video
-              <input
-                type="file"
-                accept="video/*"
-                hidden
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!file) return;
-                  if (file.size > 500 * 1024 * 1024) {
-                    setError('That video is over 500 MB. Trim it to just your set and try again.');
-                    return;
-                  }
-                  setVideoFile(file);
-                  start('upload');
-                }}
-              />
-            </label>
+            </Button>
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="video/*"
+              hidden
+              aria-label="Choose a workout video to analyze"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (!file) return;
+                if (file.size > 500 * 1024 * 1024) {
+                  setError('That video is over 500 MB. Trim it to just your set and try again.');
+                  return;
+                }
+                setVideoFile(file);
+                start('upload');
+              }}
+            />
+            <p className="disclaimer">Analyzed on your device — the video never leaves this browser.</p>
             {error && !active && (
               <p className="disclaimer" role="alert">
                 {error}
               </p>
             )}
-            <Button variant="ghost" className="full-width" onClick={() => start('demo')}>
-              No camera? Try the landmark demo
-            </Button>
+            {search.get('mode') !== 'demo' && (
+              <Button variant="ghost" className="full-width" onClick={() => start('demo')}>
+                No camera? Try the landmark demo
+              </Button>
+            )}
             <p className="disclaimer">
               <Info size={15} /> Cues are approximate and depend on camera position. Move within your
               comfortable range.

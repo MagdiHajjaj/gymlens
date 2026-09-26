@@ -129,8 +129,8 @@ export function HistoryPage() {
         )}
       </section>
       <p className="small-muted">
-        Demo sessions are labeled and excluded from your training totals. Local history retains your 50 most
-        recent sessions.
+        Demo sessions are labeled and excluded from your training totals. Local history keeps your 50
+        most recent sessions.
       </p>
     </div>
   );

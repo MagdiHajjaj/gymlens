@@ -2797,6 +2797,3 @@ td strong {
 .camera-stage.is-upload canvas {
   transform: none;
 }
-.upload-button {
-  cursor: pointer;
-}
