@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GymLens</title>
+<style>
+:root{--bg:#F4F4F5;--card:#fff;--line:#E9E9EB;--ink:#101012;--mut:#71717A;--acc:#1F9D55;--r:20px}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter','Segoe UI',sans-serif;background:#fff;color:var(--ink);-webkit-font-smoothing:antialiased;overflow:hidden}
+#app{position:fixed;inset:0}
+.view{position:absolute;inset:0;display:none;flex-direction:column;background:#fff;overflow:hidden}
+.view.active{display:flex}
+/* ---------- session ---------- */
+#v-session{background:#0A0A0B}
+.cam{position:absolute;inset:0}
+.cam canvas{width:100%;height:100%;display:block}
+.hud{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;padding:calc(18px + env(safe-area-inset-top)) 20px 0;color:#fff}
+.hud .back{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);border:0;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.hud .meta{text-align:center}
+.hud .meta .ex{font-size:16px;font-weight:600}
+.hud .meta .tm{font-size:12.5px;color:rgba(255,255,255,.6);font-variant-numeric:tabular-nums;margin-top:3px;font-weight:500}
+.hud .setline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:7px}
+.hud .setline .t{font-size:10.5px;font-weight:600;letter-spacing:.14em;color:rgba(255,255,255,.75)}
+.hud .setline .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25)}
+.hud .setline .dot.done{background:#30D158}
+.hud .setline .dot.cur{background:#fff}
+.hud .live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.1em;color:rgba(255,255,255,.85)}
+.hud .live i{width:7px;height:7px;border-radius:50%;background:#30D158;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.3}}
+.repzone{position:absolute;left:22px;bottom:120px;z-index:5;color:#fff}
+.repzone .n{font-size:76px;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;display:inline-block}
+.repzone .n.tick{animation:tick .3s ease}
+@keyframes tick{40%{transform:scale(1.05)}}
+.repzone .l{font-size:11px;letter-spacing:.22em;color:rgba(255,255,255,.55);font-weight:600;margin-top:4px}
+.repzone .tgt{font-size:12px;color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;margin-top:6px;font-weight:500}
+.readouts{position:absolute;right:22px;bottom:132px;z-index:5;text-align:right;color:#fff}
+.readouts div{margin-top:10px}
+.readouts .k{font-size:9.5px;letter-spacing:.18em;color:rgba(255,255,255,.5);font-weight:600}
+.readouts .v{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
+.cue{position:absolute;left:0;right:0;bottom:216px;display:flex;justify-content:center;z-index:6;pointer-events:none;padding:0 24px}
+.cue .pill{background:rgba(18,18,20,.72);backdrop-filter:blur(14px);border-radius:999px;padding:11px 18px;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:500;color:#fff;opacity:0;transform:translateY(8px);transition:all .3s;max-width:100%}
+.cue.show .pill{opacity:1;transform:none}
+.cue .pill i{width:7px;height:7px;border-radius:50%;background:#30D158;flex-shrink:0}
+.sess-controls{position:absolute;left:0;right:0;bottom:0;padding:0 22px calc(26px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;z-index:7}
+.btn-round{width:60px;height:60px;border-radius:50%;border:0;background:rgba(255,255,255,.14);backdrop-filter:blur(10px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn-round:active{transform:scale(.94)}
+.btn-text{background:none;border:0;color:rgba(255,255,255,.85);font:600 15px inherit;cursor:pointer;padding:12px}
+.veil{position:absolute;inset:0;background:rgba(8,8,10,.6);backdrop-filter:blur(8px);z-index:8;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;color:#fff}
+.veil.show{display:flex}
+.veil .t{font-size:22px;font-weight:600}
+.veil button{border:0;background:#fff;color:#000;font:600 15px inherit;padding:14px 38px;border-radius:999px;cursor:pointer}
+/* ---------- light views ---------- */
+.scroll{flex:1;overflow-y:auto;padding:calc(20px + env(safe-area-inset-top)) 22px 120px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.eyebrow{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.h1{font-size:31px;font-weight:400;letter-spacing:-.01em;margin:6px 0 20px;font-family:Georgia,'Times New Roman',serif}
+.h1 .thin{font-weight:400;color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.cta-row{display:flex;align-items:center;justify-content:space-between}
+.btn-primary{border:0;background:var(--ink);color:#fff;font:600 15px inherit;padding:15px 26px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:9px}
+.btn-primary:active{transform:scale(.97)}
+.stat-grid{display:flex;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.stat-grid>div{flex:1}
+.stat-grid>div+div{border-left:1px solid var(--line);padding-left:16px}
+.stat-grid .n{font-size:21px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat-grid .l{font-size:11px;color:var(--mut);font-weight:500;margin-top:3px}
+.sect{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--mut);margin:28px 2px 10px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.sect .link{font-size:12px;color:var(--ink);font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer}
+.row{display:flex;align-items:center;gap:15px;padding:15px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}
+.row .ic{width:46px;height:46px;border-radius:15px;background:#F4F4F5;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.row .nm{font-size:15.5px;font-weight:600}
+.row .ms{font-size:12.5px;color:var(--mut);margin-top:2px}
+.row .chev{margin-left:auto;color:#C7C7CC}
+.card.tight{padding:6px 18px}
+.bars{display:flex;align-items:flex-end;gap:7px;height:96px;padding-top:8px}
+.bars .bar{flex:1;border-radius:5px;background:#EDEDEF;min-height:6px}
+.bars .bar.hot{background:var(--ink)}
+.bars .bar.warn{background:#E8A13D}
+.note{border-left:3px solid var(--acc);padding:2px 0 2px 16px;margin:4px 0}
+.note p{font-size:14.5px;line-height:1.65;color:#26262a}
+.note .lbl{font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--acc);margin-bottom:8px}
+.fault{padding:13px 0;border-bottom:1px solid var(--line);display:flex;gap:12px}
+.fault:last-child{border:0}
+.fault .dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.fault .t{font-size:14px;font-weight:600}
+.fault .d{font-size:12.5px;color:var(--mut);margin-top:3px;line-height:1.55}
+.btn-block{width:100%;border:0;background:var(--ink);color:#fff;font:600 16px inherit;padding:17px;border-radius:18px;cursor:pointer;margin-top:20px}
+.btn-block:active{transform:scale(.98)}
+.btn-block.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);margin-top:10px}
+/* setup steppers */
+.step{display:flex;align-items:center;justify-content:space-between;padding:17px 2px;border-bottom:1px solid var(--line)}
+.step .k{font-size:14.5px;font-weight:600}
+.step .k .d{font-size:12px;color:var(--mut);font-weight:400;margin-top:2px}
+.stepper{display:flex;align-items:center;gap:16px}
+.stepper button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:19px;font-weight:500;cursor:pointer;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.stepper button:active{background:#F1F1F3}
+.stepper .val{font-size:17px;font-weight:700;min-width:64px;text-align:center;font-variant-numeric:tabular-nums}
+.exhead{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.exhead .ic{width:56px;height:56px;border-radius:18px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center}
+/* rest */
+#v-rest{align-items:center;justify-content:center;text-align:center;padding:40px 32px}
+.ring{position:relative;width:210px;height:210px;margin:26px auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .t .n{font-size:56px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.ring .t .l{font-size:10.5px;letter-spacing:.24em;color:var(--mut);font-weight:600;margin-top:4px}
+.restbtns{display:flex;gap:10px;margin-top:30px;width:100%}
+.restbtns button{flex:1;border-radius:16px;padding:16px;font:600 15px inherit;cursor:pointer;border:1px solid var(--line);background:#fff}
+.restbtns button.go{background:var(--ink);color:#fff;border:0}
+/* search */
+.search{display:flex;align-items:center;gap:10px;background:#F4F4F5;border-radius:14px;padding:13px 15px;margin:16px 0 6px}
+.search input{border:0;background:transparent;outline:0;font:400 15px inherit;width:100%;color:var(--ink)}
+/* set log */
+.slog{display:flex;align-items:center;padding:13px 2px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.slog:last-child{border:0}
+.slog .s{width:52px;height:52px;border-radius:16px;background:#F4F4F5;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+.slog .s.ok{background:var(--acc);color:#fff}
+.slog .mid{margin-left:14px}
+.slog .mid .a{font-size:14.5px;font-weight:600}
+.slog .mid .b{font-size:12px;color:var(--mut);margin-top:2px}
+.slog .rt{margin-left:auto;text-align:right}
+.slog .rt .a{font-size:16px;font-weight:700}
+.slog .rt .b{font-size:11px;color:var(--mut)}
+/* hub */
+.hub-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.mini{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.mini .k{font-size:10.5px;font-weight:600;letter-spacing:.1em;color:var(--mut)}
+.mini .big{font-size:26px;margin-top:6px;font-variant-numeric:tabular-nums;font-family:Georgia,'Times New Roman',serif}
+.mini .sub{font-size:11.5px;color:var(--mut);margin-top:4px;line-height:1.45}
+.recov{display:flex;align-items:center;gap:18px;cursor:pointer}
+.rring{position:relative;width:104px;height:104px;flex-shrink:0}
+.rring svg{transform:rotate(-90deg)}
+.rring .t{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rring .t .n{font-size:28px;font-variant-numeric:tabular-nums;font-family:Georgia,'Times New Roman',serif}
+.rring .t .l{font-size:8.5px;letter-spacing:.18em;color:var(--mut);font-weight:600}
+.recov .mets{flex:1}
+.mrow2{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.mrow2:last-child{border:0}
+.mrow2 .k{color:var(--mut)}
+.mrow2 .v{font-weight:700;font-variant-numeric:tabular-nums}
+.sched-strip{display:flex;gap:2px;margin-top:4px}
+.sched-strip .dcol{flex:1;text-align:center;padding:10px 0 8px;border-radius:12px;cursor:pointer}
+.sched-strip .dcol.today{background:#F1F1F3}
+.sched-strip .dl{font-size:10px;font-weight:600;color:var(--mut);letter-spacing:.06em}
+.sched-strip .dd{width:7px;height:7px;border-radius:50%;background:#E4E4E7;margin:8px auto 0}
+.sched-strip .dd.on{background:var(--ink)}
+.dayrow{display:flex;align-items:center;gap:14px;padding:15px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.dayrow:last-child{border:0}
+.dayrow .dw{width:46px;flex-shrink:0}
+.dayrow .dw .d{font-size:14px;font-weight:700}
+.dayrow .dw .t{font-size:10px;color:var(--mut);font-weight:600}
+.dayrow .what{font-size:14px;font-weight:600}
+.dayrow .what.rest{color:var(--mut);font-weight:500}
+.dayrow .chev{margin-left:auto;color:#C7C7CC}
+.sheet{position:absolute;inset:0;z-index:40;display:none;align-items:flex-end;background:rgba(0,0,0,.35)}
+.sheet.show{display:flex}
+.sheet .box{background:#fff;border-radius:24px 24px 0 0;width:100%;max-height:70%;overflow-y:auto;padding:8px 22px calc(30px + env(safe-area-inset-bottom))}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:#E4E4E7;margin:8px auto 10px}
+.sheet .opt{display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid var(--line);font-size:15px;font-weight:600;cursor:pointer}
+.sheet .opt:last-child{border:0}
+.sheet .opt .ms{font-size:12px;color:var(--mut);font-weight:400;margin-left:auto}
+.factor{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13.5px;align-items:baseline}
+.factor:last-child{border:0}
+.factor .f{font-weight:700;font-variant-numeric:tabular-nums;min-width:44px;text-align:right;margin-left:auto}
+.factor .f.pos{color:var(--acc)}
+.factor .f.neg{color:#C4552E}
+/* coach */
+.rec-card+.rec-card{margin-top:12px}
+.rec-eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--acc)}
+.rec-title{font-size:16.5px;font-weight:700;letter-spacing:-.01em;margin:8px 0 6px}
+.rec-body{font-size:13.5px;line-height:1.6;color:#3a3a3e}
+.rec-why{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut);line-height:1.55}
+.rec-why .tag{flex-shrink:0;font-size:9.5px;font-weight:700;letter-spacing:.1em;background:#F1F1F3;border-radius:6px;padding:4px 8px;color:var(--ink)}
+.rec-cta{margin-top:12px;font-size:14px;font-weight:600;cursor:pointer}
+.backbtn{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink);flex-shrink:0}
+/* tabbar */
+.tabbar{position:absolute;left:16px;right:16px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:20;background:rgba(255,255,255,.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:26px;display:flex;padding:6px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.tabbar button{flex:1;border:0;background:transparent;color:#Aeaeb2;font:600 10px inherit;letter-spacing:.04em;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0;border-radius:19px}
+.tabbar button.on{color:var(--ink);background:#F1F1F3}
+.tabbar button svg{width:21px;height:21px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div class="view active" id="v-home">
+    <div class="scroll">
+      <div class="eyebrow">SATURDAY, SEPTEMBER 26</div>
+      <div class="h1">Good evening, Yousif</div>
+      <div class="card">
+        <div class="recov" data-go="v-recovery">
+          <div class="rring">
+            <svg width="104" height="104" viewBox="0 0 104 104">
+              <circle cx="52" cy="52" r="44" fill="none" stroke="#EDEDEF" stroke-width="9"/>
+              <circle cx="52" cy="52" r="44" fill="none" stroke="#1F9D55" stroke-width="9" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="35.9"/>
+            </svg>
+            <div class="t"><div class="n">87%</div><div class="l">RECOVERY</div></div>
+          </div>
+          <div class="mets">
+            <div class="mrow2"><span class="k">HRV</span><span class="v">64 ms · +6%</span></div>
+            <div class="mrow2"><span class="k">Resting HR</span><span class="v">52 bpm</span></div>
+            <div class="mrow2"><span class="k">Sleep</span><span class="v">7h 24m</span></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:13.5px;font-weight:600" data-go="v-recovery">Primed — your body is ready for more today <span style="color:var(--mut)">→</span></div>
+      </div>
+      <div class="hub-grid">
+        <div class="mini"><div class="k">SLEEP</div><div class="big">92</div><div class="sub">7h 24m · in bed 11:12 PM</div></div>
+        <div class="mini"><div class="k">STRAIN</div><div class="big">12.4</div><div class="sub">Target 14–17 for 87% recovery</div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="cta-row">
+          <div><div style="font-size:16px;font-weight:700" id="todayPlan">Today: Push-up</div><div style="font-size:13px;color:var(--mut);margin-top:4px">From your training schedule</div></div>
+          <button class="btn-primary" id="btnPlanStart">Start <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="sect">Schedule <span class="link" data-go="v-plan">Edit plan</span></div>
+      <div class="card"><div class="sched-strip" id="schedStrip"></div></div>
+      <div class="sect">Coach picks <span class="link" data-go="v-coach">View all</span></div>
+      <div class="card rec-card" data-go="v-coach" style="cursor:pointer">
+        <div class="rec-eyebrow">TRAINING</div>
+        <div class="rec-title">Push your strain to 14–17 today</div>
+        <div class="rec-body">Recovery is 87% and HRV is up 6%. Yesterday's 16.2 was right in your band — repeat that effort.</div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button class="on" data-tab="v-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg>HOME</button>
+      <button data-tab="v-coach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.3 11c.7.5 1.3 1.4 1.3 2h4c0-.6.6-1.5 1.3-2A6 6 0 0 0 12 3z"/></svg>COACH</button>
+      <button data-tab="v-library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>TRAIN</button>
+      <button data-tab="v-report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>HISTORY</button>
+    </div></div>
+
+  <!-- LIBRARY -->
+  <div class="view" id="v-library">
+    <div class="scroll">
+      <div class="eyebrow">TRAIN</div>
+      <div class="h1">Exercises</div>
+      <div class="search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#71717A" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input id="exSearch" placeholder="Search exercises"></div>
+      <div class="card tight" id="libList" style="margin-top:10px"></div>
+    </div>
+    <div class="tabbar">
+      <button data-tab="v-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg>HOME</button>
+      <button data-tab="v-coach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.3 11c.7.5 1.3 1.4 1.3 2h4c0-.6.6-1.5 1.3-2A6 6 0 0 0 12 3z"/></svg>COACH</button>
+      <button class="on" data-tab="v-library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>TRAIN</button>
+      <button data-tab="v-report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>HISTORY</button>
+    </div></div>
+
+  <!-- SETUP -->
+  <div class="view" id="v-setup">
+    <div class="scroll">
+      <div class="eyebrow" data-go="v-library" style="cursor:pointer">‹ EXERCISES</div>
+      <div style="height:14px"></div>
+      <div class="exhead">
+        <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 20v-6a6 6 0 0 1 12 0v6"/><path d="M12 14V4"/></svg></div>
+        <div><div class="h1" id="setupName" style="margin:0">Squat</div><div style="font-size:12.5px;color:var(--mut)" id="setupMuscles">Quads · Glutes · Core</div></div>
+      </div>
+      <div class="sect">Workout plan</div>
+      <div class="card tight" style="padding:4px 18px">
+        <div class="step"><div class="k">Sets<div class="d">Work sets</div></div><div class="stepper"><button data-k="sets" data-d="-1">−</button><div class="val" id="v-sets">4</div><button data-k="sets" data-d="1">+</button></div></div>
+        <div class="step"><div class="k">Reps<div class="d">Per set</div></div><div class="stepper"><button data-k="reps" data-d="-1">−</button><div class="val" id="v-reps">10</div><button data-k="reps" data-d="1">+</button></div></div>
+        <div class="step"><div class="k">Rest<div class="d">Between sets</div></div><div class="stepper"><button data-k="rest" data-d="-1">−</button><div class="val" id="v-rest">90s</div><button data-k="rest" data-d="1">+</button></div></div>
+        <div class="step" style="border:0"><div class="k">Weight<div class="d">0 = bodyweight</div></div><div class="stepper"><button data-k="weight" data-d="-1">−</button><div class="val" id="v-weight">20kg</div><button data-k="weight" data-d="1">+</button></div></div>
+      </div>
+      <button class="btn-block" id="btnBegin">Start set 1</button>
+    </div>
+  </div>
+
+  <!-- SESSION -->
+  <div class="view" id="v-session">
+    <div class="cam"><canvas id="skel"></canvas></div>
+    <div class="hud">
+      <button class="back" id="btnQuit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="meta"><div class="ex" id="sessName">Squat</div><div class="tm" id="timer">00:00</div>
+        <div class="setline"><span class="t" id="setLabel">SET 1 / 4</span><span id="setDots" style="display:flex;gap:6px"></span></div>
+      </div>
+      <div class="live"><i></i>LIVE</div>
+    </div>
+    <div class="repzone"><div class="n" id="repnum">0</div><div class="l">REPS</div><div class="tgt">TARGET <span id="repTarget">10</span></div></div>
+    <div class="readouts">
+      <div><div class="k">KNEE</div><div class="v"><span id="mKnee">165</span>°</div></div>
+      <div><div class="k">DEPTH</div><div class="v"><span id="mDepth">0</span>%</div></div>
+    </div>
+    <div class="cue" id="cue"><div class="pill"><i></i><span id="cueTxt">Chest up</span></div></div>
+    <div class="sess-controls">
+      <button class="btn-round" id="btnPause"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg></button>
+      <button class="btn-text" id="btnEndSet">End set</button>
+    </div>
+    <div class="veil" id="veil"><div class="t">Paused</div><button id="btnResume">Resume</button></div>
+  </div>
+
+  <!-- REST -->
+  <div class="view" id="v-rest">
+    <div class="eyebrow">REST</div>
+    <div class="ring">
+      <svg width="210" height="210" viewBox="0 0 210 210">
+        <circle cx="105" cy="105" r="88" fill="none" stroke="#EDEDEF" stroke-width="10"/>
+        <circle id="ringFg" cx="105" cy="105" r="88" fill="none" stroke="#101012" stroke-width="10" stroke-linecap="round" stroke-dasharray="552.9" stroke-dashoffset="0"/>
+      </svg>
+      <div class="t"><div class="n" id="restClock">1:30</div><div class="l">REMAINING</div></div>
+    </div>
+    <div style="font-size:15px;font-weight:600" id="restNext">Next: Set 2 of 4</div>
+    <div style="font-size:13px;color:var(--mut);margin-top:6px" id="restSum">Set 1 · 10 reps · 94° avg</div>
+    <div class="restbtns"><button id="btnAddRest">+15s</button><button class="go" id="btnSkipRest">Skip rest</button></div>
+  </div>
+
+  <!-- PLAN -->
+  <div class="view" id="v-plan">
+    <div class="scroll">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px"><button class="backbtn" data-go="v-home"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button><div class="eyebrow">TRAINING SCHEDULE</div></div>
+      <div class="h1">This week</div>
+      <div class="card">
+        <div class="cta-row">
+          <div><div style="font-size:16px;font-weight:700" id="planToday">Today: Push-up</div><div style="font-size:13px;color:var(--mut);margin-top:4px" id="planTodaySub">4×10 · scheduled</div></div>
+          <button class="btn-primary" id="btnPlanStart2">Start</button>
+        </div>
+      </div>
+      <div class="sect">Days</div>
+      <div class="card tight" style="padding:6px 18px" id="planList"></div>
+      <div style="font-size:12.5px;color:var(--mut);margin-top:16px;line-height:1.6;text-align:center">Tap a day to change what's<br>scheduled. Rest days rebuild you.</div>
+    </div>
+
+    <div class="sheet" id="daySheet"><div class="box"><div class="grab"></div><div class="eyebrow" id="sheetTitle" style="margin-bottom:6px">SATURDAY</div><div id="sheetOpts"></div></div></div>
+  </div>
+
+  <!-- RECOVERY -->
+  <div class="view" id="v-recovery">
+    <div class="scroll">
+      <div class="eyebrow" data-go="v-home" style="cursor:pointer">‹ HOME</div>
+      <div style="height:14px"></div>
+      <div class="card">
+        <div class="recov">
+          <div class="rring">
+            <svg width="104" height="104" viewBox="0 0 104 104">
+              <circle cx="52" cy="52" r="44" fill="none" stroke="#EDEDEF" stroke-width="9"/>
+              <circle cx="52" cy="52" r="44" fill="none" stroke="#1F9D55" stroke-width="9" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="35.9"/>
+            </svg>
+            <div class="t"><div class="n">87%</div><div class="l">RECOVERY</div></div>
+          </div>
+          <div class="mets">
+            <div class="mrow2"><span class="k">Status</span><span class="v" style="color:var(--acc)">Primed</span></div>
+            <div class="mrow2"><span class="k">Strain target</span><span class="v">14–17</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sect">Vitals</div>
+      <div class="card tight" style="padding:6px 18px">
+        <div class="mrow2" style="font-size:14px"><span class="k">HRV</span><span class="v">64 ms · +6%</span></div>
+        <div class="mrow2" style="font-size:14px"><span class="k">Resting HR</span><span class="v">52 bpm · −2</span></div>
+        <div class="mrow2" style="font-size:14px"><span class="k">Respiratory rate</span><span class="v">14.2 /min</span></div>
+        <div class="mrow2" style="font-size:14px"><span class="k">Sleep</span><span class="v">7h 24m · score 92</span></div>
+      </div>
+      <div class="sect">Recovery · 7 days</div>
+      <div class="card"><div class="bars" id="recBars" style="height:110px"></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:10px;font-weight:500"><span>Sun</span><span>Today</span></div>
+      </div>
+      <div class="sect">What moved it</div>
+      <div class="card tight" style="padding:6px 18px">
+        <div class="factor"><div><div style="font-weight:600">Consistent bedtime</div><div style="font-size:12px;color:var(--mut);margin-top:2px">11:12 PM · 5 nights running</div></div><div class="f pos">+4%</div></div>
+        <div class="factor"><div><div style="font-weight:600">Yesterday's strain 16.2</div><div style="font-size:12px;color:var(--mut);margin-top:2px">In your optimal band</div></div><div class="f pos">+2%</div></div>
+        <div class="factor"><div><div style="font-weight:600">Caffeine after 2 PM</div><div style="font-size:12px;color:var(--mut);margin-top:2px">Sleep latency +18 min</div></div><div class="f neg">−3%</div></div>
+      </div>
+      <button class="btn-block" data-go="v-plan">View training plan</button>
+    </div>
+  </div>
+
+  <!-- COACH -->
+  <div class="view" id="v-coach">
+    <div class="scroll">
+      <div class="eyebrow">SATURDAY, SEPTEMBER 26</div>
+      <div class="h1">Coach</div>
+      <div class="sect" style="margin-top:0">Today</div>
+      <div class="card rec-card">
+        <div class="rec-eyebrow">TRAINING</div>
+        <div class="rec-title">Aim for strain 14–17</div>
+        <div class="rec-body">You're primed. Push-up is scheduled — your HRV is up 6%, a good day to push the pace between sets.</div>
+        <div class="rec-why"><span class="tag">WHY</span><span>Recovery 87% · HRV 64 ms (+6%) · yesterday's strain 16.2</span></div>
+        <div class="rec-cta" id="coachStart">Start today's session →</div>
+      </div>
+      <div class="card rec-card">
+        <div class="rec-eyebrow">SLEEP</div>
+        <div class="rec-title">Cut caffeine by noon</div>
+        <div class="rec-body">Yesterday's coffee after 2 PM added 18 minutes of sleep latency and cost 3% recovery.</div>
+        <div class="rec-why"><span class="tag">WHY</span><span>Sleep latency +18 min · recovery −3%</span></div>
+      </div>
+      <div class="sect">Patterns</div>
+      <div class="card rec-card">
+        <div class="rec-eyebrow">FORM</div>
+        <div class="rec-title">Fix the forward lean</div>
+        <div class="rec-body">2 faults in your last squat session, both in the final set. Cap sets at 8 and re-brace between sets.</div>
+        <div class="rec-why"><span class="tag">WHY</span><span>Reps 21, 23 · depth dropped as you fatigued</span></div>
+        <div class="rec-cta" data-go="v-report">View session report →</div>
+      </div>
+      <div class="card rec-card">
+        <div class="rec-eyebrow">WEEK</div>
+        <div class="rec-title">Sunday rest is well placed</div>
+        <div class="rec-body">Three training days with rising strain. Keep Sunday clear — your 5-night 11:12 PM bedtime streak added 4% recovery.</div>
+        <div class="rec-why"><span class="tag">WHY</span><span>Strain trend climbing · bedtime streak 5 nights</span></div>
+      </div>
+    </div>
+    <div class="tabbar">
+      <button data-tab="v-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg>HOME</button>
+      <button class="on" data-tab="v-coach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.3 11c.7.5 1.3 1.4 1.3 2h4c0-.6.6-1.5 1.3-2A6 6 0 0 0 12 3z"/></svg>COACH</button>
+      <button data-tab="v-library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>TRAIN</button>
+      <button data-tab="v-report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>HISTORY</button>
+    </div></div>
+
+  <!-- REPORT -->
+  <div class="view" id="v-report">
+    <div class="scroll">
+      <div class="eyebrow">SESSION 12 · COMPLETE</div>
+      <div class="h1">Nice work.</div>
+      <div class="card">
+        <div class="stat-grid" style="margin:0;padding:0;border:0">
+          <div><div class="n" id="rTotal">40</div><div class="l">Total reps</div></div>
+          <div><div class="n" id="rDepth">94°</div><div class="l">Avg depth</div></div>
+          <div><div class="n" id="rTime">18:24</div><div class="l">Duration</div></div>
+        </div>
+      </div>
+      <div class="sect">Sets</div>
+      <div class="card tight" style="padding:6px 18px" id="setLog"></div>
+      <div class="sect">Coach notes</div>
+      <div class="note"><div class="lbl">AI INSIGHT</div><p id="coachTxt">Depth improved <b>8° vs last session</b>. Your cleanest block was sets 2–3. Two forward-lean faults came in the final set — likely fatigue. Next time, cap sets at 8 and reset your brace between them.</p></div>
+      <div class="sect">Depth per rep</div>
+      <div class="card"><div class="bars" id="repBars" style="height:110px"></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:10px;font-weight:500"><span>Rep 1</span><span id="repCap">Rep 40</span></div>
+      </div>
+      <button class="btn-block" data-go="v-home">Done</button>
+      <button class="btn-block ghost">Discard session</button>
+    </div>
+    <div class="tabbar">
+      <button data-tab="v-home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg>HOME</button>
+      <button data-tab="v-coach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.3 11c.7.5 1.3 1.4 1.3 2h4c0-.6.6-1.5 1.3-2A6 6 0 0 0 12 3z"/></svg>COACH</button>
+      <button data-tab="v-library"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>TRAIN</button>
+      <button class="on" data-tab="v-report"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>HISTORY</button>
+    </div></div>
+
+</div>
+<script>
+/* ============ data & state ============ */
+const EXERCISES=[
+ {n:'Squat',m:'Quads · Glutes · Core'},{n:'Deadlift',m:'Back · Glutes · Hamstrings'},
+ {n:'Bench press',m:'Chest · Triceps · Shoulders'},{n:'Overhead press',m:'Shoulders · Triceps'},
+ {n:'Bent-over row',m:'Back · Biceps'},{n:'Pull-up',m:'Back · Biceps'},
+ {n:'Lunge',m:'Quads · Glutes'},{n:'Bicep curl',m:'Biceps · Forearms'},
+ {n:'Push-up',m:'Chest · Triceps · Core'},{n:'Plank',m:'Core · Stability'}];
+const RESTS=[30,45,60,90,120,180];
+let plan={ex:0,sets:4,reps:10,rest:90,weight:20};
+let curSet=1,setLog=[],allDepths=[];
+let reps=0,wasDeep=false,maxF=0,depthSum=0,depthN=0,shallow=0;
+let running=true,simNow=0,lastFrame=0,cueTimer=null,cueIdx=0;
+let workoutT0=0,restLeft=0,restId=null,restTotal=1;
+const cues=['Chest up','Knees tracking over toes','Depth is there — hold it'];
+const $=id=>document.getElementById(id);
+
+/* ============ navigation ============ */
+const views={};document.querySelectorAll('.view').forEach(v=>views[v.id]=v);
+function go(id){Object.entries(views).forEach(([k,el])=>el.classList.toggle('active',k===id));
+const tabId=(id==='v-plan')?'v-home':id;
+document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tabId));}
+document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.go)));
+document.querySelectorAll('[data-tab]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.tab)));
+
+/* ============ library & setup ============ */
+function exRow(e,i){return `<div class="row" data-ex="${i}"><div class="ic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 20v-6a6 6 0 0 1 12 0v6"/><path d="M12 14V4"/></svg></div><div><div class="nm">${e.n}</div><div class="ms">${e.m}</div></div><div class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></div></div>`;}
+function renderLib(f=''){ $('libList').innerHTML=EXERCISES.map((e,i)=>({e,i})).filter(({e})=>e.n.toLowerCase().includes(f.toLowerCase())).map(({e,i})=>exRow(e,i)).join('')||'<div style="padding:20px;color:var(--mut)">No matches</div>'; bindEx();}
+function bindEx(){document.querySelectorAll('[data-ex]').forEach(el=>el.addEventListener('click',()=>openSetup(+el.dataset.ex)));}
+function openSetup(i){plan.ex=i;const e=EXERCISES[i];$('setupName').textContent=e.n;$('setupMuscles').textContent=e.m;syncPlan();go('v-setup');}
+$('exSearch').addEventListener('input',e=>renderLib(e.target.value));
+bindEx();renderLib();
+
+/* ============ health hub: schedule ============ */
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAYFULL=['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+let schedule=[0,null,1,null,7,8,null];
+const TODAY=5;
+const todayEx=()=>schedule[TODAY];
+function renderStrip(){$('schedStrip').innerHTML=DAYS.map((d,i)=>`<div class="dcol ${i===TODAY?'today':''}"><div class="dl">${d[0]}</div><div class="dd ${schedule[i]!==null?'on':''}"></div></div>`).join('');
+ document.querySelectorAll('#schedStrip .dcol').forEach(el=>el.addEventListener('click',()=>go('v-plan')));}
+function renderPlan(){$('planList').innerHTML=DAYS.map((d,i)=>{const ex=schedule[i];
+ return `<div class="dayrow" data-day="${i}"><div class="dw"><div class="d">${d}</div><div class="t">${i===TODAY?'TODAY':''}</div></div><div class="what ${ex===null?'rest':''}">${ex===null?'Rest day':EXERCISES[ex].n}</div><div class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></div></div>`;}).join('');
+ document.querySelectorAll('#planList .dayrow').forEach(el=>el.addEventListener('click',()=>openSheet(+el.dataset.day)));
+ const t=todayEx(),none=t===null;
+ $('todayPlan').textContent=none?'Today: Rest day':'Today: '+EXERCISES[t].n;
+ $('planToday').textContent=none?'Today: Rest — recover':'Today: '+EXERCISES[t].n;
+ $('planTodaySub').textContent=none?'Scheduled recovery':'4×10 · scheduled';
+ $('btnPlanStart').style.display=none?'none':'';$('btnPlanStart2').style.display=none?'none':'';}
+let sheetDay=0;
+function openSheet(i){sheetDay=i;$('sheetTitle').textContent=DAYFULL[i];
+ $('sheetOpts').innerHTML=`<div class="opt" data-pick="rest"><div>Rest day</div><div class="ms">Recover</div></div>`+EXERCISES.map((e,j)=>`<div class="opt" data-pick="${j}"><div>${e.n}</div><div class="ms">${e.m}</div></div>`).join('');
+ document.querySelectorAll('#sheetOpts .opt').forEach(el=>el.addEventListener('click',()=>{
+  const p=el.dataset.pick;schedule[sheetDay]=p==='rest'?null:+p;
+  $('daySheet').classList.remove('show');renderStrip();renderPlan();}));
+ $('daySheet').classList.add('show');}
+$('daySheet').addEventListener('click',e=>{if(e.target.id==='daySheet')e.target.classList.remove('show');});
+const startToday=()=>{const t=todayEx();if(t!==null)openSetup(t);};
+$('btnPlanStart').addEventListener('click',startToday);
+$('btnPlanStart2').addEventListener('click',startToday);
+$('coachStart').addEventListener('click',startToday);
+renderStrip();renderPlan();
+(function(){const rb=$('recBars');
+[62,71,58,80,74,83,87].forEach((v,i)=>{const b=document.createElement('div');b.className='bar'+(i===6?' hot':'');b.style.height='8px';rb.appendChild(b);
+requestAnimationFrame(()=>requestAnimationFrame(()=>{b.style.height=v+'%';b.style.transition='height .9s cubic-bezier(.2,.8,.3,1)';}));});})();
+
+function syncPlan(){$('v-sets').textContent=plan.sets;$('v-reps').textContent=plan.reps;$('v-rest').textContent=plan.rest+'s';$('v-weight').textContent=plan.weight+'kg';}
+document.querySelectorAll('.stepper button').forEach(b=>b.addEventListener('click',()=>{
+ const k=b.dataset.k,d=+b.dataset.d;
+ if(k==='sets')plan.sets=Math.min(8,Math.max(1,plan.sets+d));
+ if(k==='reps')plan.reps=Math.min(30,Math.max(1,plan.reps+d));
+ if(k==='rest'){let i=RESTS.indexOf(plan.rest);i=Math.min(RESTS.length-1,Math.max(0,i+d));plan.rest=RESTS[i];}
+ if(k==='weight')plan.weight=Math.min(200,Math.max(0,plan.weight+d*5));
+ syncPlan();}));
+
+/* ============ workout flow ============ */
+$('btnBegin').addEventListener('click',()=>{curSet=1;setLog=[];allDepths=[];workoutT0=Date.now();startSet();});
+function startSet(){reps=0;wasDeep=false;maxF=0;depthSum=0;depthN=0;shallow=0;simNow=0;running=true;
+ $('sessName').textContent=EXERCISES[plan.ex].n;
+ $('setLabel').textContent=`SET ${curSet} / ${plan.sets}`;
+ $('repTarget').textContent=plan.reps;
+ $('setDots').innerHTML=Array.from({length:plan.sets},(_,i)=>`<span class="dot ${i<curSet-1?'done':i===curSet-1?'cur':''}"></span>`).join('');
+ $('repnum').textContent='0';$('cue').classList.remove('show');$('veil').classList.remove('show');
+ go('v-session');}
+function finishSet(){const avg=depthN?Math.round(depthSum/depthN):0;
+ setLog.push({reps,avg,shallow});
+ clearInterval(restId);
+ if(curSet<plan.sets)startRest();else showReport();}
+$('btnEndSet').addEventListener('click',finishSet);
+$('btnQuit').addEventListener('click',()=>{clearInterval(restId);running=false;go('v-home');});
+
+function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
+function startRest(){restTotal=plan.rest;restLeft=plan.rest;
+ const last=setLog[setLog.length-1];
+ $('restNext').textContent=`Next: Set ${curSet+1} of ${plan.sets} · ${EXERCISES[plan.ex].n}`;
+ $('restSum').textContent=`Set ${curSet} · ${last.reps} reps · ${last.avg}° avg depth`;
+ go('v-rest');tickRest();
+ restId=setInterval(()=>{restLeft--;if(restLeft<=0){clearInterval(restId);curSet++;startSet();}else tickRest();},1000);}
+function tickRest(){$('restClock').textContent=fmt(restLeft);
+ $('ringFg').style.strokeDashoffset=(552.9*(1-restLeft/restTotal)).toFixed(1);}
+$('btnAddRest').addEventListener('click',()=>{restLeft+=15;restTotal+=15;tickRest();});
+$('btnSkipRest').addEventListener('click',()=>{clearInterval(restId);curSet++;startSet();});
+
+function showReport(){clearInterval(restId);
+ const totReps=setLog.reduce((a,s)=>a+s.reps,0);
+ const avgD=Math.round(setLog.reduce((a,s)=>a+s.avg*s.reps,0)/Math.max(1,totReps));
+ $('rTotal').textContent=totReps;$('rDepth').textContent=avgD+'°';
+ $('rTime').textContent=fmt((Date.now()-workoutT0)/1000);
+ $('repCap').textContent='Rep '+totReps;
+ $('setLog').innerHTML=setLog.map((s,i)=>`<div class="slog"><div class="s ${s.shallow===0?'ok':''}">${i+1}</div><div class="mid"><div class="a">${s.reps} reps${plan.weight?` · ${plan.weight}kg`:''}</div><div class="b">${s.shallow} shallow reps</div></div><div class="rt"><div class="a">${s.avg}°</div><div class="b">avg depth</div></div></div>`).join('');
+ const rb=$('repBars');rb.innerHTML='';
+ allDepths.forEach(d=>{const b=document.createElement('div');b.className='bar'+(d>=90?' hot':d<80?' warn':'');b.style.height=Math.max(8,d)+'%';rb.appendChild(b);});
+ go('v-report');}
+
+/* ============ session engine (simulated landmarks — real app uses MediaPipe) ============ */
+const cv=$('skel'),ctx=cv.getContext('2d');
+const repnum=$('repnum'),timerEl=$('timer'),mKnee=$('mKnee'),mDepth=$('mDepth'),cue=$('cue'),cueTxt=$('cueTxt');
+function sizeCanvas(){const r=cv.parentElement.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+function draw(t){const W=cv.clientWidth,H=cv.clientHeight;if(!W||!H)return;ctx.clearRect(0,0,W,H);
+ const f=(1-Math.cos((t/2400%1)*2*Math.PI))/2;
+ depthSum+=f*100;depthN++;maxF=Math.max(maxF,f);
+ const ankle={x:0,y:0},knee={x:.30*f,y:.50-.22*f},hip={x:-.18*f,y:1.00-.52*f};
+ const shoulder={x:hip.x+.10+.22*f,y:hip.y+.55},head={x:shoulder.x+.07,y:shoulder.y+.24};
+ const elbow={x:shoulder.x+.03,y:shoulder.y-.27},wrist={x:elbow.x+.06*f,y:elbow.y-.25};
+ const s=Math.min(W,H)/2.1,ox=W*.52,oy=H*.78,P=p=>({x:ox+p.x*s,y:oy-p.y*s});
+ const A=P(ankle),K=P(knee),Hp=P(hip),S=P(shoulder),Hd=P(head),E=P(elbow),Wr=P(wrist);
+ ctx.strokeStyle='rgba(255,255,255,.22)';ctx.setLineDash([5,7]);ctx.lineWidth=1;
+ const gy=oy-(1.00-.52*.78)*s;ctx.beginPath();ctx.moveTo(28,gy);ctx.lineTo(W-28,gy);ctx.stroke();ctx.setLineDash([]);
+ ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=2.5;ctx.lineCap='round';
+ [[A,K],[K,Hp],[Hp,S],[S,Hd],[S,E],[E,Wr]].forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+ ctx.fillStyle='#fff';[A,K,Hp,S,E,Wr].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3.6,0,7);ctx.fill();});
+ ctx.beginPath();ctx.arc(Hd.x,Hd.y,10,0,7);ctx.fill();
+ const ux=A.x-K.x,uy=A.y-K.y,vx=Hp.x-K.x,vy=Hp.y-K.y,d=Math.hypot(ux,uy)*Math.hypot(vx,vy);
+ const ka=d<1e-8?NaN:Math.acos(Math.max(-1,Math.min(1,(ux*vx+uy*vy)/d)))*180/Math.PI;
+ mKnee.textContent=Math.round(ka);mDepth.textContent=Math.round(f*100);
+ if(f>.85)wasDeep=true;
+ if(wasDeep&&f<.2){wasDeep=false;
+  const depthPct=Math.round(maxF*100);maxF=0;
+  if(depthPct<80)shallow++;
+  allDepths.push(depthPct);
+  reps++;repnum.textContent=reps;repnum.classList.remove('tick');void repnum.offsetWidth;repnum.classList.add('tick');
+  if(reps%3===0){cueTxt.textContent=cues[cueIdx++%cues.length];cue.classList.add('show');clearTimeout(cueTimer);cueTimer=setTimeout(()=>cue.classList.remove('show'),2400);}
+  if(reps>=plan.reps){setTimeout(finishSet,600);}}
+ const el=(Date.now()-workoutT0)/1000;timerEl.textContent=fmt(el);}
+function loop(now){if(!lastFrame)lastFrame=now;const dt=Math.min(100,now-lastFrame);lastFrame=now;
+ if(running&&views['v-session'].classList.contains('active')){simNow+=dt;draw(simNow);}requestAnimationFrame(loop);}
+sizeCanvas();window.addEventListener('resize',sizeCanvas);requestAnimationFrame(loop);
+$('btnPause').addEventListener('click',()=>{running=false;$('veil').classList.add('show');});
+$('btnResume').addEventListener('click',()=>{running=true;$('veil').classList.remove('show');});
+</script>
+</body>
+</html>

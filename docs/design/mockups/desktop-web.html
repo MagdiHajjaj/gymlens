@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GymLens</title>
+<style>
+:root{--bg:#F4F4F5;--card:#fff;--line:#E9E9EB;--ink:#101012;--mut:#71717A;--acc:#1F9D55;--r:20px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter','Segoe UI',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+#app{display:flex;height:100vh;overflow:hidden}
+.side{width:248px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:28px 18px}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.02em;padding:0 12px 26px;display:flex;align-items:center;gap:10px}
+.brand .mark{width:30px;height:30px;border-radius:10px;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:12px;border:0;background:transparent;padding:11px 12px;border-radius:12px;font:500 14px inherit;color:var(--mut);cursor:pointer;text-align:left}
+.nav button svg{width:19px;height:19px}
+.nav button.on{background:#F1F1F3;color:var(--ink);font-weight:600}
+.nav button:hover{background:#F6F6F7}
+.side .foot{margin-top:auto;padding:12px;display:flex;align-items:center;gap:11px;border-top:1px solid var(--line);padding-top:18px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.side .foot .nm{font-size:13.5px;font-weight:600}
+.side .foot .ms{font-size:11.5px;color:var(--mut)}
+.main{flex:1;overflow-y:auto;padding:40px 48px;scrollbar-width:none}
+.main::-webkit-scrollbar{display:none}
+.page{display:none;max-width:1080px;margin:0 auto}
+.page.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px}
+.phead .eyebrow{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.phead h1{font-size:33px;font-weight:400;letter-spacing:-.01em;margin-top:6px;font-family:Georgia,'Times New Roman',serif}
+.btn-primary{border:0;background:var(--ink);color:#fff;font:600 14.5px inherit;padding:14px 26px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:9px}
+.btn-primary:active{transform:scale(.97)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:24px}
+.card .k{font-size:11.5px;font-weight:600;letter-spacing:.08em;color:var(--mut);text-transform:uppercase}
+.card .big{font-size:34px;margin-top:10px;font-variant-numeric:tabular-nums;font-family:Georgia,'Times New Roman',serif}
+.card .sub2{font-size:12.5px;color:var(--mut);margin-top:6px}
+.card h3{font-size:16px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px}
+.row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border:0}
+.row .ic{width:44px;height:44px;border-radius:14px;background:#F4F4F5;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.row .nm{font-size:14.5px;font-weight:600}
+.row .ms{font-size:12px;color:var(--mut);margin-top:2px}
+.row .chev{margin-left:auto;color:#C7C7CC}
+.excard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;cursor:pointer;transition:transform .15s}
+.excard:hover{transform:translateY(-2px)}
+.excard .nm{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.excard .ms{font-size:12.5px;color:var(--mut);margin-top:5px}
+.excard .go{margin-top:14px;font-size:13px;font-weight:600}
+.bars{display:flex;align-items:flex-end;gap:8px;height:150px;padding-top:10px}
+.bars .bar{flex:1;border-radius:6px;background:#EDEDEF;min-height:6px}
+.bars .bar.hot{background:var(--ink)}
+.bars .bar.warn{background:#E8A13D}
+.trainwrap{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;align-items:start}
+.stage{position:relative;background:#0A0A0B;border-radius:var(--r);overflow:hidden;aspect-ratio:16/10}
+.stage canvas{width:100%;height:100%;display:block}
+.shud{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;justify-content:space-between;align-items:center;padding:20px 24px;color:#fff}
+.shud .ex{font-size:14px;font-weight:600}
+.shud .ex .set{font-size:11px;color:rgba(255,255,255,.6);font-weight:500;letter-spacing:.1em;margin-left:10px}
+.shud .tm{font-size:13px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums;font-weight:500}
+.shud .live{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.12em}
+.shud .live i{width:7px;height:7px;border-radius:50%;background:#30D158;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.3}}
+.setdots{position:absolute;top:64px;left:24px;z-index:5;display:flex;gap:7px}
+.setdots .dot{width:26px;height:4px;border-radius:2px;background:rgba(255,255,255,.22)}
+.setdots .dot.done{background:#30D158}
+.setdots .dot.cur{background:#fff}
+.repbig{position:absolute;left:26px;bottom:22px;color:#fff;z-index:5}
+.repbig .n{font-size:84px;font-weight:700;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;display:inline-block}
+.repbig .n.tick{animation:tick .3s ease}
+@keyframes tick{40%{transform:scale(1.05)}}
+.repbig .l{font-size:10.5px;letter-spacing:.22em;color:rgba(255,255,255,.55);font-weight:600;margin-top:4px}
+.sread{position:absolute;right:26px;bottom:28px;z-index:5;color:#fff;text-align:right}
+.sread .r{margin-top:10px}
+.sread .k{font-size:9.5px;letter-spacing:.18em;color:rgba(255,255,255,.5);font-weight:600}
+.sread .v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:1px}
+.cue{position:absolute;left:0;right:0;bottom:120px;display:flex;justify-content:center;z-index:6;pointer-events:none}
+.cue .pill{background:rgba(18,18,20,.72);backdrop-filter:blur(14px);border-radius:999px;padding:10px 18px;display:flex;align-items:center;gap:9px;font-size:13px;font-weight:500;color:#fff;opacity:0;transform:translateY(8px);transition:all .3s}
+.cue.show .pill{opacity:1;transform:none}
+.cue .pill i{width:7px;height:7px;border-radius:50%;background:#30D158}
+.veil{position:absolute;inset:0;background:rgba(8,8,10,.72);backdrop-filter:blur(10px);z-index:8;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:#fff;text-align:center;padding:30px}
+.veil.show{display:flex}
+.veil .t{font-size:13px;font-weight:600;letter-spacing:.2em;color:rgba(255,255,255,.6)}
+.veil .big{font-size:72px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.veil .nx{font-size:14px;color:rgba(255,255,255,.75)}
+.veil .row2{display:flex;gap:10px;margin-top:8px}
+.veil .row2 button{border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;font:600 13px inherit;padding:12px 26px;border-radius:999px;cursor:pointer}
+.veil .row2 button.go{background:#fff;color:#000;border:0}
+.panel .mrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.panel .mrow:last-child{border:0}
+.panel .mrow .k{font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--mut)}
+.stepper{display:flex;align-items:center;gap:12px}
+.stepper button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.stepper .val{font-size:15px;font-weight:700;min-width:56px;text-align:center;font-variant-numeric:tabular-nums}
+.tbtns{display:flex;gap:10px;margin-top:18px}
+.tbtns button{flex:1;border:0;border-radius:14px;padding:15px;font:600 14px inherit;cursor:pointer}
+.tbtns .pause{background:#F1F1F3;color:var(--ink)}
+.tbtns .end{background:var(--ink);color:#fff}
+.sess{display:flex;align-items:center;gap:16px;padding:18px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.sess:last-child{border:0}
+.sess .dt{width:52px;height:52px;border-radius:16px;background:#F4F4F5;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.sess .dt .d{font-size:16px;font-weight:700}
+.sess .dt .m{font-size:9.5px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.sess .nm{font-size:15px;font-weight:600}
+.sess .ms{font-size:12.5px;color:var(--mut);margin-top:2px}
+.sess .stat{margin-left:auto;text-align:right}
+.sess .stat .n{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.sess .stat .l{font-size:11px;color:var(--mut)}
+.sched7{display:flex;gap:6px;margin-top:4px}
+.sched7 .dcol{flex:1;text-align:center;padding:12px 0;border-radius:12px;cursor:pointer;background:#F7F7F8}
+.sched7 .dcol.today{background:var(--ink);color:#fff}
+.sched7 .dcol.today .dl{color:rgba(255,255,255,.6)}
+.sched7 .dl{font-size:11px;font-weight:600;color:var(--mut);letter-spacing:.06em}
+.sched7 .dd{width:8px;height:8px;border-radius:50%;background:#D9D9DC;margin:9px auto 0}
+.sched7 .dd.on{background:var(--acc)}
+.sched7 .dcol.today .dd.on{background:#30D158}
+.dayrow{display:flex;align-items:center;gap:16px;padding:16px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+.dayrow:last-child{border:0}
+.dayrow .dw{width:52px;flex-shrink:0}
+.dayrow .dw .d{font-size:15px;font-weight:700}
+.dayrow .dw .t{font-size:10px;color:var(--mut);font-weight:600;letter-spacing:.06em}
+.dayrow .what{font-size:15px;font-weight:600}
+.dayrow .what.rest{color:var(--mut);font-weight:500}
+.dayrow .chev{margin-left:auto;color:#C7C7CC}
+.sheet{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4)}
+.sheet.show{display:flex}
+.sheet .box{background:#fff;border-radius:20px;width:440px;max-width:92vw;max-height:72vh;overflow-y:auto;padding:20px 26px 26px}
+.sheet .opt{display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid var(--line);font-size:15px;font-weight:600;cursor:pointer}
+.sheet .opt:last-child{border:0}
+.sheet .opt .ms{font-size:12px;color:var(--mut);font-weight:400;margin-left:auto}
+.rec-card{cursor:pointer}
+.rec-eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--acc)}
+.rec-title{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:8px 0 6px}
+.rec-body{font-size:13.5px;line-height:1.6;color:#3a3a3e}
+.rec-why{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mut);line-height:1.55}
+.rec-why .tag{flex-shrink:0;font-size:9.5px;font-weight:700;letter-spacing:.1em;background:#F1F1F3;border-radius:6px;padding:4px 8px;color:var(--ink)}
+.rec-cta{margin-top:12px;font-size:14px;font-weight:600;cursor:pointer}
+.note{border-left:3px solid var(--acc);padding:2px 0 2px 16px}
+.note p{font-size:14.5px;line-height:1.65;color:#26262a}
+.note .lbl{font-size:11px;font-weight:600;letter-spacing:.14em;color:var(--acc);margin-bottom:8px}
+.slog{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+.slog:last-child{border:0}
+.slog .s{width:44px;height:44px;border-radius:14px;background:#F4F4F5;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.slog .s.ok{background:var(--acc);color:#fff}
+.slog .mid{margin-left:14px}
+.slog .mid .a{font-size:14px;font-weight:600}
+.slog .mid .b{font-size:11.5px;color:var(--mut);margin-top:2px}
+.slog .rt{margin-left:auto;font-size:16px;font-weight:700}
+@media(max-width:900px){.grid4{grid-template-columns:repeat(2,1fr)}.grid2,.trainwrap,.grid3{grid-template-columns:1fr}.side{width:76px}.side .brand span,.nav button span,.side .foot div{display:none}.nav button{justify-content:center}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="side">
+    <div class="brand"><div class="mark">G</div><span>GymLens</span></div>
+    <nav class="nav">
+      <button class="on" data-page="p-dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5l9-7 9 7V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/></svg><span>Dashboard</span></button>
+      <button data-page="p-plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Plan</span></button>
+      <button data-page="p-coach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.3 11c.7.5 1.3 1.4 1.3 2h4c0-.6.6-1.5 1.3-2A6 6 0 0 0 12 3z"/></svg><span>Coach</span></button>
+      <button data-page="p-lib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M17 4v16M4 9v6M20 9v6M7 12h10"/></svg><span>Exercises</span></button>
+      <button data-page="p-train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Train</span></button>
+      <button data-page="p-hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg><span>History</span></button>
+    </nav>
+    <div class="foot"><div class="avatar">Y</div><div><div class="nm">Yousif</div><div class="ms">Pro plan</div></div></div>
+  </aside>
+
+  <div class="main">
+    <div class="page active" id="p-dash">
+      <div class="phead">
+        <div><div class="eyebrow">SATURDAY, SEPTEMBER 26</div><h1>Good evening, Yousif</h1></div>
+        <button class="btn-primary" data-page="p-lib">Start training <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="grid3" style="margin-bottom:16px">
+        <div class="card"><div class="k">Recovery</div><div class="big" style="color:var(--acc)">87%</div><div class="sub2">Primed · HRV 64 ms · RHR 52</div></div>
+        <div class="card"><div class="k">Sleep</div><div class="big">92</div><div class="sub2">7h 24m · in bed 11:12 PM</div></div>
+        <div class="card"><div class="k">Strain</div><div class="big">12.4</div><div class="sub2">Target 14–17 for 87% recovery</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3>Training schedule</h3><span style="font-size:13px;font-weight:600;cursor:pointer" data-page="p-plan">Edit plan →</span></div>
+        <div class="sched7" id="schedStrip"></div>
+      </div>
+      <div class="grid4">
+        <div class="card"><div class="k">Day streak</div><div class="big">6</div><div class="sub2">Personal best: 11</div></div>
+        <div class="card"><div class="k">Reps this week</div><div class="big">142</div><div class="sub2">+18% vs last week</div></div>
+        <div class="card"><div class="k">Avg depth</div><div class="big">94°</div><div class="sub2">+8° vs last session</div></div>
+        <div class="card"><div class="k">Sessions</div><div class="big">12</div><div class="sub2">This month</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>Activity</h3><div class="sub2" style="margin:2px 0 6px">Reps per day</div>
+          <div class="bars" id="weekbars"></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:10px;font-weight:500"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div>
+        <div class="card"><h3>Recent sessions</h3><div class="sub2" style="margin:2px 0 6px">Tap to open report</div>
+          <div class="sess" data-page="p-hist"><div class="dt"><div class="d">26</div><div class="m">SEP</div></div><div><div class="nm">Squat</div><div class="ms">4×10 · 18:24</div></div><div class="stat"><div class="n">94°</div><div class="l">avg depth</div></div></div>
+          <div class="sess" data-page="p-hist"><div class="dt"><div class="d">24</div><div class="m">SEP</div></div><div><div class="nm">Bicep curl</div><div class="ms">3×12 · 14:02</div></div><div class="stat"><div class="n">96%</div><div class="l">clean reps</div></div></div>
+          <div class="sess" data-page="p-hist"><div class="dt"><div class="d">22</div><div class="m">SEP</div></div><div><div class="nm">Push-up</div><div class="ms">3×10 · 12:47</div></div><div class="stat"><div class="n">91%</div><div class="l">clean reps</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-lib">
+      <div class="phead"><div><div class="eyebrow">TRAIN</div><h1>Exercises</h1></div></div>
+      <div class="grid3" id="libGrid"></div>
+    </div>
+
+    <div class="page" id="p-plan">
+      <div class="phead">
+        <div><div class="eyebrow">TRAINING SCHEDULE</div><h1>This week</h1></div>
+        <button class="btn-primary" id="btnPlanGo">Start today's session</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><h3 id="planToday">Today: Push-up</h3><span class="sub2" id="planTodaySub">4×10 · scheduled</span></div>
+        <div id="planList"></div>
+      </div>
+    </div>
+
+    <div class="page" id="p-coach">
+      <div class="phead"><div><div class="eyebrow">SATURDAY, SEPTEMBER 26</div><h1>Coach</h1></div></div>
+      <div class="k" style="margin-bottom:12px">TODAY</div>
+      <div class="grid2" style="margin-bottom:16px">
+        <div class="card rec-card">
+          <div class="rec-eyebrow">TRAINING</div>
+          <div class="rec-title">Aim for strain 14–17</div>
+          <div class="rec-body">You're primed. Push-up is scheduled — your HRV is up 6%, a good day to push the pace between sets.</div>
+          <div class="rec-why"><span class="tag">WHY</span><span>Recovery 87% · HRV 64 ms (+6%) · yesterday's strain 16.2</span></div>
+          <div class="rec-cta" data-page="p-plan">Start today's session →</div>
+        </div>
+        <div class="card rec-card">
+          <div class="rec-eyebrow">SLEEP</div>
+          <div class="rec-title">Cut caffeine by noon</div>
+          <div class="rec-body">Yesterday's coffee after 2 PM added 18 minutes of sleep latency and cost 3% recovery.</div>
+          <div class="rec-why"><span class="tag">WHY</span><span>Sleep latency +18 min · recovery −3%</span></div>
+        </div>
+      </div>
+      <div class="k" style="margin-bottom:12px">PATTERNS</div>
+      <div class="grid2">
+        <div class="card rec-card">
+          <div class="rec-eyebrow">FORM</div>
+          <div class="rec-title">Fix the forward lean</div>
+          <div class="rec-body">2 faults in your last squat session, both in the final set. Cap sets at 8 and re-brace between sets.</div>
+          <div class="rec-why"><span class="tag">WHY</span><span>Reps 21, 23 · depth dropped as you fatigued</span></div>
+          <div class="rec-cta" data-page="p-hist">View session report →</div>
+        </div>
+        <div class="card rec-card">
+          <div class="rec-eyebrow">WEEK</div>
+          <div class="rec-title">Sunday rest is well placed</div>
+          <div class="rec-body">Three training days with rising strain. Keep Sunday clear — your 5-night 11:12 PM bedtime streak added 4% recovery.</div>
+          <div class="rec-why"><span class="tag">WHY</span><span>Strain trend climbing · bedtime streak 5 nights</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-train">
+      <div class="phead">
+        <div><div class="eyebrow">LIVE SESSION</div><h1 id="trainName">Squat</h1></div>
+        <button class="btn-primary" id="btnEndTop">End session</button>
+      </div>
+      <div class="trainwrap">
+        <div class="stage">
+          <canvas id="skel"></canvas>
+          <div class="shud"><div class="ex"><span id="sessCode">SQ—01</span><span class="set" id="setLabel">SET 1 / 4</span></div><div class="live"><i></i>LIVE</div><div class="tm" id="timer">00:00</div></div>
+          <div class="setdots" id="setDots"></div>
+          <div class="repbig"><div class="n" id="repnum">0</div><div class="l">REPS · TARGET <span id="repTarget">10</span></div></div>
+          <div class="sread">
+            <div class="r"><div class="k">KNEE</div><div class="v"><span id="mKnee">165</span>°</div></div>
+            <div class="r"><div class="k">DEPTH</div><div class="v"><span id="mDepth">0</span>%</div></div>
+          </div>
+          <div class="cue" id="cue"><div class="pill"><i></i><span id="cueTxt">Chest up</span></div></div>
+          <div class="veil" id="veil"><div class="t">REST</div><div class="big" id="restClock">1:30</div><div class="nx" id="restNext">Next: Set 2 of 4</div><div class="row2"><button id="btnAddRest">+15s</button><button class="go" id="btnSkipRest">Skip</button></div></div>
+        </div>
+        <div class="card panel">
+          <h3>Plan</h3><div class="sub2" style="margin:2px 0 8px">Adjust, then start</div>
+          <div class="mrow"><div class="k">SETS</div><div class="stepper"><button data-k="sets" data-d="-1">−</button><div class="val" id="v-sets">4</div><button data-k="sets" data-d="1">+</button></div></div>
+          <div class="mrow"><div class="k">REPS</div><div class="stepper"><button data-k="reps" data-d="-1">−</button><div class="val" id="v-reps">10</div><button data-k="reps" data-d="1">+</button></div></div>
+          <div class="mrow"><div class="k">REST</div><div class="stepper"><button data-k="rest" data-d="-1">−</button><div class="val" id="v-rest">90s</div><button data-k="rest" data-d="1">+</button></div></div>
+          <div class="mrow"><div class="k">WEIGHT</div><div class="stepper"><button data-k="weight" data-d="-1">−</button><div class="val" id="v-weight">20kg</div><button data-k="weight" data-d="1">+</button></div></div>
+          <div class="tbtns"><button class="pause" id="btnPause">Pause</button><button class="end" id="btnStart2">Start</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="p-hist">
+      <div class="phead">
+        <div><div class="eyebrow">SESSION 12 · TODAY</div><h1>Session report</h1></div>
+        <button class="btn-primary" data-page="p-lib">Train again</button>
+      </div>
+      <div class="grid4">
+        <div class="card"><div class="k">Total reps</div><div class="big" id="rTotal">40</div></div>
+        <div class="card"><div class="k">Avg depth</div><div class="big" id="rDepth">94°</div></div>
+        <div class="card"><div class="k">Duration</div><div class="big" id="rTime">18:24</div></div>
+        <div class="card"><div class="k">Sets</div><div class="big" id="rSets">4</div></div>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <div class="card"><h3>Sets</h3><div id="setLog" style="margin-top:6px"></div>
+          <div style="margin-top:22px"><h3>Depth per rep</h3>
+          <div class="bars" id="repBars"></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:10px;font-weight:500"><span>Rep 1</span><span id="repCap">Rep 40</span></div></div>
+        </div>
+        <div class="card"><div class="note"><div class="lbl">AI INSIGHT</div><p>Depth improved <b>8° vs last session</b>. Your cleanest block was sets 2–3. Two forward-lean faults came in the final set — likely fatigue. Next time, cap sets at 8 and reset your brace between them.</p></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="sheet" id="daySheet"><div class="box"><div class="k" id="sheetTitle" style="margin-bottom:8px">SATURDAY</div><div id="sheetOpts"></div></div></div>
+</div>
+<script>
+const EXERCISES=[
+ {n:'Squat',m:'Quads · Glutes · Core',c:'SQ—01'},{n:'Deadlift',m:'Back · Glutes · Hamstrings',c:'DL—02'},
+ {n:'Bench press',m:'Chest · Triceps · Shoulders',c:'BP—03'},{n:'Overhead press',m:'Shoulders · Triceps',c:'OP—04'},
+ {n:'Bent-over row',m:'Back · Biceps',c:'RW—05'},{n:'Pull-up',m:'Back · Biceps',c:'PU—06'},
+ {n:'Lunge',m:'Quads · Glutes',c:'LN—07'},{n:'Bicep curl',m:'Biceps · Forearms',c:'BC—08'},
+ {n:'Push-up',m:'Chest · Triceps · Core',c:'PH—09'}];
+const RESTS=[30,45,60,90,120,180];
+let plan={ex:0,sets:4,reps:10,rest:90,weight:20};
+let curSet=1,setLog=[],allDepths=[];
+let reps=0,wasDeep=false,maxF=0,depthSum=0,depthN=0,shallow=0;
+let running=false,started=false,simNow=0,lastFrame=0,cueTimer=null,cueIdx=0;
+let workoutT0=0,restLeft=0,restId=null;
+const cues=['Chest up','Knees tracking over toes','Depth is there — hold it'];
+const $=id=>document.getElementById(id);
+const pages={};document.querySelectorAll('.page').forEach(p=>pages[p.id]=p);
+function go(id){Object.entries(pages).forEach(([k,el])=>el.classList.toggle('active',k===id));
+document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===id));
+document.querySelector('.main').scrollTo(0,0);if(id==='p-train')sizeCanvas();}
+document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.page)));
+$('libGrid').innerHTML=EXERCISES.map((e,i)=>`<div class="excard" data-ex="${i}"><div class="nm">${e.n}</div><div class="ms">${e.m}</div><div class="go">Set up →</div></div>`).join('');
+document.querySelectorAll('[data-ex]').forEach(el=>el.addEventListener('click',()=>{plan.ex=+el.dataset.ex;started=false;running=false;syncTrain();go('p-train');}));
+/* ---- training schedule ---- */
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAYFULL=['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+let schedule=[0,null,1,null,7,8,null];
+const TODAY=5,todayEx=()=>schedule[TODAY];
+function renderStrip(){$('schedStrip').innerHTML=DAYS.map((d,i)=>`<div class="dcol ${i===TODAY?'today':''}" data-p="p-plan"><div class="dl">${d}</div><div class="dd ${schedule[i]!==null?'on':''}"></div></div>`).join('');
+ document.querySelectorAll('#schedStrip .dcol').forEach(el=>el.addEventListener('click',()=>go('p-plan')));}
+function renderPlan(){$('planList').innerHTML=DAYS.map((d,i)=>{const ex=schedule[i];
+ return `<div class="dayrow" data-day="${i}"><div class="dw"><div class="d">${d}</div><div class="t">${i===TODAY?'TODAY':''}</div></div><div class="what ${ex===null?'rest':''}">${ex===null?'Rest day':EXERCISES[ex].n}</div><div class="chev">→</div></div>`;}).join('');
+ document.querySelectorAll('#planList .dayrow').forEach(el=>el.addEventListener('click',()=>openSheet(+el.dataset.day)));
+ const t=todayEx(),none=t===null;
+ $('planToday').textContent=none?'Today: Rest — recover':'Today: '+EXERCISES[t].n;
+ $('planTodaySub').textContent=none?'Scheduled recovery':'4×10 · scheduled';
+ $('btnPlanGo').style.display=none?'none':'';}
+let sheetDay=0;
+function openSheet(i){sheetDay=i;$('sheetTitle').textContent=DAYFULL[i];
+ $('sheetOpts').innerHTML=`<div class="opt" data-pick="rest"><div>Rest day</div><div class="ms">Recover</div></div>`+EXERCISES.map((e,j)=>`<div class="opt" data-pick="${j}"><div>${e.n}</div><div class="ms">${e.m}</div></div>`).join('');
+ document.querySelectorAll('#sheetOpts .opt').forEach(el=>el.addEventListener('click',()=>{
+  const p=el.dataset.pick;schedule[sheetDay]=p==='rest'?null:+p;
+  $('daySheet').classList.remove('show');renderStrip();renderPlan();}));
+ $('daySheet').classList.add('show');}
+$('daySheet').addEventListener('click',e=>{if(e.target.id==='daySheet')e.target.classList.remove('show');});
+$('btnPlanGo').addEventListener('click',()=>{const t=todayEx();if(t===null)return;plan.ex=t;started=false;running=false;syncTrain();go('p-train');});
+renderStrip();renderPlan();
+function syncPlan(){$('v-sets').textContent=plan.sets;$('v-reps').textContent=plan.reps;$('v-rest').textContent=plan.rest+'s';$('v-weight').textContent=plan.weight+'kg';}
+document.querySelectorAll('.stepper button').forEach(b=>b.addEventListener('click',()=>{
+ const k=b.dataset.k,d=+b.dataset.d;
+ if(k==='sets')plan.sets=Math.min(8,Math.max(1,plan.sets+d));
+ if(k==='reps')plan.reps=Math.min(30,Math.max(1,plan.reps+d));
+ if(k==='rest'){let i=RESTS.indexOf(plan.rest);i=Math.min(RESTS.length-1,Math.max(0,i+d));plan.rest=RESTS[i];}
+ if(k==='weight')plan.weight=Math.min(200,Math.max(0,plan.weight+d*5));
+ syncPlan();}));
+function syncTrain(){const e=EXERCISES[plan.ex];$('trainName').textContent=e.n;$('sessCode').textContent=e.c;$('btnStart2').textContent='Start';}
+function fmt(s){return Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');}
+function beginWorkout(){started=true;curSet=1;setLog=[];allDepths=[];workoutT0=Date.now();startSet();}
+function startSet(){reps=0;wasDeep=false;maxF=0;depthSum=0;depthN=0;shallow=0;simNow=0;running=true;
+ $('setLabel').textContent=`SET ${curSet} / ${plan.sets}`;$('repTarget').textContent=plan.reps;
+ $('setDots').innerHTML=Array.from({length:plan.sets},(_,i)=>`<span class="dot ${i<curSet-1?'done':i===curSet-1?'cur':''}"></span>`).join('');
+ $('repnum').textContent='0';$('cue').classList.remove('show');$('veil').classList.remove('show');
+ $('btnPause').textContent='Pause';$('btnStart2').textContent='End set';}
+document.querySelector('.tbtns').addEventListener('click',e=>{
+ if(e.target.id==='btnStart2'){if(!started)beginWorkout();else if(running)finishSet();}
+ if(e.target.id==='btnPause'&&started){running=!running;$('btnPause').textContent=running?'Pause':'Resume';}});
+function finishSet(){const avg=depthN?Math.round(depthSum/depthN):0;setLog.push({reps,avg,shallow});running=false;
+ if(curSet<plan.sets)startRest();else showReport();}
+function startRest(){restLeft=plan.rest;const last=setLog[setLog.length-1];
+ $('restNext').textContent=`Next: Set ${curSet+1} of ${plan.sets} · ${last.reps} reps · ${last.avg}° avg`;
+ $('veil').classList.add('show');tickRest();
+ restId=setInterval(()=>{restLeft--;if(restLeft<=0){clearInterval(restId);curSet++;startSet();}else tickRest();},1000);}
+function tickRest(){$('restClock').textContent=fmt(restLeft);}
+$('btnAddRest').addEventListener('click',()=>{restLeft+=15;tickRest();});
+$('btnSkipRest').addEventListener('click',()=>{clearInterval(restId);curSet++;startSet();});
+function endSession(){clearInterval(restId);running=false;started=false;syncTrain();showReport();}
+$('btnEndTop').addEventListener('click',endSession);
+function showReport(){const totReps=setLog.reduce((a,s)=>a+s.reps,0);
+ const avgD=totReps?Math.round(setLog.reduce((a,s)=>a+s.avg*s.reps,0)/totReps):0;
+ $('rTotal').textContent=totReps;$('rDepth').textContent=avgD+'°';$('rSets').textContent=setLog.length;
+ $('rTime').textContent=fmt((Date.now()-workoutT0)/1000);$('repCap').textContent='Rep '+totReps;
+ $('setLog').innerHTML=setLog.map((s,i)=>`<div class="slog"><div class="s ${s.shallow===0?'ok':''}">${i+1}</div><div class="mid"><div class="a">${s.reps} reps${plan.weight?` · ${plan.weight}kg`:''}</div><div class="b">${s.shallow} shallow reps</div></div><div class="rt">${s.avg}°</div></div>`).join('')||'<div style="color:var(--mut);padding:8px 0">No sets logged yet</div>';
+ const rb=$('repBars');rb.innerHTML='';
+ allDepths.forEach(d=>{const b=document.createElement('div');b.className='bar'+(d>=90?' hot':d<80?' warn':'');b.style.height=Math.max(8,d)+'%';rb.appendChild(b);});
+ go('p-hist');}
+(function(){const wb=$('weekbars');
+[34,52,40,68,55,92,48].forEach((v,i)=>{const b=document.createElement('div');b.className='bar'+(i===5?' hot':'');b.style.height='8px';wb.appendChild(b);
+requestAnimationFrame(()=>requestAnimationFrame(()=>{b.style.height=v+'%';b.style.transition='height .9s cubic-bezier(.2,.8,.3,1)';}));});})();
+const cv=$('skel'),ctx=cv.getContext('2d');
+const repnum=$('repnum'),timerEl=$('timer'),mKnee=$('mKnee'),mDepth=$('mDepth'),cue=$('cue'),cueTxt=$('cueTxt');
+function sizeCanvas(){const r=cv.parentElement.getBoundingClientRect();if(!r.width)return;const dpr=Math.min(2,window.devicePixelRatio||1);cv.width=r.width*dpr;cv.height=r.height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+function draw(t){const W=cv.clientWidth,H=cv.clientHeight;if(!W||!H)return;ctx.clearRect(0,0,W,H);
+ const f=(1-Math.cos((t/2400%1)*2*Math.PI))/2;
+ depthSum+=f*100;depthN++;maxF=Math.max(maxF,f);
+ const ankle={x:0,y:0},knee={x:.30*f,y:.50-.22*f},hip={x:-.18*f,y:1.00-.52*f};
+ const shoulder={x:hip.x+.10+.22*f,y:hip.y+.55},head={x:shoulder.x+.07,y:shoulder.y+.24};
+ const elbow={x:shoulder.x+.03,y:shoulder.y-.27},wrist={x:elbow.x+.06*f,y:elbow.y-.25};
+ const s=Math.min(W,H)/1.15,ox=W*.5,oy=H*.82,P=p=>({x:ox+p.x*s,y:oy-p.y*s});
+ const A=P(ankle),K=P(knee),Hp=P(hip),S=P(shoulder),Hd=P(head),E=P(elbow),Wr=P(wrist);
+ ctx.strokeStyle='rgba(255,255,255,.92)';ctx.lineWidth=3;ctx.lineCap='round';
+ [[A,K],[K,Hp],[Hp,S],[S,Hd],[S,E],[E,Wr]].forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+ ctx.fillStyle='#fff';[A,K,Hp,S,E,Wr].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4.5,0,7);ctx.fill();});
+ ctx.beginPath();ctx.arc(Hd.x,Hd.y,12,0,7);ctx.fill();
+ const ux=A.x-K.x,uy=A.y-K.y,vx=Hp.x-K.x,vy=Hp.y-K.y,d=Math.hypot(ux,uy)*Math.hypot(vx,vy);
+ const ka=d<1e-8?NaN:Math.acos(Math.max(-1,Math.min(1,(ux*vx+uy*vy)/d)))*180/Math.PI;
+ mKnee.textContent=Math.round(ka);mDepth.textContent=Math.round(f*100);
+ if(f>.85)wasDeep=true;
+ if(wasDeep&&f<.2){wasDeep=false;const dp=Math.round(maxF*100);maxF=0;
+  if(dp<80)shallow++;allDepths.push(dp);reps++;
+  repnum.textContent=reps;repnum.classList.remove('tick');void repnum.offsetWidth;repnum.classList.add('tick');
+  if(reps%3===0){cueTxt.textContent=cues[cueIdx++%cues.length];cue.classList.add('show');clearTimeout(cueTimer);cueTimer=setTimeout(()=>cue.classList.remove('show'),2400);}
+  if(reps>=plan.reps)setTimeout(()=>{if(running)finishSet();},600);}
+ timerEl.textContent=fmt((Date.now()-workoutT0)/1000);}
+function loop(now){if(!lastFrame)lastFrame=now;const dt=Math.min(100,now-lastFrame);lastFrame=now;
+ if(running&&pages['p-train'].classList.contains('active')){simNow+=dt;draw(simNow);}requestAnimationFrame(loop);}
+window.addEventListener('resize',sizeCanvas);sizeCanvas();requestAnimationFrame(loop);
+syncPlan();syncTrain();
+</script>
+</body>
+</html>
