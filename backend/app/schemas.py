@@ -98,6 +98,14 @@ SET_FOCUS_PHRASES = {
     "Keep your upper arm steady next set.",
     "Keep shoulders, hips, and ankles aligned.",
     "Use a fuller comfortable range next set.",
+    "Keep your back flat next set.",
+    "Hinge deeper at the hips next set.",
+    "Keep your front knee behind your toes next set.",
+    "Keep your ribs down next set.",
+    "Drive up to a full bridge next set.",
+    "Pull all the way up next set.",
+    "Keep your torso still next set.",
+    "Keep your body still next set.",
 }
 SESSION_FOCUS_PHRASES = {
     "Focus on comfortable depth next session.",
@@ -105,6 +113,14 @@ SESSION_FOCUS_PHRASES = {
     "Focus on a steady upper arm next session.",
     "Focus on shoulder, hip, and ankle alignment.",
     "Focus on a fuller comfortable range next session.",
+    "Focus on a flat back next session.",
+    "Focus on a deeper hip hinge next session.",
+    "Focus on knee position next session.",
+    "Focus on keeping your ribs down next session.",
+    "Focus on full hip extension next session.",
+    "Focus on a complete pull next session.",
+    "Focus on a steady torso next session.",
+    "Focus on a still body next session.",
 }
 
 NUMERIC_PHRASE = re.compile(r"(?:[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000)\.")

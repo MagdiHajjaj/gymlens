@@ -23,9 +23,12 @@ def test_voice_phrase_grammar_allows_bounded_coach_phrases():
         "Set 99, go.",
         "Set 3 complete. 12 reps. 2 technique cues. Sit a little deeper next set.",
         "Set 1 complete. 1 arm rep. No technique cues detected.",
+        "Set 2 complete. 8 reps. 3 technique cues. Hinge deeper at the hips next set.",
         "Session complete. 24 arm reps across 3 sets. 1 technique cue. "
         "Focus on a steady upper arm next session.",
         "Session complete. 0 reps across 0 sets. No technique cues detected.",
+        "Session complete. 16 reps across 2 sets. 4 technique cues. "
+        "Focus on a deeper hip hinge next session.",
     ]
     for text in valid:
         assert SpeechRequest(text=text).text == text

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -14,11 +14,15 @@ import {
   Info,
   Download,
   Upload,
+  SkipForward,
+  Timer,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { CameraView } from '../features/camera/CameraView';
 import { VoiceCoach } from '../features/coaching/VoiceCoach';
+import { PRIORITY, selectedExerciseWarmPhrases } from '../features/coaching/Phrasebook';
+import { summarizeSession, summarizeSet } from '../features/coaching/sessionSummary';
 import { MuscleDiagram } from '../components/MuscleDiagram';
 import { useWorkout } from '../features/workout/workoutStore';
 import { exercises } from '../features/exercises/ExerciseRegistry';
@@ -26,12 +30,31 @@ import { useIdentity } from '../features/auth/AuthProvider';
 import { exportSession, saveLocal, timeLabel } from '../lib/sessionBuffer';
 import { api } from '../lib/api';
 import type { ExerciseId, WorkoutSession } from '../types/workout';
+
+const COUNTDOWN_CALLOUTS = new Set([10, 5, 4, 3, 2, 1]);
+
 export function WorkoutPage() {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const identity = useIdentity();
-  const { selected, select, session, begin, result, paused, pause, voice, toggleVoice, finish } =
-    useWorkout();
+  const {
+    selected,
+    select,
+    session,
+    begin,
+    result,
+    paused,
+    pause,
+    voice,
+    toggleVoice,
+    restPreset,
+    rest,
+    currentSetStartRep,
+    setRestPreset,
+    startRest,
+    completeRest,
+    finish,
+  } = useWorkout();
   const [active, setActive] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -40,12 +63,47 @@ export function WorkoutPage() {
   const [cue, setCue] = useState('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [voiceStatus, setVoiceStatus] = useState('Tap Voice on to hear coaching.');
+  const [restRemaining, setRestRemaining] = useState(0);
+  const announcedCountdown = useRef(new Set<number>());
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
+  const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
+
   function enableVoice() {
     voiceCoach.stop();
     toggleVoice();
-    if (!voice) void voiceCoach.speak("Voice coach is ready. Let's get moving.", false);
-    else setVoiceStatus('Voice is off.');
+    if (!voice) {
+      void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated, {
+        priority: PRIORITY.transition,
+      });
+      void voiceCoach.warmPhrases(selectedExerciseWarmPhrases(selected), identity.authenticated);
+    } else setVoiceStatus('Voice is off.');
+  }
+
+  function finishSet() {
+    voiceCoach.stop();
+    const range = startRest(Date.now());
+    const current = useWorkout.getState().session;
+    if (!range || !current) return;
+    setRestRemaining(restPreset);
+    if (voice) {
+      void voiceCoach.speak(summarizeSet(current, range), identity.authenticated, {
+        priority: PRIORITY.summary,
+      });
+      void voiceCoach.speak(`Rest ${restPreset} seconds.`, identity.authenticated, {
+        priority: PRIORITY.transition,
+      });
+    }
+  }
+
+  function skipRest() {
+    if (!rest) return;
+    const nextSet = rest.completed_set + 1;
+    voiceCoach.stop();
+    completeRest();
+    if (voice)
+      void voiceCoach.speak(`Set ${nextSet}, go.`, identity.authenticated, {
+        priority: PRIORITY.transition,
+      });
   }
   useEffect(() => {
     if (!active) return;
@@ -77,6 +135,39 @@ export function WorkoutPage() {
     return () => clearInterval(timer);
   }, [active, paused]);
   useEffect(() => {
+    announcedCountdown.current.clear();
+  }, [rest?.ends_at_ms]);
+  useEffect(() => {
+    if (!rest) {
+      setRestRemaining(0);
+      return;
+    }
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((rest.ends_at_ms - Date.now()) / 1000));
+      setRestRemaining(remaining);
+      if (remaining === 0) {
+        if (announcedCountdown.current.has(0)) return;
+        announcedCountdown.current.add(0);
+        const nextSet = rest.completed_set + 1;
+        completeRest();
+        if (voice)
+          void voiceCoach.speak(`Set ${nextSet}, go.`, identity.authenticated, {
+            priority: PRIORITY.transition,
+          });
+        return;
+      }
+      if (voice && COUNTDOWN_CALLOUTS.has(remaining) && !announcedCountdown.current.has(remaining)) {
+        announcedCountdown.current.add(remaining);
+        void voiceCoach.speak(`${remaining}.`, identity.authenticated, {
+          priority: PRIORITY.transition,
+        });
+      }
+    };
+    update();
+    const timer = setInterval(update, 250);
+    return () => clearInterval(timer);
+  }, [completeRest, identity.authenticated, rest, voice, voiceCoach]);
+  useEffect(() => {
     if (!active || session?.status !== 'active') return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -99,25 +190,34 @@ export function WorkoutPage() {
     setActive(true);
   }
   async function end() {
-    const completed = finish();
+    if (saving) return;
     setSaving(true);
     setError('');
+    voiceCoach.stop();
+    const completed = finish();
     setUnsaved(completed);
+    const spokenSummary = voice
+      ? voiceCoach.speak(summarizeSession(completed), identity.authenticated, {
+          priority: PRIORITY.summary,
+        })
+      : Promise.resolve();
     try {
       saveLocal(completed, identity.owner);
     } catch {
       setError('Browser storage is full or unavailable. Download this session before leaving.');
+      await spokenSummary;
       setSaving(false);
       return;
     }
     if (identity.authenticated) {
       try {
         const remote = await api.save(completed);
-        saveLocal({ ...remote, local: false }, identity.owner);
+        saveLocal({ ...remote, set_ranges: completed.set_ranges, local: false }, identity.owner);
       } catch {
         /* The report exposes the local backup and a retry action. */
       }
     }
+    await spokenSummary;
     setActive(false);
     setSaving(false);
     navigate(`/session/${completed.id}`);
@@ -189,6 +289,41 @@ export function WorkoutPage() {
                 </div>
               </li>
             </ol>
+            <div className="coach-preferences">
+              <fieldset className="rest-presets">
+                <legend>Rest timer</legend>
+                <div role="group" aria-label="Rest duration">
+                  {([30, 60, 90] as const).map((seconds) => (
+                    <Button
+                      key={seconds}
+                      size="small"
+                      variant={restPreset === seconds ? 'secondary' : 'ghost'}
+                      aria-pressed={restPreset === seconds}
+                      onClick={() => setRestPreset(seconds)}
+                    >
+                      {seconds}s
+                    </Button>
+                  ))}
+                </div>
+              </fieldset>
+              <div className="setup-voice">
+                <div>
+                  <strong>Real-time voice coach</strong>
+                  <span>
+                    {voice ? 'Ready for counts, cues, and summaries' : 'Enable once before you start'}
+                  </span>
+                </div>
+                <Button
+                  size="small"
+                  variant={voice ? 'secondary' : 'ghost'}
+                  aria-pressed={voice}
+                  onClick={enableVoice}
+                >
+                  {voice ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                  {voice ? 'Voice on' : 'Enable voice'}
+                </Button>
+              </div>
+            </div>
             <Button
               className="full-width"
               onClick={() => start(search.get('mode') === 'demo' ? 'demo' : 'camera')}
@@ -254,15 +389,57 @@ export function WorkoutPage() {
       </div>
       <div className="workout-grid">
         <div>
-          <CameraView
-            onDemo={() => start('demo')}
-            voiceCoach={voiceCoach}
-            videoFile={session?.source === 'upload' ? videoFile : null}
-            onFinish={() => void end()}
-          />
+          <div className="camera-shell">
+            <CameraView
+              onDemo={() => start('demo')}
+              voiceCoach={voiceCoach}
+              videoFile={session?.source === 'upload' ? videoFile : null}
+              onFinish={() => void end()}
+            />
+            {rest && (
+              <div
+                className="camera-message rest-overlay"
+                role="dialog"
+                aria-modal="false"
+                aria-labelledby="rest-title"
+              >
+                <Timer size={30} />
+                <span className="eyebrow">SET {rest.completed_set} COMPLETE</span>
+                <h3 id="rest-title">Rest, then go again.</h3>
+                <strong className="rest-countdown" role="timer" aria-label={`${restRemaining} seconds left`}>
+                  {restRemaining}
+                </strong>
+                <span className="sr-only" aria-live="polite">
+                  {COUNTDOWN_CALLOUTS.has(restRemaining) ? `${restRemaining} seconds remaining` : ''}
+                </span>
+                <p>Set {rest.completed_set + 1} is next. Breathe and reset your position.</p>
+                <div className="button-row">
+                  <Button onClick={skipRest}>
+                    <SkipForward size={16} /> Skip rest
+                  </Button>
+                  <Button variant="secondary" onClick={() => void end()} disabled={saving}>
+                    <Square size={13} fill="currentColor" /> End session
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="workout-controls">
-            <Button variant="secondary" onClick={pause} disabled={saving || session?.status === 'completed'}>
+            <Button
+              variant="secondary"
+              onClick={pause}
+              disabled={saving || Boolean(rest) || session?.status === 'completed'}
+            >
               {paused ? <Play size={16} /> : <Pause size={16} />} {paused ? 'Resume' : 'Pause'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={finishSet}
+              disabled={
+                saving || paused || Boolean(rest) || currentSetReps === 0 || session?.status === 'completed'
+              }
+            >
+              <Timer size={16} /> Finish set · rest {restPreset}s
             </Button>
             <Button variant="ghost" onClick={enableVoice} aria-pressed={voice}>
               {voice ? <Volume2 size={17} /> : <VolumeX size={17} />} Voice {voice ? 'on' : 'off'}
@@ -284,7 +461,10 @@ export function WorkoutPage() {
               onClick={() => {
                 voiceCoach.stop();
                 if (!voice) toggleVoice();
-                void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated);
+                void voiceCoach.speak("Voice coach is ready. Let's get moving.", identity.authenticated, {
+                  priority: PRIORITY.transition,
+                });
+                void voiceCoach.warmPhrases(selectedExerciseWarmPhrases(selected), identity.authenticated);
               }}
             >
               Test voice
@@ -298,6 +478,11 @@ export function WorkoutPage() {
               {session?.total_reps || 0}
             </strong>
             <span className="rep-label">{selected === 'curl' ? 'completed arm reps' : 'completed reps'}</span>
+            <span className="set-progress">
+              {rest
+                ? `Rest after set ${rest.completed_set}`
+                : `Set ${(session?.set_ranges?.length ?? 0) + 1} · ${currentSetReps} ${currentSetReps === 1 ? 'rep' : 'reps'}`}
+            </span>
             {selected === 'curl' && (
               <div className="arm-tracking">
                 {[0, 1].map((side) => {
@@ -310,17 +495,19 @@ export function WorkoutPage() {
                         {count} {count === 1 ? 'rep' : 'reps'}
                       </strong>
                       <small>
-                        {paused
-                          ? 'Paused'
-                          : !arm?.trackingValid
-                            ? 'Not in view'
-                            : !arm.calibrated
-                              ? 'Straighten to start'
-                              : arm.phase === 'ready'
-                                ? 'Ready'
-                                : arm.phase === 'eccentric'
-                                  ? 'Lifting'
-                                  : 'Lowering'}
+                        {rest
+                          ? 'Resting'
+                          : paused
+                            ? 'Paused'
+                            : !arm?.trackingValid
+                              ? 'Not in view'
+                              : !arm.calibrated
+                                ? 'Straighten to start'
+                                : arm.phase === 'ready'
+                                  ? 'Ready'
+                                  : arm.phase === 'eccentric'
+                                    ? 'Lifting'
+                                    : 'Lowering'}
                       </small>
                       <small>{arm?.trackingValid && arm.angle !== undefined ? `${arm.angle}°` : '—'}</small>
                     </div>
@@ -330,23 +517,25 @@ export function WorkoutPage() {
             )}
             <div className="phase-label">
               <span />
-              {paused
-                ? 'Paused'
-                : !result?.trackingValid
-                  ? 'Finding your position'
-                  : !result.calibrated
-                    ? 'Calibrating'
-                    : result.phase === 'ready'
-                      ? 'Ready for your next rep'
-                      : result.phase === 'eccentric'
-                        ? selected === 'curl'
-                          ? 'Lifting'
-                          : 'Lowering'
-                        : selected === 'curl'
-                          ? 'Lowering'
-                          : selected === 'press'
-                            ? 'Pressing'
-                            : 'Returning'}
+              {rest
+                ? 'Resting between sets'
+                : paused
+                  ? 'Paused'
+                  : !result?.trackingValid
+                    ? 'Finding your position'
+                    : !result.calibrated
+                      ? 'Calibrating'
+                      : result.phase === 'ready'
+                        ? 'Ready for your next rep'
+                        : result.phase === 'eccentric'
+                          ? selected === 'curl'
+                            ? 'Lifting'
+                            : 'Lowering'
+                          : selected === 'curl'
+                            ? 'Lowering'
+                            : selected === 'press'
+                              ? 'Pressing'
+                              : 'Returning'}
             </div>
           </section>
           <section className="coach-panel">
@@ -354,20 +543,24 @@ export function WorkoutPage() {
               <Volume2 size={14} /> YOUR COACH
             </span>
             <h3>
-              {paused
-                ? 'Take a breath.'
-                : !result?.trackingValid || !result.calibrated
-                  ? 'Get into frame.'
-                  : cue
-                    ? 'One small fix.'
-                    : 'You’ve got this.'}
+              {rest
+                ? 'Recover, then go again.'
+                : paused
+                  ? 'Take a breath.'
+                  : !result?.trackingValid || !result.calibrated
+                    ? 'Get into frame.'
+                    : cue
+                      ? 'One small fix.'
+                      : 'You’ve got this.'}
             </h3>
             <p>
-              {paused
-                ? 'Resume when you’re ready and settle back into the starting position.'
-                : result?.trackingValid && result.calibrated && cue
-                  ? cue
-                  : result?.guidance || 'Keep your full movement in view and turn slightly to the side.'}
+              {rest
+                ? `${restRemaining} seconds until set ${rest.completed_set + 1}.`
+                : paused
+                  ? 'Resume when you’re ready and settle back into the starting position.'
+                  : result?.trackingValid && result.calibrated && cue
+                    ? cue
+                    : result?.guidance || 'Keep your full movement in view and turn slightly to the side.'}
             </p>
             <span className="coach-footer">
               {voice
@@ -377,7 +570,7 @@ export function WorkoutPage() {
                 : 'Visual coaching · voice is off'}
             </span>
           </section>
-          <MuscleDiagram exercise={selected} result={result} paused={paused} />
+          <MuscleDiagram exercise={selected} result={result} paused={paused || Boolean(rest)} />
           <section className="panel metrics-panel">
             <span className="eyebrow">LIVE MEASUREMENTS</span>
             {Object.entries(result?.jointAngles || {}).map(([key, value]) => (

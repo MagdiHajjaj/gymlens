@@ -1058,6 +1058,53 @@ img.exercise-art {
 .setup-steps p {
   font-size: 11px;
 }
+.coach-preferences {
+  display: grid;
+  gap: 10px;
+  margin: -8px 0 20px;
+}
+.rest-presets {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.rest-presets legend {
+  margin-bottom: 7px;
+  color: #68775f;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+.rest-presets > div {
+  display: flex;
+  gap: 7px;
+}
+.rest-presets .button {
+  flex: 1;
+}
+.setup-voice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f4f7ed;
+}
+.setup-voice > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.setup-voice strong {
+  font-size: 11px;
+}
+.setup-voice span {
+  color: #78856f;
+  font-size: 9px;
+}
 .full-width {
   width: 100%;
   margin-bottom: 8px;
@@ -1204,6 +1251,9 @@ img.exercise-art {
   grid-template-columns: minmax(0, 1fr) 260px;
   gap: 22px;
 }
+.camera-shell {
+  position: relative;
+}
 .camera-stage {
   position: relative;
   background: #182c24;
@@ -1303,6 +1353,21 @@ img.exercise-art {
 .paused-overlay {
   background: #14251ad9;
 }
+.rest-overlay {
+  border-radius: 12px;
+  background: #14251af2;
+}
+.rest-overlay .eyebrow {
+  color: #a9ca89;
+}
+.rest-countdown {
+  color: #eefbdc;
+  font-size: clamp(72px, 12vw, 118px);
+  font-weight: 350;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -5px;
+  line-height: 0.9;
+}
 .workout-controls {
   display: flex;
   gap: 8px;
@@ -1336,6 +1401,13 @@ img.exercise-art {
 .rep-label {
   font-size: 11px;
   color: #8b9980;
+}
+.set-progress {
+  display: block;
+  margin-top: 7px;
+  color: #5f7854;
+  font-size: 10px;
+  font-weight: 600;
 }
 .phase-label {
   border-top: 1px solid var(--border);
