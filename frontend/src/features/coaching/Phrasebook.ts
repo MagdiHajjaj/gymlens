@@ -1,4 +1,5 @@
 import type { ExerciseId, FormFault } from '../../types/workout';
+import { coachingPhrases } from '../exercises/MovementCues';
 
 export const PRIORITY = {
   fault: 100,
@@ -99,5 +100,9 @@ export function repCountCue(totalReps: number, exercise: ExerciseId, repsComplet
 }
 
 export function selectedExerciseWarmPhrases(exercise: ExerciseId): string[] {
-  return [...WARM_COUNT_PHRASES, ...(FAULT_PHRASES[exercise] ?? []).map(({ message }) => message)];
+  return [
+    ...WARM_COUNT_PHRASES,
+    ...coachingPhrases(exercise),
+    ...(FAULT_PHRASES[exercise] ?? []).map(({ message }) => message),
+  ];
 }

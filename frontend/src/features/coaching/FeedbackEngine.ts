@@ -34,6 +34,8 @@ export class FeedbackEngine {
   private since = 0;
   private last = new Map<string, number>();
   private faultRepeats = new Map<string, number>();
+  private movementPhase = '';
+  private movementPhaseSince = 0;
   private lastAny = -Infinity;
   private lastRepTotal = 0;
   reset() {
@@ -41,6 +43,8 @@ export class FeedbackEngine {
     this.since = 0;
     this.last.clear();
     this.faultRepeats.clear();
+    this.movementPhase = '';
+    this.movementPhaseSince = 0;
     this.lastAny = -Infinity;
     this.lastRepTotal = 0;
   }
@@ -66,6 +70,7 @@ export class FeedbackEngine {
         : null;
     if (!result.trackingValid || !result.calibrated) {
       this.current = '';
+      this.movementPhase = '';
       return announce(
         result.guidance,
         { text: result.guidance, kind: 'setup', priority: PRIORITY.setup },
@@ -113,13 +118,25 @@ export class FeedbackEngine {
       this.lastRepTotal = Number(repCue.metadata?.totalReps ?? this.lastRepTotal);
       return repCue;
     }
+    if (!result.repCompleted && context && result.phase !== 'ready') {
+      const movementPhase = `${context.exercise}:${result.phase}`;
+      if (this.movementPhase !== movementPhase) {
+        this.movementPhase = movementPhase;
+        this.movementPhaseSince = time;
+        return null;
+      }
+      if (time - this.movementPhaseSince >= 350) {
+        const cue = announce(
+          `movement:${movementPhase}`,
+          { text: result.guidance, kind: 'setup', priority: PRIORITY.setup },
+          7000,
+        );
+        if (cue) return cue;
+      }
+    } else this.movementPhase = '';
     const repNumber = context && context.totalReps > 0 ? context.totalReps : completedCount;
     return result.repCompleted
-      ? announce(
-          'rep',
-          { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep },
-          5000,
-        )
+      ? { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep }
       : announce(
           'ready',
           { text: readyCue(completedCount), kind: 'setup', priority: PRIORITY.setup },

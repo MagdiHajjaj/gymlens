@@ -195,6 +195,27 @@ it('counts curls returning to 155 degrees without requiring elbow lockout', () =
   expect(results.filter((r) => r.repCompleted)).toHaveLength(3);
 });
 
+it('calibrates a natural slightly bent curl start and still requires full measured range', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const source = fixture('curl');
+  const results = source.map((original) => {
+    const frame = structuredClone(original);
+    for (const side of [0, 1]) {
+      const shoulder = frame.landmarks[11 + side];
+      const elbow = frame.landmarks[13 + side];
+      const wrist = frame.landmarks[15 + side];
+      if (jointAngle(shoulder, elbow, wrist) > 145) {
+        const length = Math.hypot(wrist.x - elbow.x, wrist.y - elbow.y);
+        const direction = Math.atan2(shoulder.y - elbow.y, shoulder.x - elbow.x) + (145 * Math.PI) / 180;
+        wrist.x = elbow.x + Math.cos(direction) * length;
+        wrist.y = elbow.y + Math.sin(direction) * length;
+      }
+    }
+    return analyzer.analyze(frame);
+  });
+  expect(results.filter((result) => result.repCompleted)).toHaveLength(3);
+});
+
 it('does not switch arms during a brief visibility dropout', () => {
   const analyzer = new MovementAnalyzer('curl');
   const first = fixture('curl')[0];

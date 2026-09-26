@@ -85,9 +85,9 @@ it('warms selected exercise phrases through cloud without audio and aborts after
   const audio = vi.fn();
   vi.stubGlobal('Audio', audio);
   const phrases = selectedExerciseWarmPhrases('curl');
-  expect(phrases).toHaveLength(7);
+  expect(phrases.length).toBeGreaterThan(7);
   await expect(new VoiceCoach().warmPhrases(phrases, true)).resolves.toBe(false);
-  expect(speech).toHaveBeenCalledTimes(7);
+  expect(speech).toHaveBeenCalledTimes(phrases.length);
   expect(audio).not.toHaveBeenCalled();
 });
 
@@ -144,7 +144,7 @@ it('speaks setup guidance and rep counts independent of feedback cooldowns', () 
       exercise: 'squat',
       totalReps: 6,
     }),
-  ).toBeNull();
+  ).toBe('Rep 6 complete.');
 });
 
 it('prioritizes active faults over simultaneous rep totals', () => {
@@ -222,7 +222,7 @@ it('unlocks one reusable audio element from the mobile tap', async () => {
   expect(audio.pause).toHaveBeenCalledOnce();
 });
 
-it('announces rep completion for counts outside the spoken-count schedule', () => {
+it('announces every completed rep count', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {
     trackingValid: true,
@@ -234,6 +234,21 @@ it('announces rep completion for counts outside the spoken-count schedule', () =
     guidance: 'Keep your movement steady and controlled.',
   };
   expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 6 })).toBe('Rep 6 complete.');
+});
+
+it('speaks measured movement guidance after a phase remains stable', () => {
+  const engine = new FeedbackEngine();
+  const moving: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'eccentric',
+    repCompleted: false,
+    jointAngles: { elbow_angle: 110 },
+    faults: [],
+    guidance: 'Curl toward your shoulders. Keep each elbow under its shoulder and your wrists straight.',
+  };
+  expect(engine.next(moving, 0, { exercise: 'curl', totalReps: 0 })).toBeNull();
+  expect(engine.next(moving, 400, { exercise: 'curl', totalReps: 0 })).toBe(moving.guidance);
 });
 
 it('grounds the rep-completion cue in the rep’s measured angle', () => {

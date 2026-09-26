@@ -1,6 +1,7 @@
 import type { ExerciseId, ExerciseResult, FormFault, PoseFrame } from '../../types/workout';
 import { inclination, jointAngle, jointAngle3D } from '../../lib/biomechanics/angles';
 import { Smoother } from '../../lib/biomechanics/smoothing';
+import { movementCues } from './MovementCues';
 export interface ExerciseAnalyzer {
   readonly id: ExerciseId;
   reset(): void;
@@ -438,6 +439,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
   private sideLostSince = -1;
   private readySince = -1;
   private armed = false;
+  private baseline = 180;
   private phase: ExerciseResult['phase'] = 'ready';
   private started = 0;
   private minimum = 180;
@@ -462,6 +464,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     this.sideLostSince = -1;
     this.readySince = -1;
     this.armed = false;
+    this.baseline = 180;
     this.phase = 'ready';
     this.minimum = 180;
     this.maximumLean = 0;
@@ -655,10 +658,12 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     if (!this.armed) {
       const pressRack = this.id === 'press' && value <= this.config.enter;
       const pressOverhead = this.id === 'press' && value >= this.config.exit;
-      if (pressRack || pressOverhead || (this.id !== 'press' && value >= this.config.exit)) {
+      const naturalStart = this.id !== 'press' && value >= this.config.exit - 10;
+      if (pressRack || pressOverhead || naturalStart) {
         if (this.readySince < 0) this.readySince = frame.timestampMs;
         if (frame.timestampMs - this.readySince >= this.config.calibrationMs) {
           this.armed = true;
+          this.baseline = value;
           if (this.id === 'press') this.pressDirection = pressRack ? 'up' : 'down';
         }
       } else this.readySince = -1;
@@ -670,7 +675,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
           : this.exercise.calibrationGuidance;
       return result;
     }
-    result.guidance = 'Keep your movement steady and controlled.';
+    result.guidance = movementCues[this.id][this.phase];
     if (this.phase === 'ready') {
       const movingUp = this.id === 'press' && this.pressDirection === 'up';
       const entering = movingUp ? value > this.config.enter : value < this.config.enter;
@@ -723,7 +728,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         this.reset();
         return empty('Reset your starting position before your next rep.');
       }
-      const atEnd = movingUp ? value <= this.config.enter : value >= this.config.exit;
+      const returnTarget = Math.min(this.config.exit, this.baseline) - 3;
+      const atEnd = movingUp ? value <= this.config.enter : value >= returnTarget;
       if (this.phase === 'concentric' && atEnd) {
         if (this.exitSince < 0) this.exitSince = frame.timestampMs;
       } else if (this.phase === 'concentric') this.exitSince = -1;
@@ -735,7 +741,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         const duration = frame.timestampMs - this.started;
         const rangeReached = movingUp
           ? 180 - this.minimum >= this.config.exit
-          : this.minimum <= this.config.exit - this.config.minimumRange;
+          : this.minimum <= Math.min(this.config.exit, this.baseline) - this.config.minimumRange;
         result.repCompleted = duration >= this.config.minimumMs && rangeReached;
         if (result.repCompleted) {
           if (!movingUp && this.minimum > this.config.depth) {
@@ -760,11 +766,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
       }
     }
     result.phase = this.phase;
-    if (this.id === 'curl')
-      result.guidance =
-        this.phase === 'ready' || (this.phase === 'eccentric' && this.minimum > this.config.depth)
-          ? 'Curl your hand toward your shoulder. Keep your elbow steady.'
-          : 'Lower your hand back to a comfortably straight arm to finish the rep.';
+    if (!result.guidance.startsWith('Rep not counted:')) result.guidance = movementCues[this.id][this.phase];
     return result;
   }
 }
