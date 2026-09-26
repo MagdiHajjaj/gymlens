@@ -770,6 +770,28 @@ img.exercise-art {
   font-size: 14px;
   letter-spacing: 0.4px;
 }
+.category-art {
+  object-fit: cover;
+  display: block;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #eef2e6;
+}
+.category-art-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5f8570;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  overflow: hidden;
+}
+.category-art-fallback span {
+  padding: 0 4px;
+  text-align: center;
+  line-height: 1.2;
+}
 .exercise-category {
   position: absolute;
   top: 13px;
