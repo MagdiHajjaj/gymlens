@@ -1,3 +1,4 @@
+import re
 from typing import Literal
 from uuid import UUID
 
@@ -84,7 +85,102 @@ PHRASES = {
     "Keep your shoulders, hips, and ankles in line.",
     "Try a little more depth within your comfortable range.",
     "Try a fuller range of motion at a comfortable pace.",
+    "2. Settle into your pace.",
+    "3. Stay controlled.",
+    "4. Keep the rhythm.",
+    "5. Control the return.",
+    "10. Keep the rhythm.",
 }
+
+SET_FOCUS_PHRASES = {
+    "Sit a little deeper next set.",
+    "Keep your chest more upright next set.",
+    "Keep your upper arm steady next set.",
+    "Keep shoulders, hips, and ankles aligned.",
+    "Use a fuller comfortable range next set.",
+}
+SESSION_FOCUS_PHRASES = {
+    "Focus on comfortable depth next session.",
+    "Focus on an upright chest next session.",
+    "Focus on a steady upper arm next session.",
+    "Focus on shoulder, hip, and ankle alignment.",
+    "Focus on a fuller comfortable range next session.",
+}
+
+NUMERIC_PHRASE = re.compile(r"(?:[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000)\.")
+REST_PHRASE = re.compile(r"Rest (?:30|60|90) seconds\.")
+SET_GO_PHRASE = re.compile(r"Set (?P<set>[1-9]|[1-9][0-9]), go\.")
+SET_SUMMARY = re.compile(
+    r"Set (?P<set>[1-9]|[1-9][0-9]) complete\. "
+    r"(?P<reps>[0-9]{1,4}) (?P<unit>rep|reps|arm rep|arm reps)\. (?P<detail>.+)"
+)
+SESSION_SUMMARY = re.compile(
+    r"Session complete\. (?P<reps>[0-9]{1,4}) (?P<unit>rep|reps|arm rep|arm reps) across "
+    r"(?P<sets>[0-9]{1,2}) (?P<set_unit>set|sets)\. (?P<detail>.+)"
+)
+TECHNIQUE_DETAIL = re.compile(
+    r"(?P<count>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) "
+    r"technique (?P<unit>cue|cues)\. (?P<focus>.+)"
+)
+
+
+def _bounded(raw: str, maximum: int, allow_zero: bool = True) -> int | None:
+    value = int(raw)
+    return value if (allow_zero or value > 0) and value <= maximum else None
+
+
+def _count_unit(count: int, unit: str, singular: str, plural: str) -> bool:
+    return unit == (singular if count == 1 else plural)
+
+
+def _technique_detail(detail: str, focus_phrases: set[str]) -> bool:
+    if detail == "No technique cues detected.":
+        return True
+    match = TECHNIQUE_DETAIL.fullmatch(detail)
+    if not match:
+        return False
+    count = _bounded(match["count"], 5000, allow_zero=False)
+    return bool(
+        count
+        and _count_unit(count, match["unit"], "cue", "cues")
+        and match["focus"] in focus_phrases
+    )
+
+
+def _summary(value: str) -> bool:
+    match = SET_SUMMARY.fullmatch(value)
+    if match:
+        reps = _bounded(match["reps"], 5000)
+        valid_reps = reps is not None and (
+            _count_unit(reps, match["unit"], "rep", "reps")
+            or _count_unit(reps, match["unit"], "arm rep", "arm reps")
+        )
+        return valid_reps and _technique_detail(match["detail"], SET_FOCUS_PHRASES)
+    match = SESSION_SUMMARY.fullmatch(value)
+    if not match:
+        return False
+    reps = _bounded(match["reps"], 5000)
+    sets = _bounded(match["sets"], 99)
+    valid_reps = reps is not None and (
+        _count_unit(reps, match["unit"], "rep", "reps")
+        or _count_unit(reps, match["unit"], "arm rep", "arm reps")
+    )
+    return bool(
+        valid_reps
+        and sets is not None
+        and _count_unit(sets, match["set_unit"], "set", "sets")
+        and _technique_detail(match["detail"], SESSION_FOCUS_PHRASES)
+    )
+
+
+def approved_speech(value: str) -> bool:
+    return (
+        value in PHRASES
+        or bool(NUMERIC_PHRASE.fullmatch(value))
+        or bool(REST_PHRASE.fullmatch(value))
+        or bool(SET_GO_PHRASE.fullmatch(value))
+        or _summary(value)
+    )
 
 
 class SpeechRequest(StrictModel):
@@ -93,7 +189,7 @@ class SpeechRequest(StrictModel):
     @field_validator("text")
     @classmethod
     def approved(cls, value):
-        if value not in PHRASES:
+        if not approved_speech(value):
             raise ValueError("Choose an approved coaching phrase")
         return value
 

@@ -324,9 +324,11 @@ def finish(
 
 @app.post("/api/coaching/speech")
 def coaching(payload: SpeechRequest, user: User = Depends(current_user)):
-    services.rate_limit(user.id, "speech", 12)
+    services.rate_limit(user.id, "speech-request", 60)
     return Response(
-        services.speech(payload.text),
+        services.speech(
+            payload.text, before_provider=lambda: services.rate_limit(user.id, "speech-provider", 12)
+        ),
         media_type="audio/mpeg",
         headers={"Cache-Control": "private, max-age=86400"},
     )
