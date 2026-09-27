@@ -1,4 +1,5 @@
 import type { ExerciseId, RepEvent, WorkoutSession } from '../../types/workout';
+import { formatRepList } from './repList';
 
 const cueNames: Record<string, string> = {
   insufficient_depth: 'Shallow depth',
@@ -200,7 +201,7 @@ export function buildSessionReport(session: WorkoutSession) {
       action:
         nextActions[strongestCue.code] ??
         'Review the flagged reps below and check your camera setup before the next session.',
-      evidence: `${strongestCue.count} of ${reps.length} detailed reps triggered this cue: reps ${strongestCue.reps.join(', ')}.${cues.filter((cue) => cue.count === strongestCue.count).length > 1 ? ' Other cues occurred equally often; this is one focus to review.' : ''}`,
+      evidence: `${strongestCue.count} of ${reps.length} detailed reps triggered this cue: reps ${formatRepList(strongestCue.reps)}.${cues.filter((cue) => cue.count === strongestCue.count).length > 1 ? ' Other cues occurred equally often; this is one focus to review.' : ''}`,
     };
   } else if (measured !== reps.length || !completeDetails) {
     focus = {

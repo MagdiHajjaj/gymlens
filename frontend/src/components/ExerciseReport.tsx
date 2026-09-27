@@ -21,6 +21,7 @@ import {
   measuredTime,
   primaryJoint,
 } from '../features/insights/sessionReport';
+import { formatRepList } from '../features/insights/repList';
 import { generateStatisticsInsight } from '../features/insights/insightEngine';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useFitnessGoal } from '../features/goals/goals';
@@ -315,7 +316,9 @@ export function ExerciseReport({
                       {cue.count} / {report.reps.length} detailed reps
                     </span>
                   </div>
-                  <p>Rep {cue.reps.join(', ')}</p>
+                  <p>
+                    Rep{cue.reps.length === 1 ? '' : 's'} {formatRepList(cue.reps)}
+                  </p>
                 </li>
               ))}
             </ul>

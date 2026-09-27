@@ -37,7 +37,7 @@ describe('session report evidence', () => {
     expect(report.cues[0]).toMatchObject({ count: 2, reps: [2, 3] });
     expect(report.cuedReps).toBe(2);
     expect(report.focus.evidence).toContain('2 of 3 detailed reps');
-    expect(report.focus.evidence).toContain('reps 2, 3');
+    expect(report.focus.evidence).toContain('reps 2–3');
   });
 
   it('does not turn no cues into a form score or a progression recommendation', () => {
