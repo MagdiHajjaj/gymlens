@@ -385,6 +385,35 @@
   font-size: 13px;
   color: #536656;
 }
+.history-workout-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 6px;
+}
+/* Combined workout report: one section per exercise inside a single report. */
+.exercise-report {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 2px solid var(--border);
+}
+.exercise-report:first-of-type {
+  margin-top: 22px;
+}
+.exercise-report-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.exercise-report-heading h2 {
+  margin: 2px 0 0;
+}
+.exercise-report-heading p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #536656;
+}
 .history-exercise-list {
   list-style: none;
   padding: 0;
