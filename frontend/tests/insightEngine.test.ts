@@ -142,11 +142,11 @@ describe('generateStatisticsInsight', () => {
       ),
     });
     const oneRep = generateStatisticsInsight(singleFault);
-    expect(oneRep.recap).toContain('on 1 rep (');
+    expect(oneRep.recap).toContain('on 1 of 6 reps (');
     expect(oneRep.recap).not.toContain('1 reps');
 
     const manyFaults = generateStatisticsInsight(baseSession());
-    expect(manyFaults.recap).toContain('on 3 reps (');
+    expect(manyFaults.recap).toContain('on 3 of 6 reps (');
   });
 
   it('uses depth decay as the next focus when cues are clean but range fades', () => {
@@ -223,15 +223,17 @@ describe('goal-oriented insights', () => {
     expect(insight.evidence.next_focus.why).toContain('4 of 4 reps');
   });
 
-  it('strength goal picks a next focus distinct from room-to-grow', () => {
+  it('strength goal keeps the top fault as the next focus, framed as the one priority', () => {
     const insight = generateStatisticsInsight(baseSession(), 'strength');
 
-    // The fault drill is already the first room-to-grow item, so the focus
-    // must move to a different grounded finding (here: the depth-decay pause).
+    // The fault drill is also the first room-to-grow item; the focus must
+    // still name the top priority, framed as the single thing to work on
+    // rather than demoted to a weaker finding.
     expect(insight.improvements[0]).toContain('slow 3-second descent');
     expect(insight.next_focus).not.toBe(insight.improvements[0]);
-    expect(insight.next_focus).toContain('pause');
-    expect(insight.evidence.next_focus.why).toContain('19°');
+    expect(insight.next_focus).toContain('slow 3-second descent');
+    expect(insight.next_focus).toMatch(/priority/i);
+    expect(insight.evidence.next_focus.why).toContain('3 of 6 reps');
   });
 
   it('never repeats a room-to-grow finding as the next focus when alternatives exist', () => {
@@ -246,7 +248,7 @@ describe('goal-oriented insights', () => {
     const insight = generateStatisticsInsight(baseSession(), 'consistency');
 
     expect(insight.next_focus).toContain('clean streak was 2 of 6');
-    expect(insight.evidence.next_focus.why).toContain('2 clean reps in a row');
+    expect(insight.evidence.next_focus.why).toContain('Clean on 1–2');
   });
 
   it('weight_loss goal cites measured volume without diet or outcome claims', () => {
@@ -345,5 +347,169 @@ describe('why explanations in plain English', () => {
     const decay = insight.evidence.improvements.find((item) => item.why.includes('shallower'));
     expect(decay?.why).toContain('19°');
     expect(decay?.why).toContain('averaged 94° at your deepest point');
+  });
+});
+
+describe('what went well honesty', () => {
+  const allFaultedSession = (angles: number[]) =>
+    baseSession({
+      total_reps: angles.length,
+      reps: angles.map((angle, index) => ({
+        rep_number: index + 1,
+        completed_at: `2026-01-01T00:00:${String(10 + index * 10).padStart(2, '0')}.000Z`,
+        metrics_json: { min_angle: angle, duration_ms: 2000 },
+        faults_json: [
+          { code: 'insufficient_depth', message: 'Try a little more depth.', severity: 'warning' },
+        ],
+      })),
+    });
+
+  it('keeps a zero-clean stat out of the strengths list', () => {
+    const insight = generateStatisticsInsight(allFaultedSession([95, 96, 97, 96, 95, 96]));
+
+    expect(insight.stats.cleanReps).toBe(0);
+    expect(insight.strengths.join(' ')).not.toMatch(/0 of \d+ reps had no supported technique cue/);
+    // the zero stat is still reported neutrally in the recap
+    expect(insight.recap).toMatch(/none were clean/);
+    // the genuinely positive consistency finding remains
+    expect(insight.strengths).toHaveLength(1);
+    expect(insight.strengths[0]).toMatch(/stayed consistent/);
+  });
+
+  it('celebrates clean reps when they exist', () => {
+    const insight = generateStatisticsInsight(baseSession());
+
+    expect(insight.stats.cleanReps).toBe(2);
+    expect(insight.strengths.join(' ')).toMatch(/2 of 6 reps had no supported technique cue/);
+  });
+
+  it('leaves strengths empty when nothing went well', () => {
+    const insight = generateStatisticsInsight(allFaultedSession([80, 110, 90, 100, 85, 105]));
+
+    expect(insight.stats.cleanReps).toBe(0);
+    expect(insight.strengths).toEqual([]);
+  });
+});
+
+describe('evaluation coherence', () => {
+  // Mirrors the reported screenshot: 10 curl reps, limited range on every rep,
+  // upper-arm movement on a scattered few.
+  const screenshotSession = (): WorkoutSession =>
+    baseSession({
+      exercise: 'curl',
+      total_reps: 10,
+      reps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rep_number) => ({
+        rep_number,
+        completed_at: `2026-01-01T00:00:${String(rep_number * 5).padStart(2, '0')}.000Z`,
+        metrics_json: { min_angle: 95 + rep_number, duration_ms: 2000 },
+        faults_json: [
+          { code: 'limited_range', message: 'Limited range of motion.', severity: 'warning' as const },
+          ...([5, 7, 8].includes(rep_number)
+            ? [{ code: 'upper_arm_movement', message: 'Upper arm moving.', severity: 'warning' as const }]
+            : []),
+        ],
+      })),
+    });
+
+  it('keeps the most frequent cue as the next focus instead of a demoted runner-up', () => {
+    const insight = generateStatisticsInsight(screenshotSession());
+
+    expect(insight.next_focus).toContain('full comfortable curl path');
+    expect(insight.next_focus).not.toContain('Pin your upper arms');
+    expect(insight.next_focus).toMatch(/priority/i);
+    expect(insight.evidence.next_focus.why).toContain('10 of 10 reps (100%)');
+  });
+
+  it('never calls a secondary cue the most frequent one', () => {
+    const insight = generateStatisticsInsight(screenshotSession());
+    const texts = [insight.next_focus, ...insight.improvements].join(' ');
+
+    expect(texts).not.toMatch(/most frequent cue: Upper arm moving/);
+    expect(insight.improvements[0]).toMatch(/most frequent cue: Limited range of motion/);
+  });
+
+  it('reserves "throughout" for cues that span the whole session', () => {
+    const insight = generateStatisticsInsight(screenshotSession());
+    const frequencies = insight.stats.faultFrequencies;
+    const limited = frequencies.find((fault) => fault.code === 'limited_range');
+    const upperArm = frequencies.find((fault) => fault.code === 'upper_arm_movement');
+
+    expect(limited?.timing).toBe('throughout the session');
+    expect(upperArm?.timing).toBe('in the last two-thirds of the session');
+  });
+
+  it('compresses full rep lists into ranges', () => {
+    const insight = generateStatisticsInsight(screenshotSession());
+
+    expect(insight.evidence.next_focus.why).toContain('on 1–10');
+    expect(insight.improvements.join(' ')).not.toContain('1, 2, 3, 4, 5');
+  });
+
+  it('cites measured evidence in why lines instead of restating the claim', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    const clean = insight.evidence.strengths.find((item) =>
+      item.text.includes('no supported technique cue'),
+    );
+
+    expect(clean?.why).toContain('Clean on 1–2');
+    const consistency = insight.evidence.strengths.find((item) =>
+      item.text.includes('stayed consistent'),
+    );
+    // baseSession angles are not consistent enough for this strength; the
+    // zero-clean fixture covers the range-based why instead.
+    expect(consistency).toBeUndefined();
+  });
+
+  it('backs the consistency claim with the measured angle range', () => {
+    const steady = baseSession({
+      total_reps: 4,
+      reps: [95, 96, 97, 96].map((min_angle, index) => ({
+        rep_number: index + 1,
+        completed_at: `2026-01-01T00:00:${String(10 + index * 10).padStart(2, '0')}.000Z`,
+        metrics_json: { min_angle, duration_ms: 2000 },
+        faults_json: [],
+      })),
+    });
+    const insight = generateStatisticsInsight(steady);
+    const consistency = insight.evidence.strengths.find((item) =>
+      item.text.includes('stayed consistent'),
+    );
+
+    expect(consistency?.why).toContain('ranged from 95° to 97°');
+  });
+
+  it('names the fastest and slowest reps instead of repeating the spread', () => {
+    const insight = generateStatisticsInsight(baseSession());
+    const tempo = insight.evidence.improvements.find((item) => item.text.includes('steadier tempo'));
+
+    expect(tempo?.why).toContain('Slowest was rep 6');
+    expect(tempo?.why).toContain('fastest was rep 1');
+  });
+
+  it('contains no invented set or rep prescriptions in drill copy', () => {
+    const insight = generateStatisticsInsight(screenshotSession());
+    const allCopy = [
+      insight.recap,
+      ...insight.strengths,
+      ...insight.improvements,
+      insight.next_focus,
+      ...insight.evidence.strengths.map((item) => item.why),
+      ...insight.evidence.improvements.map((item) => item.why),
+      insight.evidence.next_focus.why,
+    ].join(' ');
+
+    expect(allCopy).not.toMatch(/for two sets|for 2 sets/i);
+  });
+});
+
+describe('formatRepList', () => {
+  it('compresses contiguous runs into ranges', async () => {
+    const { formatRepList } = await import('../src/features/insights/repList');
+
+    expect(formatRepList([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])).toBe('1–10');
+    expect(formatRepList([1, 2, 3, 5, 7, 8])).toBe('1–3, 5, 7–8');
+    expect(formatRepList([5])).toBe('5');
+    expect(formatRepList([])).toBe('');
+    expect(formatRepList([8, 5, 7])).toBe('5, 7–8');
   });
 });

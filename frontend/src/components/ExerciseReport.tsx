@@ -21,6 +21,7 @@ import {
   measuredTime,
   primaryJoint,
 } from '../features/insights/sessionReport';
+import { formatRepList } from '../features/insights/repList';
 import { generateStatisticsInsight } from '../features/insights/insightEngine';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useFitnessGoal } from '../features/goals/goals';
@@ -101,6 +102,9 @@ export function ExerciseReport({
 
   const report = buildSessionReport(session);
   const observedInsight = generateStatisticsInsight(session, goal?.id);
+  // "What went well" only renders when there is something genuinely positive
+  // to say — a zero-clean session reports that fact in the recap instead.
+  const strengths = insight?.strengths || observedInsight.strengths;
   const joint = primaryJoint(session.exercise);
   const chart = report.reps.map((rep) => ({
     rep: rep.rep_number,
@@ -229,17 +233,24 @@ export function ExerciseReport({
           {goal && <span className="tag green">Training for: {goal.name}</span>}
           <h2 id={`report-coach-title-${session.id}`}>A moment to reflect.</h2>
           <p>{insight?.recap || observedInsight.recap}</p>
-          <h3 className="reflect-pos">What went well</h3>
-          <ul>
-            {(insight?.strengths || observedInsight.strengths).map((text, i) => (
-              <li key={i}>
-                {text}
-                {!insight && observedInsight.evidence.strengths[i]?.why && (
-                  <span className="coach-why"> Why: {observedInsight.evidence.strengths[i]?.why}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {strengths.length > 0 && (
+            <>
+              <h3 className="reflect-pos">What went well</h3>
+              <ul>
+                {strengths.map((text, i) => (
+                  <li key={i}>
+                    {text}
+                    {!insight && observedInsight.evidence.strengths[i]?.why && (
+                      <span className="coach-why">
+                        {' '}
+                        Why: {observedInsight.evidence.strengths[i]?.why}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <h3 className="reflect-neg">Room to grow</h3>
           <ul>
             {(insight?.improvements || observedInsight.improvements).map((text, i) => (
@@ -305,7 +316,9 @@ export function ExerciseReport({
                       {cue.count} / {report.reps.length} detailed reps
                     </span>
                   </div>
-                  <p>Rep {cue.reps.join(', ')}</p>
+                  <p>
+                    Rep{cue.reps.length === 1 ? '' : 's'} {formatRepList(cue.reps)}
+                  </p>
                 </li>
               ))}
             </ul>

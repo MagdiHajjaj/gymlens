@@ -1,5 +1,6 @@
 import { exercises } from '../exercises/ExerciseRegistry';
 import { cueLabel } from './sessionReport';
+import { formatRepList } from './repList';
 import type { GoalId } from '../goals/goals';
 import type { ExerciseId, FormFault, Insight, RepEvent, WorkoutSession } from '../../types/workout';
 
@@ -15,7 +16,8 @@ export interface FaultFrequency {
   count: number;
   percent: number;
   reps: number[];
-  timing: 'early' | 'middle' | 'late' | 'throughout';
+  /** Plain-language description of where in the session the cue appeared. */
+  timing: string;
 }
 
 export interface DepthDecayStats {
@@ -62,13 +64,6 @@ export interface GroundedInsight extends Insight {
   stats: InsightStats;
 }
 
-const timingLabels: Record<FaultFrequency['timing'], string> = {
-  early: 'early',
-  middle: 'mid-session',
-  late: 'late',
-  throughout: 'throughout',
-};
-
 const faultDrills: Record<ExerciseId, Record<string, string>> = {
   squat: {
     insufficient_depth: 'Use a slow 3-second descent to a repeatable depth target within your comfortable range.',
@@ -76,7 +71,7 @@ const faultDrills: Record<ExerciseId, Record<string, string>> = {
   },
   curl: {
     limited_range: 'Use a full comfortable curl path and pause briefly near the bottom before the next rep.',
-    upper_arm_movement: 'Pin your upper arms close to your sides and slow the lifting phase for two sets.',
+    upper_arm_movement: 'Pin your upper arms close to your sides and slow the lifting phase.',
     excessive_torso_swing: 'Pick a weight you can curl without rocking your torso, and keep your hips still through each rep.',
   },
   pushup: {
@@ -174,17 +169,32 @@ function cleanStreak(reps: RepEvent[]) {
   return longest;
 }
 
-function faultTiming(repNumbers: number[], totalReps: number): FaultFrequency['timing'] {
-  const thirds = new Set(
-    repNumbers.map((rep) => {
-      const ratio = rep / Math.max(totalReps, 1);
-      if (ratio <= 1 / 3) return 'early';
-      if (ratio > 2 / 3) return 'late';
-      return 'middle';
-    }),
+/**
+ * Where in the session a cue appeared, described honestly. "Throughout" is
+ * reserved for cues that genuinely span all three parts of the session;
+ * anything narrower names the span it actually covered.
+ */
+function faultTiming(repNumbers: number[], totalReps: number): string {
+  const thirdOf = (rep: number): 'early' | 'middle' | 'late' => {
+    const ratio = rep / Math.max(totalReps, 1);
+    if (ratio <= 1 / 3) return 'early';
+    if (ratio > 2 / 3) return 'late';
+    return 'middle';
+  };
+  const thirds = [...new Set(repNumbers.map(thirdOf))];
+  if (thirds.length === 1) {
+    if (thirds[0] === 'early') return 'early in the session';
+    if (thirds[0] === 'late') return 'late in the session';
+    return 'in the middle of the session';
+  }
+  const ordered = thirds.sort(
+    (a, b) => ['early', 'middle', 'late'].indexOf(a) - ['early', 'middle', 'late'].indexOf(b),
   );
-  if (thirds.size > 1) return 'throughout';
-  return [...thirds][0] ?? 'throughout';
+  const key = ordered.join(',');
+  if (key === 'early,middle,late') return 'throughout the session';
+  if (key === 'early,middle') return 'in the first two-thirds of the session';
+  if (key === 'middle,late') return 'in the last two-thirds of the session';
+  return 'early and late in the session';
 }
 
 function summarizeFaults(reps: RepEvent[]): FaultFrequency[] {
@@ -251,11 +261,18 @@ function bestCleanRep(reps: RepEvent[]) {
 }
 
 function durationStats(reps: RepEvent[]) {
-  const durations = reps.map(repDuration).filter((value): value is number => value !== undefined);
-  if (!durations.length) return { spread: undefined, averageMs: undefined };
+  const measured = reps
+    .map((rep) => ({ rep: rep.rep_number, ms: repDuration(rep) }))
+    .filter((row): row is { rep: number; ms: number } => row.ms !== undefined);
+  if (!measured.length) return { spread: undefined, averageMs: undefined };
+  const durations = measured.map((row) => row.ms);
+  const slowest = measured.reduce((a, b) => (b.ms > a.ms ? b : a));
+  const fastest = measured.reduce((a, b) => (b.ms < a.ms ? b : a));
   return {
     spread: Math.max(...durations) - Math.min(...durations),
     averageMs: average(durations),
+    slowest,
+    fastest,
   };
 }
 
@@ -325,66 +342,135 @@ function isCleanAndConsistent(stats: InsightStats) {
   );
 }
 
-function pauseFocus(decay: DepthDecayStats): InsightEvidenceItem {
-  return evidenceText(
-    `Hold a controlled pause at your deepest comfortable point for 2 sets; your late reps showed less range than early reps.`,
-    `Your depth faded ${decay.change}°: early reps averaged ${decay.firstAverage}° at your deepest point, late reps only ${decay.lastAverage}°.`,
-  );
+/**
+ * A single grounded finding: an action to take, a one-sentence evidence note
+ * for the improvements list, and raw data for the "Why" line. Findings are
+ * built once and rendered in two places: an improvement reads
+ * "<action> <note>", while the next-session focus always names the top
+ * priority as "Make this your priority next session: <action>". Because the
+ * focus framing is structurally different from any improvement text, the
+ * focus can honestly repeat the top priority instead of being demoted to a
+ * weaker finding just to avoid a duplicate sentence.
+ */
+interface Finding {
+  action: string;
+  note: string;
+  why: string;
 }
 
-function progressionFocus(stats: InsightStats): InsightEvidenceItem {
-  return evidenceText(
-    `Progress gently next time: add 1 rep or use a slower eccentric while keeping the same clean, consistent range.`,
-    `${stats.cleanReps} of ${stats.totalReps} reps were clean with no technique cues, and your depth varied by only ${stats.minAngleStdDev ?? 0}°.`,
-  );
+function findingItem(finding: Finding): InsightEvidenceItem {
+  return evidenceText(`${finding.action} ${finding.note}`, finding.why);
 }
 
-function consistencyFocus(stats: InsightStats): InsightEvidenceItem {
-  return evidenceText(
-    `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps. Book your next session soon — showing up again is the whole game.`,
-    `You strung together ${stats.longestCleanStreak} clean rep${stats.longestCleanStreak === 1 ? '' : 's'} in a row out of ${stats.totalReps} recorded reps.`,
-  );
+function faultDrill(exerciseId: ExerciseId, fault: FaultFrequency): string {
+  // Optional chaining: exercises without drill entries fall back to the measured cue message.
+  return faultDrills[exerciseId]?.[fault.code] ?? fault.message;
 }
 
-function weightLossFocus(session: WorkoutSession, stats: InsightStats): InsightEvidenceItem {
+function faultFinding(exerciseId: ExerciseId, fault: FaultFrequency, totalReps: number): Finding {
+  return {
+    action: faultDrill(exerciseId, fault),
+    note: `This was the most frequent cue: ${fault.label} on ${fault.count} of ${totalReps} reps (${fault.percent}%), appearing ${fault.timing}.`,
+    why: `${fault.label} on ${formatRepList(fault.reps)} — ${fault.count} of ${totalReps} reps (${fault.percent}%).`,
+  };
+}
+
+function decayFinding(decay: DepthDecayStats): Finding {
+  return {
+    action: 'Pause briefly at the bottom of each rep next session.',
+    note: `Your range faded ${decay.change}° across the session (${decay.firstAverage}° → ${decay.lastAverage}° average minimum joint angle).`,
+    why: `Early reps (${formatRepList(decay.firstReps)}) averaged ${decay.firstAverage}° at your deepest point; late reps (${formatRepList(decay.lastReps)}) averaged ${decay.lastAverage}° — your range got ${decay.change}° shallower.`,
+  };
+}
+
+function tempoFinding(
+  stats: InsightStats,
+  slowest?: { rep: number; ms: number },
+  fastest?: { rep: number; ms: number },
+): Finding | null {
+  if (stats.durationSpreadMs === undefined || stats.durationSpreadMs < 1500) return null;
+  const spread = (stats.durationSpreadMs / 1000).toFixed(1);
+  const detail =
+    slowest && fastest
+      ? `Slowest was rep ${slowest.rep} (${(slowest.ms / 1000).toFixed(1)}s); fastest was rep ${fastest.rep} (${(fastest.ms / 1000).toFixed(1)}s).`
+      : `Your rep pace varied by ${spread}s between your fastest and slowest rep.`;
+  return {
+    action: 'Use a steadier tempo next session.',
+    note: `Rep duration spread was ${spread}s from fastest to slowest.`,
+    why: detail,
+  };
+}
+
+function repeatabilityFinding(
+  stats: InsightStats,
+  minAngle?: number,
+  maxAngle?: number,
+): Finding | null {
+  if (stats.minAngleStdDev === undefined || stats.minAngleStdDev <= 10) return null;
+  const detail =
+    minAngle !== undefined && maxAngle !== undefined
+      ? `Deepest points ranged from ${minAngle}° to ${maxAngle}° across ${stats.measuredReps} measured reps.`
+      : `Your depth varied by ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`;
+  return {
+    action: 'Make every rep match your best rep shape.',
+    note: `Your minimum joint angle varied by ${stats.minAngleStdDev}° (standard deviation).`,
+    why: detail,
+  };
+}
+
+interface FocusCandidate {
+  action: string;
+  why: string;
+}
+
+function progressionCandidate(stats: InsightStats): FocusCandidate | null {
+  if (!isCleanAndConsistent(stats)) return null;
+  return {
+    action:
+      'Progress gently next time: add 1 rep or use a slower eccentric while keeping the same clean, consistent range.',
+    why: `${stats.cleanReps} of ${stats.totalReps} reps were clean with no technique cues, and your depth varied by only ${stats.minAngleStdDev ?? 0}°.`,
+  };
+}
+
+function consistencyCandidate(stats: InsightStats, cleanRepNumbers: number[]): FocusCandidate | null {
+  if (stats.totalReps === 0) return null;
+  return {
+    action: `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps — extend it next session.`,
+    why:
+      cleanRepNumbers.length > 0
+        ? `Clean on ${formatRepList(cleanRepNumbers)} — ${stats.cleanReps} of ${stats.totalReps} reps.`
+        : `No clean reps this session out of ${stats.totalReps} recorded reps.`,
+  };
+}
+
+function weightLossCandidate(session: WorkoutSession, stats: InsightStats): FocusCandidate | null {
+  if (stats.totalReps === 0) return null;
   const exerciseName = exercises[session.exercise].name.toLowerCase();
   const compound = COMPOUND_EXERCISES[session.exercise] ?? false;
-  return evidenceText(
-    `You logged ${stats.totalReps} ${exerciseName} reps. For weight loss, repeat sessions built on full-body compound movements regularly through the week — training frequency matters more than any single workout.`,
-    `${stats.totalReps} measured reps this session; ${exerciseName} ${compound ? 'is a full-body compound movement' : 'is not a full-body compound movement'}.`,
-  );
-}
-
-function tempoFocus(stats: InsightStats): InsightEvidenceItem {
-  return evidenceText(
-    `Use a steadier tempo: rep duration spread was ${((stats.durationSpreadMs ?? 0) / 1000).toFixed(1)}s from fastest to slowest.`,
-    `Your rep pace varied by ${((stats.durationSpreadMs ?? 0) / 1000).toFixed(1)}s between your fastest and slowest rep.`,
-  );
-}
-
-function repeatabilityFocus(stats: InsightStats): InsightEvidenceItem {
-  return evidenceText(
-    `Make each rep more repeatable: your minimum joint angle varied by ${stats.minAngleStdDev}° standard deviation.`,
-    `Your depth varied by ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`,
-  );
+  return {
+    action: `You logged ${stats.totalReps} ${exerciseName} reps. For weight loss, repeat sessions built on full-body compound movements regularly through the week — training frequency matters more than any single workout.`,
+    why: `${stats.totalReps} measured reps this session; ${exerciseName} ${compound ? 'is a full-body compound movement' : 'is not a full-body compound movement'}.`,
+  };
 }
 
 interface FocusParts {
   topFault?: FaultFrequency;
   decay?: DepthDecayStats;
-  faultFrequencies: FaultFrequency[];
-  dedupedImprovements: InsightEvidenceItem[];
+  cleanRepNumbers: number[];
+  slowestRep?: { rep: number; ms: number };
+  fastestRep?: { rep: number; ms: number };
+  minAngle?: number;
+  maxAngle?: number;
   exercise: { name: string; setup: string };
 }
 
 /**
- * The goal reorders which grounded finding becomes the next-session focus.
- * 'form' (and no goal) keeps the original fault-first behavior exactly.
- *
- * The focus must differ from every "room to grow" item: candidates are tried
- * in goal-priority order and the first one not already listed as an
- * improvement wins. When every candidate is already listed, the primary
- * candidate is reused rather than inventing a weaker fallback.
+ * The next-session focus is always the single highest-priority grounded
+ * finding — never a demoted runner-up. The goal reorders which finding wins:
+ * 'form' (and no goal) keeps fault-first behavior. The focus text is framed
+ * as the one priority ("Make this your priority next session: …"), which is
+ * structurally different from the room-to-grow wording, so the top priority
+ * stays the focus even when it also leads the improvements list.
  */
 function selectNextFocus(
   session: WorkoutSession,
@@ -392,46 +478,56 @@ function selectNextFocus(
   goalId: GoalId | null | undefined,
   parts: FocusParts,
 ): InsightEvidenceItem {
-  const { topFault, decay, faultFrequencies, dedupedImprovements, exercise } = parts;
-  const candidates: InsightEvidenceItem[] = [];
-  if (goalId === 'strength') {
-    if (isCleanAndConsistent(stats)) candidates.push(progressionFocus(stats));
-    if (topFault) candidates.push(faultImprovement(session.exercise, topFault, stats.totalReps));
-    if (decay && decay.change >= 5) candidates.push(pauseFocus(decay));
-  } else if (goalId === 'consistency') {
-    if (stats.totalReps > 0) candidates.push(consistencyFocus(stats));
-  } else if (goalId === 'weight_loss') {
-    if (stats.totalReps > 0) candidates.push(weightLossFocus(session, stats));
-  } else {
-    if (topFault) candidates.push(faultImprovement(session.exercise, topFault, stats.totalReps));
-    if (decay && decay.change >= 5) candidates.push(pauseFocus(decay));
-    if (isCleanAndConsistent(stats)) candidates.push(progressionFocus(stats));
-  }
-  // Secondary grounded findings for when the primary pick duplicates a room-to-grow item.
-  const secondFault = faultFrequencies[1];
-  if (secondFault) candidates.push(faultImprovement(session.exercise, secondFault, stats.totalReps));
-  if (stats.durationSpreadMs !== undefined && stats.durationSpreadMs >= 1500)
-    candidates.push(tempoFocus(stats));
-  if (stats.minAngleStdDev !== undefined && stats.minAngleStdDev > 10)
-    candidates.push(repeatabilityFocus(stats));
+  const { topFault, decay, cleanRepNumbers, slowestRep, fastestRep, minAngle, maxAngle, exercise } =
+    parts;
+  const fault: FocusCandidate | null = topFault
+    ? {
+        action: faultDrill(session.exercise, topFault),
+        why: `${topFault.label} was the most frequent cue: ${topFault.count} of ${stats.totalReps} reps (${topFault.percent}%), on ${formatRepList(topFault.reps)}.`,
+      }
+    : null;
+  const decayed: FocusCandidate | null =
+    decay && decay.change >= 5
+      ? {
+          action: 'Hold a controlled pause at your deepest comfortable point next session.',
+          why: `Your depth faded ${decay.change}°: early reps averaged ${decay.firstAverage}° at your deepest point, late reps only ${decay.lastAverage}°.`,
+        }
+      : null;
+  const tempo = tempoFinding(stats, slowestRep, fastestRep);
+  const repeatable = repeatabilityFinding(stats, minAngle, maxAngle);
 
-  const used = new Set(dedupedImprovements.map((item) => item.text));
-  const distinct = candidates.find((candidate) => !used.has(candidate.text));
-  if (distinct) return distinct;
-  if (candidates[0]) return candidates[0];
-  if (dedupedImprovements[0]) return dedupedImprovements[0];
+  const candidates: FocusCandidate[] = [];
+  if (goalId === 'strength') {
+    const progression = progressionCandidate(stats);
+    if (progression) candidates.push(progression);
+    if (fault) candidates.push(fault);
+    if (decayed) candidates.push(decayed);
+  } else if (goalId === 'consistency') {
+    const consistency = consistencyCandidate(stats, cleanRepNumbers);
+    if (consistency) candidates.push(consistency);
+    if (fault) candidates.push(fault);
+    if (decayed) candidates.push(decayed);
+  } else if (goalId === 'weight_loss') {
+    const weightLoss = weightLossCandidate(session, stats);
+    if (weightLoss) candidates.push(weightLoss);
+    if (fault) candidates.push(fault);
+    if (decayed) candidates.push(decayed);
+  } else {
+    if (fault) candidates.push(fault);
+    if (decayed) candidates.push(decayed);
+    const progression = progressionCandidate(stats);
+    if (progression) candidates.push(progression);
+  }
+  if (tempo) candidates.push(tempo);
+  if (repeatable) candidates.push(repeatable);
+
+  const winner = candidates[0];
+  if (winner) {
+    return evidenceText(`Make this your priority next session: ${winner.action}`, winner.why);
+  }
   return evidenceText(
     `Set up a clear ${exercise.setup.toLowerCase()} Then move at a steady, comfortable pace.`,
     'We did not record enough measurements this session for a more specific focus.',
-  );
-}
-
-function faultImprovement(exerciseId: ExerciseId, fault: FaultFrequency, totalReps: number) {
-  // Optional chaining: exercises without drill entries fall back to the measured cue message.
-  const drill = faultDrills[exerciseId]?.[fault.code] ?? fault.message;
-  return evidenceText(
-    `${drill} This was the most frequent cue: ${fault.label} on ${fault.count} of ${totalReps} reps (${fault.percent}%), appearing ${timingLabels[fault.timing]}.`,
-    `Most frequent technique cue: ${fault.label.toLowerCase()} on reps ${fault.reps.join(', ')} — ${fault.count} of ${totalReps} reps (${fault.percent}%).`,
   );
 }
 
@@ -440,6 +536,28 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
   const strengths: InsightEvidenceItem[] = [];
   const improvements: InsightEvidenceItem[] = [];
   const topFault = stats.faultFrequencies[0];
+
+  // Raw material for evidence lines: which reps were clean, the measured
+  // angle range, and the fastest/slowest reps. Whys cite these instead of
+  // paraphrasing the claim.
+  const sortedReps = [...session.reps].sort((a, b) => a.rep_number - b.rep_number);
+  const cleanRepNumbers = sortedReps
+    .filter((rep) => rep.faults_json.length === 0)
+    .map((rep) => rep.rep_number);
+  const minAngles = sortedReps
+    .map(repMinAngle)
+    .filter((value): value is number => value !== undefined);
+  const minAngle = minAngles.length ? Math.min(...minAngles) : undefined;
+  const maxAngle = minAngles.length ? Math.max(...minAngles) : undefined;
+  const durations = sortedReps
+    .map((rep) => ({ rep: rep.rep_number, ms: repDuration(rep) }))
+    .filter((row): row is { rep: number; ms: number } => row.ms !== undefined);
+  const slowestRep = durations.length
+    ? durations.reduce((a, b) => (b.ms > a.ms ? b : a))
+    : undefined;
+  const fastestRep = durations.length
+    ? durations.reduce((a, b) => (b.ms < a.ms ? b : a))
+    : undefined;
 
   if (stats.totalReps === 0) {
     strengths.push(
@@ -455,12 +573,16 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       ),
     );
   } else {
-    strengths.push(
-      evidenceText(
-        `${stats.cleanReps} of ${stats.totalReps} reps had no supported technique cue, with a longest clean streak of ${stats.longestCleanStreak}.`,
-        `Clean reps: ${stats.cleanReps}/${stats.totalReps}; longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}.`,
-      ),
-    );
+    if (stats.cleanReps > 0) {
+      // A zero-clean session is already reported neutrally in the recap; it is
+      // not something that "went well", so it stays out of the strengths list.
+      strengths.push(
+        evidenceText(
+          `${stats.cleanReps} of ${stats.totalReps} reps had no supported technique cue, with a longest clean streak of ${stats.longestCleanStreak}.`,
+          `Clean on ${formatRepList(cleanRepNumbers)} — no supported technique cues on those reps.`,
+        ),
+      );
+    }
     if (stats.bestRep && stats.bestRepMinAngle !== undefined) {
       strengths.push(
         evidenceText(
@@ -473,21 +595,18 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       strengths.push(
         evidenceText(
           `Your depth stayed consistent across measured reps (standard deviation ${stats.minAngleStdDev}°).`,
-          `Your depth varied by just ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`,
+          minAngle !== undefined && maxAngle !== undefined
+            ? `Deepest points ranged from ${minAngle}° to ${maxAngle}° across ${stats.measuredReps} measured reps.`
+            : `Your depth varied by just ${stats.minAngleStdDev}° across ${stats.measuredReps} measured reps.`,
         ),
       );
     }
   }
 
-  if (topFault) improvements.push(faultImprovement(session.exercise, topFault, stats.totalReps));
+  if (topFault) improvements.push(findingItem(faultFinding(session.exercise, topFault, stats.totalReps)));
 
   if (stats.depthDecay && stats.depthDecay.change >= 5) {
-    improvements.push(
-      evidenceText(
-        `Depth/range faded ${stats.depthDecay.change}° across the session (${stats.depthDecay.firstAverage}° → ${stats.depthDecay.lastAverage}° average minimum joint angle). Add a 3-second pause at the bottom for 2 sets next session.`,
-        `Early reps (reps ${stats.depthDecay.firstReps.join(', ')}) averaged ${stats.depthDecay.firstAverage}° at your deepest point; late reps (reps ${stats.depthDecay.lastReps.join(', ')}) averaged ${stats.depthDecay.lastAverage}° — your range got ${stats.depthDecay.change}° shallower.`,
-      ),
-    );
+    improvements.push(findingItem(decayFinding(stats.depthDecay)));
   } else if (stats.depthDecay && stats.depthDecay.change <= -5) {
     strengths.push(
       evidenceText(
@@ -497,13 +616,11 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
     );
   }
 
-  if (stats.minAngleStdDev !== undefined && stats.minAngleStdDev > 10) {
-    improvements.push(repeatabilityFocus(stats));
-  }
+  const repeatable = repeatabilityFinding(stats, minAngle, maxAngle);
+  if (repeatable) improvements.push(findingItem(repeatable));
 
-  if (stats.durationSpreadMs !== undefined && stats.durationSpreadMs >= 1500) {
-    improvements.push(tempoFocus(stats));
-  }
+  const tempo = tempoFinding(stats, slowestRep, fastestRep);
+  if (tempo) improvements.push(findingItem(tempo));
 
   if (!stats.measuredReps && stats.totalReps > 0) {
     improvements.push(
@@ -521,8 +638,11 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
   const nextFocus = selectNextFocus(session, stats, goalId, {
     topFault,
     decay: stats.depthDecay,
-    faultFrequencies: stats.faultFrequencies,
-    dedupedImprovements,
+    cleanRepNumbers,
+    slowestRep,
+    fastestRep,
+    minAngle,
+    maxAngle,
     exercise,
   });
 
@@ -540,14 +660,22 @@ function recap(session: WorkoutSession, stats: InsightStats) {
     return `${demoPrefix}No completed ${exercise} reps were recorded, so rep-level range, tempo, and cue measurements are unavailable.`;
 
   const faultCount = stats.faultFrequencies.reduce((sum, fault) => sum + fault.count, 0);
-  const angleText = stats.measuredReps
-    ? `${stats.measuredReps} reps included minimum joint angle measurements`
-    : 'minimum joint angle was unavailable';
+  const cleanText =
+    stats.cleanReps === 0
+      ? 'none were clean by supported cues'
+      : `${stats.cleanReps} of ${stats.totalReps} were clean by supported cues`;
+  const cueText = `${faultCount} technique cue${faultCount === 1 ? '' : 's'} observed`;
+  const angleText =
+    stats.measuredReps > 0 && stats.measuredReps >= stats.totalReps
+      ? `Joint angles were measured on all ${stats.totalReps} reps`
+      : stats.measuredReps > 0
+        ? `Joint angles were measured on ${stats.measuredReps} of ${stats.totalReps} reps`
+        : 'No joint angle measurements were recorded';
   const topFault = stats.faultFrequencies[0];
-  const cueText = topFault
-    ? `The most common cue was ${topFault.label} on ${topFault.count} rep${topFault.count === 1 ? '' : 's'} (${topFault.percent}%).`
+  const topCueText = topFault
+    ? `The most common cue was ${topFault.label} on ${topFault.count} of ${stats.totalReps} reps (${topFault.percent}%).`
     : 'No supported technique cues were detected; that is not proof of perfect form.';
-  return `${demoPrefix}${stats.totalReps} ${exercise} reps recorded; ${stats.cleanReps} were clean by supported cues and ${faultCount} cue events were observed. ${angleText}. ${cueText}`;
+  return `${demoPrefix}${stats.totalReps} ${exercise} reps recorded; ${cleanText}, and ${cueText}. ${angleText}. ${topCueText}`;
 }
 
 export function generateStatisticsInsight(
