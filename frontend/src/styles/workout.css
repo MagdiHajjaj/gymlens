@@ -65,6 +65,11 @@
   gap: 12px;
   margin-top: 20px;
 }
+/* Reserve one line so the "N picked" status never shifts the grid. */
+.exercise-picker .picked-status {
+  min-height: 1.7em;
+  margin: 0;
+}
 .workout-exercise-options > button {
   min-height: 88px;
   display: flex;
