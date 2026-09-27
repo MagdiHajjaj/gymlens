@@ -294,12 +294,15 @@ def test_gemini_structured_validation_and_saved_result(client, monkeypatch):
     response = client.post(f"/api/workouts/{sid}/insights")
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "gemini"
-    payload = json.loads(calls[0]["contents"].split("statistics: ", 1)[1])
+    payload = json.loads(calls[0]["contents"].split("Session evidence:\n", 1)[1])
     assert payload["exercise"] == "squat"
     assert payload["totals"]["reps"] == 1
     assert payload["range"]["averageMinAngle"] == 92
     assert payload["tempo"]["averageMs"] == 2500
+    assert "rep numbers" in calls[0]["contents"]
+    assert "Summarize only these observed exercise statistics" not in calls[0]["contents"]
     config = calls[0]["config"]
+    assert config.temperature == 0.7
     assert config.response_schema is None
     assert config.response_json_schema["additionalProperties"] is False
     assert set(config.response_json_schema["required"]) == {
@@ -308,6 +311,36 @@ def test_gemini_structured_validation_and_saved_result(client, monkeypatch):
     assert client.post(f"/api/workouts/{sid}/insights").json() == response.json()
     assert len(calls) == 1
     assert client.get(f"/api/workouts/{sid}").json()["insight"]["recap"] == valid["recap"]
+
+
+def test_workout_summary_fault_labels_are_plain_language():
+    workout = make_workout(
+        reps=[
+            make_rep(1, full_metrics(90)),
+            make_rep(
+                2,
+                full_metrics(110),
+                [
+                    {"code": "insufficient_depth", "message": "Deeper", "severity": "warning"},
+                    {"code": "mystery_code", "message": "?", "severity": "info"},
+                ],
+            ),
+        ]
+    )
+    faults = {f["code"]: f for f in services._workout_summary(workout)["faults"]}
+    assert faults["insufficient_depth"]["label"] == "Shallow depth"
+    assert faults["mystery_code"]["label"] == "mystery_code"  # unknown codes pass through
+
+
+def test_workout_summary_includes_athlete_profile():
+    workout = make_workout(reps=[make_rep(1, full_metrics(90))])
+    user = SimpleNamespace(fitness_goal="strength", experience_level="intermediate")
+    assert services._workout_summary(workout, user)["athlete"] == {
+        "fitness_goal": "strength",
+        "experience_level": "intermediate",
+    }
+    assert "athlete" not in services._workout_summary(workout)
+    assert "athlete" not in services._workout_summary(workout, SimpleNamespace())
 
 
 def test_invalid_gemini_output_is_not_saved(client, monkeypatch):
