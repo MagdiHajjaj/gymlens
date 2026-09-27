@@ -68,6 +68,9 @@ export interface WorkoutSession {
   workout_id?: string;
   exercise: ExerciseId;
   started_at: string;
+  /** Stamped when pose tracking first goes live (calibrated); the session
+   *  clock excludes the "find your position" window before this. */
+  tracking_started_at?: string;
   ended_at?: string;
   total_reps: number;
   status: 'active' | 'completed';

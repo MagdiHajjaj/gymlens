@@ -116,3 +116,27 @@ it('keeps the global rep target when the exercise has no plan item', () => {
   expect(useWorkout.getState().session?.exercise).toBe('squat');
   expect(useWorkout.getState().targetReps).toBe(15);
 });
+
+it('stamps tracking_started_at when calibration completes, not before', () => {
+  useWorkout.getState().begin('demo');
+  expect(useWorkout.getState().session?.tracking_started_at).toBeUndefined();
+
+  // Uncalibrated ingest: the clock must not start.
+  useWorkout.getState().ingest({ ...completeResult(), calibrated: false, repCompleted: false }, 1_000);
+  expect(useWorkout.getState().session?.tracking_started_at).toBeUndefined();
+
+  // Calibration completes: stamped once, never overwritten.
+  useWorkout.getState().ingest(completeResult(), 2_000);
+  const stamped = useWorkout.getState().session?.tracking_started_at;
+  expect(stamped).toBeDefined();
+  useWorkout.getState().ingest(completeResult(), 3_000);
+  expect(useWorkout.getState().session?.tracking_started_at).toBe(stamped);
+});
+
+it('leaves tracking_started_at unset when tracking never begins', () => {
+  useWorkout.getState().begin('camera');
+  useWorkout.getState().ingest({ ...completeResult(), trackingValid: false, repCompleted: false }, 1_000);
+
+  expect(useWorkout.getState().session?.tracking_started_at).toBeUndefined();
+  expect(useWorkout.getState().finish().tracking_started_at).toBeUndefined();
+});
