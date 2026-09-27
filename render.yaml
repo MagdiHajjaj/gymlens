@@ -5,12 +5,13 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install uv && uv sync --locked --no-dev
-    startCommand: uv run alembic upgrade head && exec uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: uv run alembic upgrade head
+    startCommand: exec uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health/ready
     autoDeployTrigger: commit
     envVars:
       - key: PYTHON_VERSION
-        value: 3.14.3
+        value: 3.12.7
       - key: DATABASE_URL
         sync: false
       - key: AUTH0_DOMAIN
