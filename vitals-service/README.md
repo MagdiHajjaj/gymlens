@@ -73,9 +73,11 @@ Whoever owns the Render account (the main API already lives there):
    - `VITE_VITALS_WS_URL` = `wss://gymlens-vitals.onrender.com`
      (note `wss`, not `https`). Redeploy the frontend.
 
-**Verify**: open the site, start a workout, begin a rest — the Vitals
-panel should go from "Connecting…" to "Measuring…" and then show a
-pulse number. On mobile, tap "Check vitals" during rest.
+**Verify**: open the site, start a live-camera workout — the vitals
+section beneath the camera should go from "Connecting…" to
+"Measuring…" and then show a rolling pulse average (face + upper
+chest visible, good light, hold still ~12s). Vitals run only on live
+camera sessions; demo/upload videos intentionally show nothing.
 
 Notes:
 
