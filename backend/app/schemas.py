@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import date
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -49,6 +50,17 @@ class WorkoutCreate(StrictModel):
 
 class WorkoutFinish(StrictModel):
     ended_at: AwareDatetime
+
+
+class ScheduledWorkoutCreate(StrictModel):
+    scheduled_date: date
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    exercises: list[Exercise] = Field(min_length=1, max_length=10)
+
+    @field_validator("exercises")
+    @classmethod
+    def dedupe_exercises(cls, value):
+        return list(dict.fromkeys(value))
 
 
 class Fault(StrictModel):

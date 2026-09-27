@@ -980,8 +980,12 @@ img.exercise-art {
   justify-content: center;
   padding-bottom: 8px;
 }
-.cal-day:hover {
+.cal-day:not(:disabled):hover {
   background: #e9efe0;
+}
+.cal-day:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .cal-day.has-workout {
   background: #e4ecd4;
@@ -1008,6 +1012,145 @@ img.exercise-art {
 }
 .cal-day.is-selected .cal-dot {
   background: var(--lime);
+}
+.cal-sched {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c08a2d;
+}
+.cal-day.is-selected .cal-sched {
+  background: #f0c66a;
+}
+/* Scheduled sessions */
+.sched-section {
+  margin-bottom: 12px;
+}
+.sched-heading {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #96a08c;
+  margin: 0 0 8px;
+}
+.sched-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sched-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8d6;
+  border-radius: 12px;
+  background: #fbfcf8;
+  padding: 10px 12px;
+}
+.sched-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sched-info strong {
+  font-size: 13px;
+  color: #263c31;
+}
+.sched-info small {
+  font-size: 11px;
+  color: #96a08c;
+}
+.sched-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.sched-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  background: #28472e;
+  color: #f2f6ea;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+.sched-delete {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #e2e8d6;
+  background: #fff;
+  color: #9aa48f;
+}
+.sched-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  border: 1px dashed #b9c4a8;
+  border-radius: 10px;
+  background: transparent;
+  color: #4c5f4a;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+.sched-form {
+  margin-top: 12px;
+  border: 1px solid #e2e8d6;
+  border-radius: 12px;
+  background: #fbfcf8;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sched-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sched-field span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #526052;
+}
+.sched-field input {
+  height: 42px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #fff;
+  color: #263c31;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+}
+.sched-field input:focus {
+  border-color: #7c9a6d;
+  outline: 3px solid #dce9d4;
+}
+.sched-form .movement-chips {
+  margin: 0;
+}
+.sched-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .calendar-detail {
   margin-top: 14px;

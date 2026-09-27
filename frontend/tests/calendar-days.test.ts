@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, parseDayKey, workoutsByDay } from '../src/lib/calendarDays';
+import { dayKey, parseDayKey, workoutsByDay, selectableWindow, canGoNextMonth } from '../src/lib/calendarDays';
 import { groupWorkouts } from '../src/lib/workoutGroups';
 import type { WorkoutHistoryEntry } from '../src/types/workout';
 
@@ -42,5 +42,26 @@ describe('calendar day helpers', () => {
     expect(byDay.get('2026-09-27')![0].sessions).toHaveLength(2);
     expect(byDay.get('2026-09-25')).toHaveLength(1);
     expect(byDay.get('2026-09-26')).toBeUndefined();
+  });
+});
+
+describe('selectable week window', () => {
+  it('covers the last 7 days including today', () => {
+    const { minKey, maxKey } = selectableWindow(new Date(2026, 8, 27, 12, 0, 0));
+    expect(minKey).toBe('2026-09-21');
+    expect(maxKey).toBe('2026-09-27');
+  });
+
+  it('spans month boundaries correctly', () => {
+    const { minKey, maxKey } = selectableWindow(new Date(2026, 9, 3, 12, 0, 0));
+    expect(minKey).toBe('2026-09-27');
+    expect(maxKey).toBe('2026-10-03');
+  });
+});
+
+describe('next-month navigation', () => {
+  it('never allows navigating into the future', () => {
+    expect(canGoNextMonth(new Date(2026, 8, 27), { y: 2026, m: 8 })).toBe(false);
+    expect(canGoNextMonth(new Date(2026, 8, 27), { y: 2026, m: 7 })).toBe(true);
   });
 });
