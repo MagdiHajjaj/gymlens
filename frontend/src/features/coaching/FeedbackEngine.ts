@@ -11,6 +11,12 @@ interface CueContext {
 const finiteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
+// Live fault coaching: variants cycle in order, then a drill cue, then the
+// fault retires for the session while visual cues stay on.
+const FAULT_BASE_COOLDOWN_MS = 10000;
+const FAULT_DRILL_AFTER = 3;
+const FAULT_RETIRE_AFTER = 6;
+
 const median = (values: number[]): number => {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -62,7 +68,7 @@ export class FeedbackEngine {
   private current = '';
   private since = 0;
   private last = new Map<string, number>();
-  private faultRepeats = new Map<string, number>();
+  private faultSpoken = new Map<string, number>();
   private movementPhase = '';
   private movementPhaseSince = 0;
   private lastAny = -Infinity;
@@ -75,7 +81,7 @@ export class FeedbackEngine {
     this.current = '';
     this.since = 0;
     this.last.clear();
-    this.faultRepeats.clear();
+    this.faultSpoken.clear();
     this.movementPhase = '';
     this.movementPhaseSince = 0;
     this.lastAny = -Infinity;
@@ -122,34 +128,40 @@ export class FeedbackEngine {
       );
     }
     const fault = result.faults[0];
-    if (fault) {
+    if (fault && context) {
+      // The voice path only speaks phrasebook copy: raw analyzer messages
+      // never reach the speaker, and unknown codes stay visual-only.
+      const entry = FAULT_PHRASES[context.exercise]?.find((e) => e.code === fault.code);
+      if (!entry) return null;
       if (this.current !== fault.code) {
         this.current = fault.code;
         this.since = time;
       }
+      const spoken = this.faultSpoken.get(fault.code) ?? 0;
+      // Retire the cue for the rest of the session: the user has heard it
+      // enough, and visual cues remain on.
+      if (spoken >= FAULT_RETIRE_AFTER) return null;
+      // Backoff: 10s, then 20s, then 40s between reminders of the same fault.
+      const cooldownMs = FAULT_BASE_COOLDOWN_MS * 2 ** Math.min(spoken, 2);
       if (
         (!result.repCompleted && time - this.since < 900) ||
-        time - (this.last.get(fault.code) ?? -Infinity) < 10000 ||
+        time - (this.last.get(fault.code) ?? -Infinity) < cooldownMs ||
         time - this.lastAny < 5000
       )
         return null;
       this.last.set(fault.code, time);
       this.lastAny = time;
-      const repeats = this.faultRepeats.get(fault.code) ?? 0;
-      this.faultRepeats.set(fault.code, repeats + 1);
-      // Alternate phrasings keep repeated corrections from sounding looped.
-      // Variants are pre-approved by the speech grammar; unknown codes fall
-      // back to the analyzer's message, which is approved too.
-      const variant = context?.exercise
-        ? FAULT_PHRASES[context.exercise]?.find((entry) => entry.code === fault.code)?.repeatMessage
-        : undefined;
-      const message =
-        repeats === 0 || repeats % 2 === 0 ? fault.message : (variant ?? fault.message);
+      this.faultSpoken.set(fault.code, spoken + 1);
+      // Cycle the variants in order (no immediate repeats); after repeated
+      // occurrences switch to the drill cue — a different angle, not another
+      // repetition.
+      const text =
+        spoken >= FAULT_DRILL_AFTER ? entry.drill : entry.variants[spoken % entry.variants.length];
       return {
-        text: message,
+        text,
         kind: 'fault',
         priority: PRIORITY.fault,
-        metadata: { code: fault.code, severity: fault.severity },
+        metadata: { code: fault.code, severity: fault.severity, occurrence: spoken + 1 },
       };
     }
     this.current = '';
