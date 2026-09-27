@@ -1,42 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Download, Check, CloudUpload, Info, Repeat2, Sparkles } from 'lucide-react';
-import { LineChart, Line, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Download, Check, CloudUpload, Info } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { ExerciseReport } from '../components/ExerciseReport';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
-import {
-  buildSessionReport,
-  cueLabel,
-  measuredAngle,
-  measuredTime,
-  primaryJoint,
-} from '../features/insights/sessionReport';
-import { generateStatisticsInsight } from '../features/insights/insightEngine';
-import { useWorkout } from '../features/workout/workoutStore';
 import { usePlan } from '../features/workout/planStore';
-import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
-import { duration, exportSession, localSessions, saveLocal, timeLabel } from '../lib/sessionBuffer';
-import type { WorkoutSession } from '../types/workout';
+import { exportSession, localSessions, saveLocal } from '../lib/sessionBuffer';
+import type { Insight, WorkoutSession } from '../types/workout';
 
 export function SessionPage() {
   const { id } = useParams();
   const { authenticated, owner } = useIdentity();
-  const navigate = useNavigate();
-  const select = useWorkout((state) => state.select);
   const hasPlan = usePlan((state) => state.plan.length > 0);
-  const { goal } = useFitnessGoal();
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<'save' | 'insights' | null>(null);
+  const [busy, setBusy] = useState<'save' | null>(null);
   const [error, setError] = useState('');
   const [saveError, setSaveError] = useState('');
-  const [insightError, setInsightError] = useState('');
   const [backupWarning, setBackupWarning] = useState('');
   const [version, setVersion] = useState(0);
   const currentRequest = useRef('');
-  const attemptedInsight = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +30,6 @@ export function SessionPage() {
     setSession(local || null);
     setError('');
     setSaveError('');
-    setInsightError('');
     setBackupWarning('');
     setBusy(null);
     if (!authenticated || local?.local) {
@@ -97,16 +81,10 @@ export function SessionPage() {
     }
   }
 
-  async function insights() {
-    if (!session || busy) return;
-    const requestKey = currentRequest.current;
-    setBusy('insights');
-    setInsightError('');
-    try {
-      const insight = await api.insights(session.id);
-      if (currentRequest.current !== requestKey) return;
-      const updated = { ...session, insight };
-      setSession(updated);
+  function handleInsight(sessionId: string, insight: Insight) {
+    setSession((prev) => {
+      if (!prev || prev.id !== sessionId) return prev;
+      const updated = { ...prev, insight };
       try {
         saveLocal(updated, owner);
       } catch {
@@ -114,33 +92,9 @@ export function SessionPage() {
           'The account report is available, but this browser could not store the updated copy.',
         );
       }
-    } catch {
-      if (currentRequest.current === requestKey)
-        setInsightError(
-          'Additional commentary is unavailable. The recorded findings above remain available.',
-        );
-    } finally {
-      if (currentRequest.current === requestKey) setBusy(null);
-    }
+      return updated;
+    });
   }
-
-  // Restores the pre-grounded-report behavior: eligible reports fetch the Gemini
-  // insight on load instead of waiting for a manual request. Guarded to run
-  // once per session so it never spams the rate-limited endpoint.
-  useEffect(() => {
-    if (
-      loading ||
-      !authenticated ||
-      !session ||
-      session.local ||
-      session.insight ||
-      session.status !== 'completed' ||
-      attemptedInsight.current === session.id
-    )
-      return;
-    attemptedInsight.current = session.id;
-    void insights();
-  }, [loading, authenticated, session?.id, session?.local, session?.insight, session?.status]);
 
   if (loading && !session)
     return (
@@ -160,34 +114,8 @@ export function SessionPage() {
       </div>
     );
 
-  const report = buildSessionReport(session);
-  const observedInsight = generateStatisticsInsight(session, goal?.id);
-  const joint = primaryJoint(session.exercise);
-  const chart = report.reps.map((rep) => ({
-    rep: rep.rep_number,
-    angle: measuredAngle(rep) ?? null,
-    left: rep.metrics_json.arm_side === 0 ? (measuredAngle(rep) ?? null) : null,
-    right: rep.metrics_json.arm_side === 1 ? (measuredAngle(rep) ?? null) : null,
-    both: rep.metrics_json.arm_side === 2 ? (measuredAngle(rep) ?? null) : null,
-    unknown: ![0, 1, 2].includes(rep.metrics_json.arm_side) ? (measuredAngle(rep) ?? null) : null,
-  }));
-  const repeat = () => {
-    select(session.exercise);
-    navigate('/workout');
-  };
   const isDemo = session.source === 'demo';
   const local = session.local !== false;
-  const canRequestInsight =
-    authenticated && !local && report.measured > 0 && session.status === 'completed';
-  const insightUnavailableReason = !authenticated
-    ? 'Sign in and save this session to your account to request AI commentary.'
-    : local
-      ? 'Save this session to your account to request AI commentary.'
-      : session.status !== 'completed'
-        ? 'Finish the session before requesting AI commentary.'
-        : report.measured === 0
-          ? 'AI commentary needs recorded rep measurements.'
-          : '';
   const sourceLabel = isDemo
     ? 'Demo · sample movement'
     : session.source === 'upload'
@@ -265,387 +193,9 @@ export function SessionPage() {
         </div>
       )}
 
-      <dl className="session-key-stats">
-        <div>
-          <dt>Completed reps</dt>
-          <dd>{report.total}</dd>
-          <p>
-            {report.arms
-              ? 'Simultaneous curls count as one rep; single-arm curls count individually.'
-              : 'Completed movements counted by the tracker.'}
-          </p>
-        </div>
-        <div>
-          <dt>{session.source === 'upload' ? 'Analysis time' : 'Session time'}</dt>
-          <dd>{session.ended_at ? timeLabel(duration(session)) : 'Incomplete'}</dd>
-          <p>
-            {session.source === 'upload'
-              ? 'Elapsed analysis time, not the video length.'
-              : 'Includes calibration, pauses, and rest.'}
-          </p>
-        </div>
-        <div>
-          <dt>Reps with recorded cues</dt>
-          <dd>
-            {report.reps.length ? (
-              <>
-                {report.cuedReps}
-                <small> / {report.reps.length}</small>
-              </>
-            ) : (
-              '—'
-            )}
-          </dd>
-          <p>Based on available rep details. This is not a form score.</p>
-        </div>
-      </dl>
-      <p className="report-coverage">
-        {report.reps.length} rep details · {report.measured} valid angle measurements · {report.timed} rep
-        timings
-        {!report.completeDetails && (
-          <strong>
-            {' '}
-            · Individual details do not match the session total; findings cover only the available reps.
-          </strong>
-        )}
-      </p>
-
-      {report.arms && (
-        <section className="panel report-arm-counts" aria-label="Recorded reps by arm">
-          <div>
-            <span>Left arm</span>
-            <strong>{report.arms.left} reps</strong>
-          </div>
-          <div>
-            <span>Right arm</span>
-            <strong>{report.arms.right} reps</strong>
-          </div>
-          {report.arms.both > 0 && (
-            <div>
-              <span>Both arms together</span>
-              <strong>{report.arms.both} reps</strong>
-            </div>
-          )}
-          {report.arms.unknown > 0 && (
-            <div>
-              <span>Arm not recorded</span>
-              <strong>{report.arms.unknown} reps</strong>
-            </div>
-          )}
-          <p>
-            These are recorded counts, not a measure of strength or muscle imbalance. A difference can also
-            reflect visibility or alternating reps.
-          </p>
-        </section>
-      )}
-
-      <div className="report-findings-grid">
-        <section className="report-coach" aria-labelledby="report-coach-title">
-          <span className="eyebrow">
-            <Sparkles size={15} />
-            {session.insight ? 'GEMINI FEEDBACK' : isDemo ? 'SAMPLE FEEDBACK' : 'SESSION FEEDBACK'}
-          </span>
-          {goal && <span className="tag green">Training for: {goal.name}</span>}
-          <h2 id="report-coach-title">A moment to reflect.</h2>
-          <p>{session.insight?.recap || observedInsight.recap}</p>
-          <h3 className="reflect-pos">What went well</h3>
-          <ul>
-            {(session.insight?.strengths || observedInsight.strengths).map((text, i) => (
-              <li key={i}>
-                {text}
-                {!session.insight && observedInsight.evidence.strengths[i]?.why && (
-                  <span className="coach-why"> Why: {observedInsight.evidence.strengths[i]?.why}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <h3 className="reflect-neg">Room to grow</h3>
-          <ul>
-            {(session.insight?.improvements || observedInsight.improvements).map((text, i) => (
-              <li key={i}>
-                {text}
-                {!session.insight && observedInsight.evidence.improvements[i]?.why && (
-                  <span className="coach-why"> Why: {observedInsight.evidence.improvements[i]?.why}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <div className="next-focus">
-            <span className="eyebrow">NEXT SESSION&rsquo;S FOCUS</span>
-            <p>{session.insight?.next_focus || observedInsight.next_focus}</p>
-            {!session.insight && observedInsight.evidence.next_focus.why && (
-              <p className="coach-why">Why: {observedInsight.evidence.next_focus.why}</p>
-            )}
-          </div>
-          {session.insight ? (
-            <p className="coach-source-note">
-              Generated by Gemini from your recorded measurements. Check it against the recorded cues
-              and measurements above; it does not add new observations.
-            </p>
-          ) : (
-            <>
-              <p className="coach-source-note">
-                Based only on this session&rsquo;s recorded measurements. This is not a form score or a
-                medical assessment.
-              </p>
-              {!isDemo && canRequestInsight && (
-                <Button variant="secondary" disabled={Boolean(busy)} onClick={() => void insights()}>
-                  <Sparkles size={15} />
-                  {busy === 'insights'
-                    ? 'Preparing commentary…'
-                    : insightError
-                      ? 'Retry AI commentary'
-                      : 'Request AI commentary'}
-                </Button>
-              )}
-              {!isDemo && !canRequestInsight && insightUnavailableReason && (
-                <p className="coach-why">{insightUnavailableReason}</p>
-              )}
-            </>
-          )}
-          {insightError && !session.insight && (
-            <p className="notice error" role="alert">
-              {insightError}
-            </p>
-          )}
-        </section>
-        <section className="panel report-cues" aria-labelledby="report-cues-title">
-          <h2 id="report-cues-title">What the tracker observed</h2>
-          {report.cues.length ? (
-            <ul>
-              {report.cues.map((cue) => (
-                <li key={cue.code}>
-                  <div>
-                    <strong>{cue.label}</strong>
-                    <span>
-                      {cue.count} / {report.reps.length} detailed reps
-                    </span>
-                  </div>
-                  <p>Rep {cue.reps.join(', ')}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="report-no-cues">
-              <h3>{report.reps.length ? 'No supported cues recorded' : 'No rep-level findings yet'}</h3>
-              <p>
-                {report.reps.length
-                  ? `The tracker recorded no supported technique cues on ${report.reps.length} reps. This does not mean every aspect of your form was assessed.`
-                  : 'Without completed rep details, the report cannot assess your movement.'}
-              </p>
-            </div>
-          )}
-          <p className="report-note">
-            Cues are camera estimates for the checks this exercise supports. They do not measure every aspect
-            of technique.
-          </p>
-        </section>
-      </div>
-
-      <section className="panel report-sets" aria-labelledby="report-sets-title">
-        <h2 id="report-sets-title">Your recorded sets</h2>
-        {report.sets.length ? (
-          <>
-            <div className="recorded-set-list">
-              {report.sets.map((set) => (
-                <div key={set.label}>
-                  <strong>{set.label}</strong>
-                  <span>{set.reps.length} reps</span>
-                  <small>
-                    Reps {set.reps[0].rep_number}–{set.reps[set.reps.length - 1].rep_number}
-                  </small>
-                  {set.restSeconds !== undefined && <small>{set.restSeconds}s rest planned</small>}
-                </div>
-              ))}
-            </div>
-            {!report.hasCompleteSets && (
-              <p className="report-note">
-                Only some reps have reliable set boundaries. Ungrouped reps are included in the session total.
-              </p>
-            )}
-          </>
-        ) : (
-          <p>
-            Set boundaries are unavailable for this workout. During a workout, tap &ldquo;Finish set ·
-            rest&rdquo; between sets and the report will split your reps into sets here.
-          </p>
-        )}
-      </section>
-
-      <details className="panel report-details">
-        <summary>
-          <strong>Explore measurements and individual reps</strong>
-          <span>Joint angles, timing, and the evidence behind each cue</span>
-        </summary>
-        <section className="report-measurements">
-          <h2>Recorded {joint} angles</h2>
-          <p>
-            Lowest captured joint angle per completed rep. This is not total range of motion, and a lower
-            number is not automatically better.
-          </p>
-          {report.measured ? (
-            <div className="report-angle-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chart}>
-                  <CartesianGrid strokeDasharray="3 4" vertical={false} />
-                  <XAxis dataKey="rep" tickFormatter={(value) => `Rep ${value}`} />
-                  <YAxis domain={[0, 180]} tickFormatter={(value) => `${value}°`} />
-                  <Tooltip
-                    labelFormatter={(value) => `Rep ${value}`}
-                    formatter={(value) => [`${value}°`, joint]}
-                  />
-                  {report.arms ? (
-                    <>
-                      <Legend />
-                      <Line
-                        dataKey="left"
-                        name="Left arm"
-                        stroke="#427756"
-                        connectNulls={false}
-                        dot
-                        isAnimationActive={false}
-                      />
-                      <Line
-                        dataKey="right"
-                        name="Right arm"
-                        stroke="#7461a8"
-                        connectNulls={false}
-                        dot
-                        isAnimationActive={false}
-                      />
-                      {report.arms.both > 0 && (
-                        <Line
-                          dataKey="both"
-                          name="Both arms (average)"
-                          stroke="#b77935"
-                          connectNulls={false}
-                          dot
-                          isAnimationActive={false}
-                        />
-                      )}
-                      {report.arms.unknown > 0 && (
-                        <Line
-                          dataKey="unknown"
-                          name="Arm not recorded"
-                          stroke="#7b7468"
-                          connectNulls={false}
-                          dot
-                          isAnimationActive={false}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <Line
-                      dataKey="angle"
-                      name={`${joint} angle`}
-                      stroke="#427756"
-                      dot
-                      isAnimationActive={false}
-                    />
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="report-note">No valid rep-level angles were recorded.</p>
-          )}
-          {report.groups.length > 0 && (
-            <div className="report-measurement-groups">
-              {report.groups.map((group) => (
-                <article key={group.label}>
-                  <h3>{group.label}</h3>
-                  <p>
-                    {group.angles.length} / {group.reps.length} reps include angles.
-                    {group.medianSeconds !== undefined &&
-                      ` Typical tracked rep time: ${group.medianSeconds}s (median of available timings).`}
-                  </p>
-                  {group.change ? (
-                    <p>
-                      First three reps ({group.change.firstReps.join(', ')}):{' '}
-                      <strong>{group.change.first}°</strong> average minimum angle. Last three (
-                      {group.change.lastReps.join(', ')}): <strong>{group.change.last}°</strong>. Change:{' '}
-                      <strong>
-                        {group.change.delta > 0 ? '+' : ''}
-                        {group.change.delta}°
-                      </strong>
-                      .
-                    </p>
-                  ) : (
-                    <p>
-                      Need at least six reps with valid angles in this group to compare the first three with
-                      the last three.
-                    </p>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-          <p className="report-note">
-            Angle comparisons stay within recorded sets and, for curls, within the same arm or bilateral
-            group. Changes can reflect movement or camera position; they do not establish fatigue or
-            improvement. Rep timing covers the tracked movement cycle, not time under load.
-          </p>
-        </section>
-        <section className="report-rep-section">
-          <h2>Individual reps</h2>
-          {report.reps.length ? (
-            <div className="table-scroll">
-              <table>
-                <caption className="sr-only">Recorded measurements and cues for each rep</caption>
-                <thead>
-                  <tr>
-                    <th>Rep</th>
-                    {report.arms && <th>Arm</th>}
-                    <th>Lowest {joint} angle</th>
-                    <th>Tracked time</th>
-                    <th>Recorded cues</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.reps.map((rep) => (
-                    <tr key={rep.rep_number}>
-                      <td>{rep.rep_number}</td>
-                      {report.arms && (
-                        <td>
-                          {rep.metrics_json.arm_side === 0
-                            ? 'Left'
-                            : rep.metrics_json.arm_side === 1
-                              ? 'Right'
-                              : rep.metrics_json.arm_side === 2
-                                ? 'Both (average)'
-                                : 'Unknown'}
-                        </td>
-                      )}
-                      <td>{measuredAngle(rep) === undefined ? 'Unavailable' : `${measuredAngle(rep)}°`}</td>
-                      <td>
-                        {measuredTime(rep) === undefined
-                          ? 'Unavailable'
-                          : `${(measuredTime(rep)! / 1000).toFixed(1)}s`}
-                      </td>
-                      <td>
-                        {rep.faults_json.length
-                          ? [...new Set(rep.faults_json.map((fault) => fault.code))].map((code) => (
-                              <span className="fault-tag" key={code}>
-                                {cueLabel(code)}
-                              </span>
-                            ))
-                          : 'None recorded'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p>No individual rep details are available.</p>
-          )}
-        </section>
-      </details>
+      <ExerciseReport session={session} autoFetchInsight onInsight={handleInsight} />
 
       <div className="report-next-actions">
-        <Button onClick={repeat}>
-          <Repeat2 size={18} /> Repeat this exercise
-        </Button>
         {hasPlan && (
           <Button asChild variant="secondary">
             <Link to="/workout?plan=review">
@@ -659,10 +209,6 @@ export function SessionPage() {
           </Link>
         </Button>
       </div>
-      <p className="report-note">
-        {isDemo ? 'Sample data only.' : 'Camera-based estimates, not a medical assessment.'} The report cannot
-        infer calories, strength gains, or injury risk from these measurements.
-      </p>
     </div>
   );
 }

@@ -120,18 +120,20 @@ export function HistoryPage() {
                                   : ''}
                             </span>
                           </div>
-                          <Button asChild size="small" variant="secondary">
-                            <Link
-                              to={`/session/${row.id}`}
-                              aria-label={`View ${exercises[row.exercise].name} report`}
-                            >
-                              View report <ArrowRight size={16} />
-                            </Link>
-                          </Button>
                         </li>
                       );
                     })}
                   </ul>
+                  <div className="history-workout-actions">
+                    <Button asChild size="small" variant="secondary">
+                      <Link
+                        to={`/report/${workout.id}`}
+                        aria-label={`View ${workoutName} combined report`}
+                      >
+                        View report <ArrowRight size={16} />
+                      </Link>
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <dl className="history-session-metrics">
