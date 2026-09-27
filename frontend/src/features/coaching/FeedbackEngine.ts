@@ -33,35 +33,14 @@ const median = (values: number[]): number => {
  * is never wrong, only occasionally not instant.
  */
 export function predictNextRepCues(
-  result: ExerciseResult,
+  _result: ExerciseResult,
   context: { exercise: ExerciseId; nextSetReps: number },
 ): string[] {
   const texts = new Set<string>();
   const countCue = repCountCue(context.nextSetReps, context.exercise);
   if (countCue?.text) texts.add(countCue.text);
-  const completion = repCompleteCue(result, context.nextSetReps);
-  if (completion) texts.add(completion);
+  if (context.nextSetReps === 1) texts.add('Rep 1 complete.');
   return [...texts];
-}
-
-/**
- * Rep-completion cue grounded in the rep's measured data: the rep number plus the
- * measured minimum joint angle when the analyzer recorded one. Never invents a
- * measurement — without rep data it stays a plain completion callout.
- */
-export function repCompleteCue(result: ExerciseResult, repNumber: number): string {
-  const label = repNumber > 0 ? `Rep ${repNumber} complete.` : 'Rep complete.';
-  const minAngle = finiteNumber(result.repMetrics?.min_angle);
-  return minAngle === undefined ? label : `${label} Bottom angle ${Math.round(minAngle)} degrees.`;
-}
-
-/**
- * Idle cue grounded in measured session state: the rep count recorded so far.
- * Replaces generic motivational filler with what the session actually measured.
- */
-export function readyCue(completedReps: number): string {
-  if (completedReps <= 0) return 'Ready.';
-  return `Ready. ${completedReps} ${completedReps === 1 ? 'rep' : 'reps'} so far.`;
 }
 
 export class FeedbackEngine {
@@ -71,12 +50,14 @@ export class FeedbackEngine {
   private faultSpoken = new Map<string, number>();
   private movementPhase = '';
   private movementPhaseSince = 0;
+  private movementPhaseSpoken = false;
+  private setupSpokenFor = '';
+  private setupSpokenAt = -Infinity;
   private lastAny = -Infinity;
   private lastRepTotal = 0;
   private recordedTotal = 0;
   private repAngles: number[] = [];
   private repDurations: number[] = [];
-  private idleCountCue = true;
   reset() {
     this.current = '';
     this.since = 0;
@@ -84,12 +65,14 @@ export class FeedbackEngine {
     this.faultSpoken.clear();
     this.movementPhase = '';
     this.movementPhaseSince = 0;
+    this.movementPhaseSpoken = false;
+    this.setupSpokenFor = '';
+    this.setupSpokenAt = -Infinity;
     this.lastAny = -Infinity;
     this.lastRepTotal = 0;
     this.recordedTotal = 0;
     this.repAngles = [];
     this.repDurations = [];
-    this.idleCountCue = true;
   }
   next(result: ExerciseResult, time: number, context?: CueContext): string | null {
     return this.nextCue(result, time, context)?.text ?? null;
@@ -114,12 +97,29 @@ export class FeedbackEngine {
     if (!result.trackingValid || !result.calibrated) {
       this.current = '';
       this.movementPhase = '';
-      return announce(
-        result.guidance,
-        { text: result.guidance, kind: 'setup', priority: PRIORITY.setup },
-        15000,
-      );
+      this.movementPhaseSpoken = false;
+      // Say each setup instruction once per episode: if the user is already
+      // holding the position and the detector disagrees, repeating the same
+      // sentence every 15s is nagging, not coaching. A changed instruction
+      // means the situation changed, so it speaks again.
+      if (result.guidance && result.guidance !== this.setupSpokenFor) {
+        const cue = announce(
+          result.guidance,
+          { text: result.guidance, kind: 'setup', priority: PRIORITY.setup },
+          0,
+          false,
+        );
+        if (cue) {
+          this.setupSpokenFor = result.guidance;
+          this.setupSpokenAt = time;
+          return cue;
+        }
+      }
+      return null;
     }
+    // Forget a spoken setup instruction after 10s of healthy tracking, so a
+    // genuinely new episode speaks again but flicker doesn't re-trigger it.
+    if (time - this.setupSpokenAt > 10000) this.setupSpokenFor = '';
     if (!result.repCompleted && result.guidance.startsWith('Rep not counted:')) {
       return announce(
         result.guidance,
@@ -165,9 +165,15 @@ export class FeedbackEngine {
       };
     }
     this.current = '';
+    const repNumber = context && context.totalReps > 0 ? (context.setReps ?? context.totalReps) : completedCount;
     if (repCue) {
       this.lastRepTotal = context?.totalReps ?? this.lastRepTotal;
-      if (context) this.recordRep(result, context.totalReps);
+      if (context) {
+        // A measured insight beats a bare milestone number.
+        const insight = this.insightFromHistory(result, repNumber, time);
+        this.recordRep(result, context.totalReps);
+        if (insight) return insight;
+      }
       return repCue;
     }
     if (!result.repCompleted && context && result.phase !== 'ready') {
@@ -175,49 +181,61 @@ export class FeedbackEngine {
       if (this.movementPhase !== movementPhase) {
         this.movementPhase = movementPhase;
         this.movementPhaseSince = time;
+        this.movementPhaseSpoken = false;
         return null;
       }
-      if (time - this.movementPhaseSince >= 350) {
+      // Speak the phase instruction only when the user is stuck: the phase
+      // has lasted much longer than their usual rep. Normal phases stay
+      // silent instead of narrating every rep on a timer.
+      const typical = this.repDurations.length ? median(this.repDurations) : 0;
+      const stuckAfterMs = Math.max(2000, typical * 0.75);
+      if (!this.movementPhaseSpoken && time - this.movementPhaseSince >= stuckAfterMs) {
+        this.movementPhaseSpoken = true;
         const cue = announce(
           `movement:${movementPhase}`,
           { text: result.guidance, kind: 'setup', priority: PRIORITY.setup },
-          7000,
+          0,
+          false,
         );
         if (cue) return cue;
       }
-    } else this.movementPhase = '';
-    const repNumber = context && context.totalReps > 0 ? (context.setReps ?? context.totalReps) : completedCount;
+      // Mid-rep: either not stuck yet or already coached. Stay silent — never
+      // fall through to idle coaching while a rep is in progress.
+      return null;
+    } else {
+      this.movementPhase = '';
+      this.movementPhaseSpoken = false;
+    }
     if (result.repCompleted && context) {
       this.lastRepTotal = context.totalReps;
       if (context.totalReps > this.recordedTotal) {
         const insight = this.insightFromHistory(result, repNumber, time);
         this.recordRep(result, context.totalReps);
         if (insight) return insight;
+        // First rep of the set: confirm the tracker caught it, then stay
+        // quiet for clean reps. No per-rep completion narration after this.
+        if (context.totalReps === 1) {
+          return { text: 'Rep 1 complete.', kind: 'rep', priority: PRIORITY.rep };
+        }
       }
     }
-    return result.repCompleted
-      ? { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep }
-      : this.idleCue(announce, context, completedCount);
+    return result.repCompleted ? null : this.idleCue(announce, context);
   }
 
   /**
-   * Idle coaching alternates between the measured rep count and a pose
-   * reminder for the current exercise, so a long pause between reps coaches
-   * setup ("make sure your pose is right") instead of just restating readiness.
-   * The 30s cooldown keeps it from nagging; the alternation only advances when
-   * a cue actually speaks.
+   * Idle coaching is a pose reminder for the current exercise, spoken at most
+   * every 45s during a genuine pause — it never restates the rep count.
    */
   private idleCue(
     announce: (key: string, cue: VoiceCue, cooldown: number, globalCooldown?: boolean) => VoiceCue | null,
     context: CueContext | undefined,
-    completedCount: number,
   ): VoiceCue | null {
-    const total = context?.totalReps ?? completedCount;
-    const text =
-      this.idleCountCue || !context ? readyCue(total) : movementCues[context.exercise].ready;
-    const cue = announce('ready', { text, kind: 'setup', priority: PRIORITY.setup }, 30000);
-    if (cue) this.idleCountCue = !this.idleCountCue;
-    return cue;
+    if (!context) return null;
+    return announce(
+      'ready',
+      { text: movementCues[context.exercise].ready, kind: 'setup', priority: PRIORITY.setup },
+      45000,
+    );
   }
 
   /**

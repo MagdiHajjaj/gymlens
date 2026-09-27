@@ -115,11 +115,6 @@ PHRASES = {
     "Keep your shoulders, hips, and ankles in line.",
     "Try a little more depth within your comfortable range.",
     "Try a fuller range of motion at a comfortable pace.",
-    "2. Settle into your pace.",
-    "3. Stay controlled.",
-    "4. Keep the rhythm.",
-    "5. Control the return.",
-    "10. Keep the rhythm.",
     "Ready.",
     "Step back so your full movement is visible.",
     "Keep your shoulder, elbow, and wrist in frame. Move the camera back if your hand is cropped.",
@@ -221,6 +216,14 @@ SESSION_FOCUS_PHRASES = {
 }
 
 NUMERIC_PHRASE = re.compile(r"(?:[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000)\.")
+# Milestone rep counts ("5. Stay controlled.", "15. Keep the rhythm."): the
+# coach confirms the count every 5 reps instead of narrating every rep. The
+# number is bounded like NUMERIC_PHRASE and the tagline rotates through a
+# fixed set, so the grammar stays closed.
+MILESTONE_PHRASE = re.compile(
+    r"(?:[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000)\. "
+    r"(?:Keep the rhythm|Stay controlled|Steady pace)\."
+)
 REST_PHRASE = re.compile(r"Rest (?:30|60|90) seconds\.")
 SET_GO_PHRASE = re.compile(r"Set (?P<set>[1-9]|[1-9][0-9]), go\.")
 REP_COMPLETE_PHRASE = re.compile(
@@ -316,6 +319,7 @@ def approved_speech(value: str) -> bool:
                for prefix in ("Reset your position. ", "Slow the next rep down. ", "Rep not counted: "))
         or bool(REJECTED_TEMPO_PHRASE.fullmatch(value))
         or bool(NUMERIC_PHRASE.fullmatch(value))
+        or bool(MILESTONE_PHRASE.fullmatch(value))
         or bool(REST_PHRASE.fullmatch(value))
         or bool(SET_GO_PHRASE.fullmatch(value))
         or bool(REP_COMPLETE_PHRASE.fullmatch(value))

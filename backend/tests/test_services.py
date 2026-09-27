@@ -60,6 +60,9 @@ def test_new_coaching_variants_remain_bounded(client, monkeypatch):
         "Rep 5001 — best range yet. Hold that standard.",
         "Rep 6 — best range yet. Hold that standard. Extra text.",
         "Rep not counted: slow down — take at least 999 seconds per rep.",
+        "5001. Stay controlled.",
+        "5. Do whatever you want.",
+        "0. Keep the rhythm.",
     ]:
         with pytest.raises(ValidationError):
             SpeechRequest(text=phrase)
@@ -70,7 +73,13 @@ def test_voice_phrase_grammar_allows_bounded_coach_phrases():
         "Voice coach is ready. Let's get moving.",
         "1.",
         "5000.",
-        "3. Stay controlled.",
+        "5. Stay controlled.",
+        "15. Keep the rhythm.",
+        "25. Steady pace.",
+        "5000. Stay controlled.",
+        "Keep the rhythm.",
+        "Stay controlled.",
+        "Rep 1 complete.",
         "Rest 30 seconds.",
         "Rest 60 seconds.",
         "Rest 90 seconds.",
@@ -209,7 +218,7 @@ def test_voice_rejects_invalid_audio_without_caching(client, monkeypatch):
         )
 
     monkeypatch.setattr(services.httpx, "post", invalid)
-    text = "3. Stay controlled."
+    text = "5. Stay controlled."
     assert client.post("/api/coaching/speech", json={"text": text}).status_code == 503
     assert not services.speech_cached(text)
 
@@ -233,7 +242,7 @@ def test_concurrent_voice_misses_share_one_provider_call(client, monkeypatch):
         )
 
     monkeypatch.setattr(services.httpx, "post", post)
-    text = "4. Keep the rhythm."
+    text = "15. Keep the rhythm."
     with ThreadPoolExecutor(max_workers=2) as pool:
         first = pool.submit(services.speech, text)
         assert started.wait(1)
