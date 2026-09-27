@@ -51,8 +51,39 @@ and breathing (~30s window) numbers. Without a visible face you still get
 
 ## Deploy (Render)
 
-New **Web Service**: Node, build `npm install`, start `npm start`,
-working directory `vitals-service/`, env `PRESAGE_API_KEY` set in the
-Render dashboard (never committed). Health: the WS port itself; the
-frontend treats vitals as optional and works fine when the service is
-down or busy.
+The frontend needs this service reachable at a public WebSocket URL.
+Whoever owns the Render account (the main API already lives there):
+
+1. Render dashboard → **New +** → **Web Service** → connect the
+   `MagdiHajjaj/gymlens` repo.
+2. Settings:
+   - **Branch**: `main` (merge the vitals stack first)
+   - **Root Directory**: `vitals-service`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - Instance: Free is fine for testing.
+3. **Environment** → add variable:
+   - `PRESAGE_API_KEY` = the key from the Presage dashboard
+     (https://presagetech.com → sign in → Dashboard → API keys).
+     Render supplies `PORT` automatically; the service reads it.
+     Never commit the key — it stays in Render's env only.
+4. Deploy, then copy the service URL, e.g.
+   `https://gymlens-vitals.onrender.com`.
+5. In the frontend host (Vercel), set:
+   - `VITE_VITALS_WS_URL` = `wss://gymlens-vitals.onrender.com`
+     (note `wss`, not `https`). Redeploy the frontend.
+
+**Verify**: open the site, start a workout, begin a rest — the Vitals
+panel should go from "Connecting…" to "Measuring…" and then show a
+pulse number. On mobile, tap "Check vitals" during rest.
+
+Notes:
+
+- Free-tier Render sleeps when idle: the first measurement after a
+  while can take ~30s while the service wakes. The panel shows
+  "Connecting…" meanwhile and the workout is unaffected.
+- The SDK pins its TLS certificates, so the service needs direct
+  internet (fine on Render).
+- If the service is down or busy, the frontend treats vitals as
+  optional: the panel shows "service unavailable" and everything
+  else keeps working.
