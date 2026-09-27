@@ -12,6 +12,7 @@ import {
   Download,
   SkipForward,
   Timer,
+  HeartPulse,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { WorkoutSetup } from '../features/workout/WorkoutSetup';
@@ -31,10 +32,9 @@ import {
   trackingStatusText,
 } from '../features/camera/measurementDisplay';
 import { api } from '../lib/api';
-import { VitalsPanel } from '../features/vitals/VitalsPanel';
-import { MobileVitalsFlow } from '../features/vitals/MobileVitalsFlow';
+import { VitalsPill } from '../features/vitals/VitalsPill';
+import { GUARDIAN_PHRASES, useVitalsGuardian } from '../features/vitals/useVitalsGuardian';
 import { useVitalsSession } from '../features/vitals/useVitalsSession';
-import { useIsMobile } from '../features/vitals/useIsMobile';
 import type { WorkoutSession } from '../types/workout';
 
 const COUNTDOWN_CALLOUTS = new Set([10, 5, 4, 3, 2, 1]);
@@ -92,14 +92,36 @@ export function WorkoutPage() {
   }, [blocker.state]);
   const announcedCountdown = useRef(new Set<number>());
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
-  // Vitals: measure during rest via the shared camera video element.
-  // Desktop auto-measures; mobile uses the tap-to-check pulse-first flow.
-  const isMobile = useIsMobile();
+  // Vitals guardian: continuous background pulse monitoring for the whole
+  // workout (sets and rest, desktop and mobile) via the shared camera
+  // video element. Only confident readings count; the session metrics
+  // keep the full vitals history (see PR4).
   const vitalsVideoRef = useRef<HTMLVideoElement | null>(null);
+  const workoutLive = session?.status === 'active' && !paused;
   const vitals = useVitalsSession({
     videoRef: vitalsVideoRef,
-    active: Boolean(rest) && !isMobile,
+    active: Boolean(workoutLive),
     onReading: recordVitals,
+  });
+  const guardian = useVitalsGuardian({
+    active: Boolean(workoutLive),
+    reading: vitals.reading,
+    onElevated: () => {
+      // Advisory nudge, not a medical directive. Banner always shows;
+      // voice only when the coach is enabled.
+      if (voice) {
+        void voiceCoach.speak(GUARDIAN_PHRASES.elevated, identity.authenticated, {
+          priority: PRIORITY.fault,
+        });
+      }
+    },
+    onRecovered: () => {
+      if (voice) {
+        void voiceCoach.speak(GUARDIAN_PHRASES.recovered, identity.authenticated, {
+          priority: PRIORITY.transition,
+        });
+      }
+    },
   });
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
   const trackedReps = session?.total_reps ?? 0;
@@ -444,6 +466,7 @@ export function WorkoutPage() {
           <ScanLine size={18} />
         )}
         <strong>{trackingLabel}</strong>
+        <VitalsPill guardian={guardian.state} avgPulse={guardian.avgPulse} />
         <span>
           {rest
             ? `Next set in ${restRemaining}s`
@@ -500,6 +523,7 @@ export function WorkoutPage() {
                   {COUNTDOWN_CALLOUTS.has(restRemaining) ? `${restRemaining} seconds remaining` : ''}
                 </span>
                 <p>Set {rest.completed_set + 1} is next. Breathe and reset your position.</p>
+                <VitalsPill guardian={guardian.state} avgPulse={guardian.avgPulse} />
                 <div className="button-row">
                   <Button onClick={skipRest}>
                     <SkipForward size={16} /> Skip rest
@@ -635,14 +659,13 @@ export function WorkoutPage() {
                               : 'Returning'}
             </div>
           </section>
-          {isMobile ? (
-            <MobileVitalsFlow
-              videoRef={vitalsVideoRef}
-              restActive={Boolean(rest)}
-              onReading={recordVitals}
-            />
-          ) : (
-            <VitalsPanel status={vitals.status} reading={vitals.reading} />
+          {guardian.state === 'elevated' && (
+            <div className="vitals-alert" role="alert" data-testid="vitals-alert">
+              <HeartPulse size={16} />
+              <span>
+                {GUARDIAN_PHRASES.elevated} For wellness info only, not medical advice.
+              </span>
+            </div>
           )}
           {plan.length > 1 && (
             <section className="panel workout-plan-panel" aria-label="Workout plan">

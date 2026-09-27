@@ -1,108 +1,47 @@
-.vitals-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* Vitals guardian styles (PR5). */
 
-.vitals-eyebrow {
+
+/* Inline guardian pill: lives in the workout status bar, not a section. */
+.vitals-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-}
-
-.vitals-metrics {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.vitals-metric {
-  display: flex;
-  flex-direction: column;
   gap: 4px;
-}
-
-.vitals-metric-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle, rgba(0, 0, 0, 0.05));
   color: var(--muted, #6b7280);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
-.vitals-value {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.1;
+.vitals-pill.is-elevated {
+  background: #fee2e2;
+  color: #b91c1c;
+  animation: vitals-pill-pulse 1.2s ease-in-out infinite;
 }
 
-.vitals-value small {
+@keyframes vitals-pill-pulse {
+  50% {
+    opacity: 0.65;
+  }
+}
+
+/* Advisory banner shown while the guardian alert is active. */
+.vitals-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
   font-size: 13px;
   font-weight: 500;
-  color: var(--muted, #6b7280);
-  margin-left: 4px;
 }
 
-.vitals-measuring {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--muted, #6b7280);
-  animation: vitals-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes vitals-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-.vitals-note {
-  font-size: 14px;
-  color: var(--muted, #6b7280);
-  margin: 0;
-}
-
-.vitals-footnote {
-  font-size: 11px;
-  color: var(--muted, #6b7280);
-  margin: 0;
-}
-
-/* Compact variant for the mobile rest flow. */
-.vitals-panel.vitals-compact {
-  padding: 14px 16px;
-}
-
-.vitals-panel.vitals-compact .vitals-value {
-  font-size: 22px;
-}
-
-.mobile-vitals-cta {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.mobile-vitals-cta p {
-  font-size: 12px;
-  color: var(--muted, #6b7280);
-  margin: 0;
-}
-
-.mobile-vitals-measuring {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mobile-vitals-measuring .vitals-note {
-  font-size: 13px;
+.vitals-alert svg {
+  flex-shrink: 0;
 }
