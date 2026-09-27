@@ -12,7 +12,7 @@ interface SpeechRequest {
   resolve: () => void;
 }
 
-const CLOUD_LIMIT = 12;
+const CLOUD_LIMIT = 40;
 const CLOUD_WINDOW_MS = 60_000;
 const CLOUD_COOLDOWN_MS = 60_000;
 const SILENT_WAV =
@@ -37,6 +37,12 @@ export class VoiceCoach {
 
   /** Resume Web Audio while a mobile tap still owns user activation. */
   unlock() {
+    // A fresh user gesture should retry ElevenLabs after a session that had to
+    // start on browser speech. Never leave the fallback latched indefinitely.
+    if (this.voiceMode === 'browser') {
+      this.voiceMode = undefined;
+      this.cloudCooldownUntil = 0;
+    }
     const AudioContextClass =
       typeof window === 'undefined'
         ? undefined
@@ -249,6 +255,13 @@ export class VoiceCoach {
       }
     } catch {
       if (!this.isCurrent(request)) return;
+      // Once this workout has spoken with ElevenLabs, keep the voice consistent.
+      // A transient provider/rate/network failure may skip a cue, but the next
+      // cue retries after cooldown instead of suddenly becoming a system voice.
+      if (this.voiceMode === 'cloud') {
+        this.report('ElevenLabs temporarily unavailable · visual cues remain on');
+        return;
+      }
       this.voiceMode = 'browser';
       await this.speakBrowser(request);
     }

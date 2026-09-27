@@ -368,9 +368,9 @@ def coaching(payload: SpeechRequest, request: Request, subject: str | None = Dep
     services.rate_limit(rate_key, "speech-request", 60 if subject else 30)
 
     def provider_limit():
-        services.rate_limit(rate_key, "speech-provider", 12 if subject else 6)
+        services.rate_limit(rate_key, "speech-provider", 40 if subject else 20)
         if not subject:
-            services.rate_limit("all-guests", "speech-provider", 12)
+            services.rate_limit("all-guests", "speech-provider", 40)
 
     return Response(
         services.speech(payload.text, before_provider=provider_limit),

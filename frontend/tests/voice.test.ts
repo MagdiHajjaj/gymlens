@@ -42,6 +42,39 @@ it('falls back to browser speech when cloud voice fails', async () => {
   expect(status).toHaveBeenLastCalledWith('Voice ready · browser');
 });
 
+it('never changes to browser speech after ElevenLabs has spoken in the workout', async () => {
+  vi.spyOn(api, 'speech')
+    .mockResolvedValueOnce(new Blob(['audio'], { type: 'audio/mpeg' }))
+    .mockRejectedValueOnce(new Error('Unavailable'));
+  const { speak } = stubBrowserSpeech();
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn(() => 'blob:voice'),
+    revokeObjectURL: vi.fn(),
+  });
+  class AudioStub {
+    src = '';
+    volume = 1;
+    onended: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onpause: (() => void) | null = null;
+    load() {}
+    pause() {}
+    play() {
+      queueMicrotask(() => this.onended?.());
+      return Promise.resolve();
+    }
+  }
+  vi.stubGlobal('Audio', AudioStub);
+  const status = vi.fn();
+  const coach = new VoiceCoach(status);
+  await coach.speak('One.', true);
+  await coach.speak('Two.', true);
+  expect(speak).not.toHaveBeenCalled();
+  expect(status).toHaveBeenLastCalledWith(
+    'ElevenLabs temporarily unavailable · visual cues remain on',
+  );
+});
+
 it('stopping prevents a delayed cloud response from playing', async () => {
   let complete!: (blob: Blob) => void;
   vi.spyOn(api, 'speech').mockReturnValue(

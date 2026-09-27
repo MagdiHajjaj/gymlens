@@ -258,7 +258,7 @@ def test_invalid_gemini_output_is_not_saved(client, monkeypatch):
 
 def test_costly_endpoint_provider_miss_rate_limit(client, monkeypatch):
     monkeypatch.setattr(settings, "elevenlabs_api_key", "")
-    for _ in range(12):
+    for _ in range(40):
         assert (
             client.post(
                 "/api/coaching/speech", json={"text": "Keep your chest a little more upright."}
