@@ -36,6 +36,7 @@ export function SessionPage() {
   const [backupWarning, setBackupWarning] = useState('');
   const [version, setVersion] = useState(0);
   const currentRequest = useRef('');
+  const attemptedInsight = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +123,24 @@ export function SessionPage() {
       if (currentRequest.current === requestKey) setBusy(null);
     }
   }
+
+  // Restores the pre-grounded-report behavior: eligible reports fetch the Gemini
+  // insight on load instead of waiting for a manual request. Guarded to run
+  // once per session so it never spams the rate-limited endpoint.
+  useEffect(() => {
+    if (
+      loading ||
+      !authenticated ||
+      !session ||
+      session.local ||
+      session.insight ||
+      session.status !== 'completed' ||
+      attemptedInsight.current === session.id
+    )
+      return;
+    attemptedInsight.current = session.id;
+    void insights();
+  }, [loading, authenticated, session?.id, session?.local, session?.insight, session?.status]);
 
   if (loading && !session)
     return (

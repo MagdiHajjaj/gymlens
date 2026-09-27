@@ -1,4 +1,5 @@
 import { exercises } from '../exercises/ExerciseRegistry';
+import { cueLabel } from './sessionReport';
 import type { GoalId } from '../goals/goals';
 import type { ExerciseId, FormFault, Insight, RepEvent, WorkoutSession } from '../../types/workout';
 
@@ -130,7 +131,7 @@ const round = (value: number, places = 0) => {
   return Math.round(value * scale) / scale;
 };
 
-const formatFaultCode = (code: string) => code.replaceAll('_', ' ');
+
 
 const average = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined;
@@ -201,7 +202,7 @@ function summarizeFaults(reps: RepEvent[]): FaultFrequency[] {
   return [...faults.entries()]
     .map(([code, value]) => ({
       code,
-      label: formatFaultCode(code),
+      label: cueLabel(code),
       message: value.message,
       count: value.reps.length,
       percent: reps.length ? round((value.reps.length / reps.length) * 100) : 0,
@@ -573,5 +574,5 @@ export function faultsForTimeline(stats: InsightStats) {
 }
 
 export function repFaultLabels(rep: RepEvent, knownFaults: FormFault[] = rep.faults_json) {
-  return knownFaults.map((fault) => formatFaultCode(fault.code));
+  return knownFaults.map((fault) => cueLabel(fault.code));
 }

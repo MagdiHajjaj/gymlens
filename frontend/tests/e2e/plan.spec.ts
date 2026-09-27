@@ -32,4 +32,8 @@ test('plan rows reorder with a press-and-drag on the handle', async ({ page }) =
   // After the drop animation the store commits the new order.
   await expect(rows.first().locator('strong')).toHaveText('Push-up');
   await expect(rows.nth(1).locator('strong')).toHaveText('Squat');
+
+  // Continuing starts with the reordered first exercise, not the first-picked one.
+  await page.getByRole('button', { name: /continue/i }).click();
+  await expect(page.getByRole('heading', { name: /push-up/i })).toBeVisible();
 });

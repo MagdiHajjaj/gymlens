@@ -84,9 +84,9 @@ test('report ties the next focus to recorded reps and reveals measurements on de
   await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
   await expect(page.locator('.session-key-stats dd')).toHaveText(['6', '02:00', '2 / 6']);
   await expect(page.locator('.report-coach')).toContainText(
-    'The most common cue was insufficient depth on 2 reps (33%)',
+    'The most common cue was Shallow depth on 2 reps (33%)',
   );
-  await expect(page.getByRole('region', { name: 'What the tracker observed' })).toContainText('Depth cue');
+  await expect(page.getByRole('region', { name: 'What the tracker observed' })).toContainText('Shallow depth');
   await expect(page.getByRole('table')).toBeHidden();
   await page.getByText('Explore measurements and individual reps', { exact: true }).click();
   await expect(page.getByRole('table')).toBeVisible();
@@ -177,13 +177,17 @@ test('failed account save preserves the browser copy and retry confirms account 
   ).toBe(6);
   await page.getByRole('button', { name: 'Retry account save' }).click();
   await expect(page.locator('.report-save-state')).toContainText('Saved to your account');
-  expect(saves).toBe(2);
-  expect(insightRequests).toBe(0);
-  await page.getByRole('button', { name: 'Request AI commentary' }).click();
+  // Becoming account-saved triggers the automatic insight request, which the mock fails.
   await expect(page.locator('.report-coach').getByRole('alert')).toContainText(
     'recorded findings above remain available',
   );
-  await expect(page.locator('.report-coach')).toContainText('insufficient depth on 2 reps (33%)');
+  expect(insightRequests).toBe(1);
+  await page.getByRole('button', { name: 'Retry AI commentary' }).click();
+  await expect(page.locator('.report-coach').getByRole('alert')).toContainText(
+    'recorded findings above remain available',
+  );
+  expect(insightRequests).toBe(2);
+  await expect(page.locator('.report-coach')).toContainText('Shallow depth on 2 reps (33%)');
 });
 
 test('bilateral curl reports retain the combined rep count', async ({ page }) => {

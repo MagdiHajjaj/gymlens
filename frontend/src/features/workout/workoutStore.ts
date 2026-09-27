@@ -22,6 +22,10 @@ interface Store {
   currentSetStartRep: number;
   select: (id: ExerciseId) => void;
   toggleExercise: (id: ExerciseId) => void;
+  /** Points the focused exercise at the given id without changing the
+   *  multi-selection. Used when the plan order (not pick order) decides
+   *  which exercise starts next. */
+  focusExercise: (id: ExerciseId) => void;
   begin: (source: 'camera' | 'demo' | 'upload', opts?: { preCalibrated?: boolean }) => void;
   ingest: (result: ExerciseResult, timestamp: number) => void;
   pause: () => void;
@@ -68,6 +72,7 @@ export const useWorkout = create<Store>((set, get) => ({
   rest: null,
   currentSetStartRep: 1,
   select: (selected) => set({ selected, selectedIds: [selected] }),
+  focusExercise: (id) => set({ selected: id }),
   toggleExercise: (id) =>
     set((state) => {
       const selectedIds = state.selectedIds.includes(id)

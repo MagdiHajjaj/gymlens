@@ -65,16 +65,12 @@ export function HistoryPage() {
       )}
       <div className="history-session-list" aria-busy={loading}>
         {workouts.map((workout) => {
-          const details = workout.sessions.reduce((sum, session) => sum + (session.reps?.length ?? 0), 0);
-          const cued = workout.sessions.reduce(
-            (sum, session) => sum + (session.reps?.filter((rep) => rep.faults_json.length > 0).length ?? 0),
-            0,
-          );
           const local = workout.sessions.some((session) => session.local !== false);
           const session = workout.sessions[0];
           const exerciseNames = workout.sessions.map((row) => exercises[row.exercise].name);
           const workoutName = workout.name || exerciseNames.join(' · ');
           const workoutAria = /workout$/i.test(workoutName) ? workoutName : `${workoutName} workout`;
+          const incomplete = workout.sessions.some((row) => row.status !== 'completed');
           return (
             <article
               className="panel history-session-card"
@@ -100,26 +96,70 @@ export function HistoryPage() {
                       : 'Camera workout'}
                 </span>
               </div>
-              <dl className="history-session-metrics">
-                <div>
-                  <dt>Total reps</dt>
-                  <dd>{workout.totalReps}</dd>
-                </div>
-                <div>
-                  <dt>{session.source === 'upload' ? 'Analysis time' : 'Session time'}</dt>
-                  <dd>{workout.endedAt ? timeLabel(workout.durationSeconds) : 'Incomplete'}</dd>
-                </div>
-                <div>
-                  <dt>Recorded cues</dt>
-                  <dd>
-                    {details
-                      ? `${cued} / ${details} detailed reps`
-                      : session.reps
-                        ? 'No rep details'
-                        : 'Open report'}
-                  </dd>
-                </div>
-              </dl>
+              {workout.sessions.length > 1 ? (
+                <>
+                  <p className="history-workout-meta">
+                    {workout.endedAt ? timeLabel(workout.durationSeconds) : 'Incomplete'} ·{' '}
+                    {workout.totalReps} reps across {workout.sessions.length} exercises
+                  </p>
+                  <ul className="history-exercise-list">
+                    {workout.sessions.map((row) => {
+                      const detailCount = row.reps?.length ?? 0;
+                      const cuedCount =
+                        row.reps?.filter((rep) => rep.faults_json.length > 0).length ?? 0;
+                      return (
+                        <li key={row.id}>
+                          <div>
+                            <strong>{exercises[row.exercise].name}</strong>
+                            <span>
+                              {row.total_reps} {row.total_reps === 1 ? 'rep' : 'reps'}
+                              {detailCount
+                                ? ` · ${cuedCount} / ${detailCount} detailed reps with cues`
+                                : row.reps
+                                  ? ' · no rep details'
+                                  : ''}
+                            </span>
+                          </div>
+                          <Button asChild size="small" variant="secondary">
+                            <Link
+                              to={`/session/${row.id}`}
+                              aria-label={`View ${exercises[row.exercise].name} report`}
+                            >
+                              View report <ArrowRight size={16} />
+                            </Link>
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <dl className="history-session-metrics">
+                  <div>
+                    <dt>Total reps</dt>
+                    <dd>{workout.totalReps}</dd>
+                  </div>
+                  <div>
+                    <dt>{session.source === 'upload' ? 'Analysis time' : 'Session time'}</dt>
+                    <dd>{workout.endedAt ? timeLabel(workout.durationSeconds) : 'Incomplete'}</dd>
+                  </div>
+                  <div>
+                    <dt>Recorded cues</dt>
+                    <dd>
+                      {(() => {
+                        const details = session.reps?.length ?? 0;
+                        const cued =
+                          session.reps?.filter((rep) => rep.faults_json.length > 0).length ?? 0;
+                        return details
+                          ? `${cued} / ${details} detailed reps`
+                          : session.reps
+                            ? 'No rep details'
+                            : 'Open report';
+                      })()}
+                    </dd>
+                  </div>
+                </dl>
+              )}
               <div className="history-session-bottom">
                 <span>
                   {local
@@ -127,7 +167,7 @@ export function HistoryPage() {
                       ? 'Saved in this browser · account save pending'
                       : 'Saved in this browser'
                     : 'Saved to account'}
-                  {workout.sessions.some((row) => row.status !== 'completed') ? ' · Incomplete workout' : ''}
+                  {incomplete ? ' · Incomplete workout' : ''}
                 </span>
                 <div>
                   <Button size="small" variant="ghost" onClick={() => {
@@ -136,13 +176,13 @@ export function HistoryPage() {
                   }} aria-label={`Repeat ${exercises[session.exercise].name}`}>
                     <Repeat2 size={16} /> Repeat
                   </Button>
-                  {workout.sessions.map((row) => (
-                    <Button asChild size="small" variant="secondary" key={row.id}>
-                      <Link to={`/session/${row.id}`} aria-label={`View ${exercises[row.exercise].name} report`}>
-                        {workout.sessions.length > 1 ? exercises[row.exercise].name : 'View report'} <ArrowRight size={16} />
+                  {workout.sessions.length === 1 && (
+                    <Button asChild size="small" variant="secondary">
+                      <Link to={`/session/${session.id}`} aria-label={`View ${exercises[session.exercise].name} report`}>
+                        View report <ArrowRight size={16} />
                       </Link>
                     </Button>
-                  ))}
+                  )}
                 </div>
               </div>
             </article>

@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { ExerciseArt } from '../../components/ExerciseArt';
 import { CameraView, type CameraReadiness } from '../camera/CameraView';
@@ -39,8 +39,10 @@ export function WorkoutSetup({
   onVoice: () => void;
   onStart: (source: 'camera' | 'demo' | 'upload', file?: File) => void;
 }) {
-  const { selected, select, selectedIds, toggleExercise, voice, restPreset, setRestPreset } = useWorkout();
+  const { selected, select, selectedIds, toggleExercise, focusExercise, voice, restPreset, setRestPreset } = useWorkout();
   const setPlan = usePlan((state) => state.setPlan);
+  const clearPlan = usePlan((state) => state.clearPlan);
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const plan = usePlan((state) => state.plan);
   const completedExerciseIds = usePlan((state) => state.completedExerciseIds);
@@ -215,6 +217,14 @@ export function WorkoutSetup({
                 </span>
                 <h2>Plan complete</h2>
                 <p>You finished every exercise in this session’s plan.</p>
+                <Button
+                  onClick={() => {
+                    clearPlan();
+                    navigate('/');
+                  }}
+                >
+                  Done <ArrowRight size={17} />
+                </Button>
                 <Button variant="secondary" onClick={exitReview}>
                   Choose another exercise
                 </Button>
@@ -225,6 +235,10 @@ export function WorkoutSetup({
                   reviewMode
                     ? continueReview
                     : () => {
+                        // The plan order (after any drag reorder) decides which
+                        // exercise starts, not the order exercises were picked.
+                        const first = usePlan.getState().plan[0]?.exerciseId;
+                        if (first) focusExercise(first);
                         setPlanning(false);
                         setPreview(true);
                       }
