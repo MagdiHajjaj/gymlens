@@ -346,6 +346,43 @@ it('grounds the idle cue in the measured session total', () => {
   expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 2 })).toBe('Ready. 2 reps so far.');
 });
 
+it('alternates idle coaching between rep count and a pose reminder', () => {
+  const engine = new FeedbackEngine();
+  const idle: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'ready',
+    repCompleted: false,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    completedReps: [],
+  };
+  const ctx = { exercise: 'squat', totalReps: 2 } as const;
+  expect(engine.next(idle, 0, ctx)).toBe('Ready. 2 reps so far.');
+  expect(engine.next(idle, 31_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
+  expect(engine.next(idle, 62_000, ctx)).toBe('Ready. 2 reps so far.');
+});
+
+it('resets the idle cue alternation', () => {
+  const engine = new FeedbackEngine();
+  const idle: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'ready',
+    repCompleted: false,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    completedReps: [],
+  };
+  const ctx = { exercise: 'squat', totalReps: 2 } as const;
+  expect(engine.next(idle, 0, ctx)).toBe('Ready. 2 reps so far.');
+  expect(engine.next(idle, 31_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
+  engine.reset();
+  expect(engine.next(idle, 62_000, ctx)).toBe('Ready. 2 reps so far.');
+});
+
 it('readyCue uses singular and plural rep counts', () => {
   expect(readyCue(0)).toBe('Ready.');
   expect(readyCue(1)).toBe('Ready. 1 rep so far.');
@@ -403,8 +440,8 @@ it('predicts the next rep cue texts from the just-completed rep', () => {
   expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 7 })).toEqual([
     'Rep 7 complete. Bottom angle 90 degrees.',
   ]);
-  const { repMetrics, ...noMetrics } = completed;
-  expect(predictNextRepCues(noMetrics as ExerciseResult, { exercise: 'squat', nextSetReps: 7 })).toEqual([
+  const noMetrics: ExerciseResult = { ...completed, repMetrics: undefined };
+  expect(predictNextRepCues(noMetrics, { exercise: 'squat', nextSetReps: 7 })).toEqual([
     'Rep 7 complete.',
   ]);
 });

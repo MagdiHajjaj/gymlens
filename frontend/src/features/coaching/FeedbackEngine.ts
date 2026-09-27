@@ -1,5 +1,6 @@
 import type { ExerciseId, ExerciseResult } from '../../types/workout';
 import { PRIORITY, repCountCue, type VoiceCue } from './Phrasebook';
+import { movementCues } from '../exercises/MovementCues';
 
 interface CueContext {
   exercise: ExerciseId;
@@ -69,6 +70,7 @@ export class FeedbackEngine {
   private recordedTotal = 0;
   private repAngles: number[] = [];
   private repDurations: number[] = [];
+  private idleCountCue = true;
   reset() {
     this.current = '';
     this.since = 0;
@@ -81,6 +83,7 @@ export class FeedbackEngine {
     this.recordedTotal = 0;
     this.repAngles = [];
     this.repDurations = [];
+    this.idleCountCue = true;
   }
   next(result: ExerciseResult, time: number, context?: CueContext): string | null {
     return this.nextCue(result, time, context)?.text ?? null;
@@ -180,12 +183,27 @@ export class FeedbackEngine {
     }
     return result.repCompleted
       ? { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep }
-      : announce(
-          'ready',
-          // Idle coaching names the measured session total, not this frame's count.
-          { text: readyCue(context?.totalReps ?? completedCount), kind: 'setup', priority: PRIORITY.setup },
-          30000,
-        );
+      : this.idleCue(announce, context, completedCount);
+  }
+
+  /**
+   * Idle coaching alternates between the measured rep count and a pose
+   * reminder for the current exercise, so a long pause between reps coaches
+   * setup ("make sure your pose is right") instead of just restating readiness.
+   * The 30s cooldown keeps it from nagging; the alternation only advances when
+   * a cue actually speaks.
+   */
+  private idleCue(
+    announce: (key: string, cue: VoiceCue, cooldown: number, globalCooldown?: boolean) => VoiceCue | null,
+    context: CueContext | undefined,
+    completedCount: number,
+  ): VoiceCue | null {
+    const total = context?.totalReps ?? completedCount;
+    const text =
+      this.idleCountCue || !context ? readyCue(total) : movementCues[context.exercise].ready;
+    const cue = announce('ready', { text, kind: 'setup', priority: PRIORITY.setup }, 30000);
+    if (cue) this.idleCountCue = !this.idleCountCue;
+    return cue;
   }
 
   /**
