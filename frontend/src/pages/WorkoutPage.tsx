@@ -33,6 +33,7 @@ import {
 } from '../features/camera/measurementDisplay';
 import { api } from '../lib/api';
 import { VitalsPill } from '../features/vitals/VitalsPill';
+import { VitalsLiveSection } from '../features/vitals/VitalsLiveSection';
 import { GUARDIAN_PHRASES, useVitalsGuardian } from '../features/vitals/useVitalsGuardian';
 import { useVitalsSession } from '../features/vitals/useVitalsSession';
 import type { WorkoutSession } from '../types/workout';
@@ -536,6 +537,11 @@ export function WorkoutPage() {
               </div>
             )}
           </div>
+          <VitalsLiveSection
+            status={vitals.status}
+            reading={vitals.reading}
+            guardian={guardian.state}
+          />
           <div className="workout-controls">
             <Button
               variant="secondary"
