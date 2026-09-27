@@ -584,17 +584,12 @@
 
 @media (max-width: 650px) {
   .workout-setup-page {
-    padding-bottom: 100px;
+    padding-bottom: 24px;
   }
   .workout-setup-page .setup-primary {
-    position: fixed;
-    bottom: max(16px, env(safe-area-inset-bottom));
-    left: 20px;
-    width: calc(100% - 40px);
-    z-index: 5;
-    box-shadow:
-      0 0 0 10px #f6f7f3,
-      0 8px 28px #182c2440;
+    position: static;
+    width: 100%;
+    box-shadow: none;
   }
   .workout-exercise-options {
     max-height: 320px;

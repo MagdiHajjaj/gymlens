@@ -116,6 +116,22 @@ test('exercise selection and responsive navigation work without overflow', async
   await page.getByRole('link', { name: 'History', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Workout history' })).toBeVisible();
 });
+
+test('mobile setup action stays in the page flow above the fixed navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/workout');
+  const action = page.getByRole('button', { name: 'Plan your session' });
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await action.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  await expect(action).toBeVisible();
+  const [actionBox, navigationBox] = await Promise.all([
+    action.boundingBox(),
+    navigation.boundingBox(),
+  ]);
+  expect(actionBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(navigationBox!.y);
+});
 test('local MediaPipe model initializes against a browser test camera', async ({ page }) => {
   await page.goto('/workout');
   await page.getByRole('button', { name: 'Set up camera' }).click();
