@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
-import { exercises } from '../features/exercises/ExerciseRegistry';
+import { WorkoutCalendar } from '../components/WorkoutCalendar';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
 import { groupWorkouts } from '../lib/workoutGroups';
@@ -139,7 +139,7 @@ export function DashboardPage() {
       <div className="dashboard-bottom">
         <section className="recent-section">
           <div className="section-heading">
-            <h2>Your recent sessions</h2>
+            <h2>Your training calendar</h2>
             <Link className="text-link" to="/history">
               View history <ArrowRight size={15} />
             </Link>
@@ -149,35 +149,7 @@ export function DashboardPage() {
               Cloud history unavailable. Showing this browser’s sessions.
             </p>
           )}
-          {sessions.length ? (
-            <div className="recent-list">
-              {sessions.slice(0, 3).map((s) => (
-                <Link to={`/session/${s.id}`} key={s.id} className="recent-row">
-                  <div className={`mini-exercise ${exercises[s.exercise].color}`}>
-                    <Activity size={20} />
-                  </div>
-                  <div>
-                    <strong>{exercises[s.exercise].name}</strong>
-                    <small>
-                      {new Date(s.started_at).toLocaleDateString()} {s.source === 'demo' ? '· Demo' : ''}
-                    </small>
-                  </div>
-                  <span>{s.total_reps} reps</span>
-                  <ArrowUpRight size={17} />
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-inline">
-              <span className="empty-icon">
-                <HistoryIcon />
-              </span>
-              <div>
-                <h3>Your story starts with one session.</h3>
-                <p>Finish a workout and you’ll find it right here.</p>
-              </div>
-            </div>
-          )}
+          <WorkoutCalendar workouts={completedWorkouts} />
         </section>
         <aside className="tip-card">
           <span className="eyebrow">
@@ -193,7 +165,4 @@ export function DashboardPage() {
       </div>
     </div>
   );
-}
-function HistoryIcon() {
-  return <Activity size={23} />;
 }
