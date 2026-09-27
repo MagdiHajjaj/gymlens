@@ -62,6 +62,7 @@ export function WorkoutPage() {
     startRest,
     completeRest,
     finish,
+    recordVitals,
   } = useWorkout();
   const [active, setActive] = useState(false);
   useEffect(() => {
@@ -95,7 +96,11 @@ export function WorkoutPage() {
   // Desktop auto-measures; mobile uses the tap-to-check pulse-first flow.
   const isMobile = useIsMobile();
   const vitalsVideoRef = useRef<HTMLVideoElement | null>(null);
-  const vitals = useVitalsSession({ videoRef: vitalsVideoRef, active: Boolean(rest) && !isMobile });
+  const vitals = useVitalsSession({
+    videoRef: vitalsVideoRef,
+    active: Boolean(rest) && !isMobile,
+    onReading: recordVitals,
+  });
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
   const trackedReps = session?.total_reps ?? 0;
   const planItem = plan.find((item) => item.exerciseId === selected);
@@ -631,7 +636,11 @@ export function WorkoutPage() {
             </div>
           </section>
           {isMobile ? (
-            <MobileVitalsFlow videoRef={vitalsVideoRef} restActive={Boolean(rest)} />
+            <MobileVitalsFlow
+              videoRef={vitalsVideoRef}
+              restActive={Boolean(rest)}
+              onReading={recordVitals}
+            />
           ) : (
             <VitalsPanel status={vitals.status} reading={vitals.reading} />
           )}

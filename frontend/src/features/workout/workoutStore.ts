@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ExerciseId, ExerciseResult, WorkoutSession, WorkoutSetRange } from '../../types/workout';
+import type { VitalsReading } from '../vitals/vitalsClient';
 import { usePlan } from './planStore';
 import { exercises } from '../exercises/ExerciseRegistry';
 
@@ -36,8 +37,16 @@ interface Store {
   completeRest: () => void;
   cancelRest: () => void;
   finish: () => WorkoutSession;
+  /** Persist a confident vitals reading into the session metrics (throttled). */
+  recordVitals: (reading: VitalsReading) => void;
 }
 let lastMetric = 0;
+let lastVitalsMetric = 0;
+
+/** Reset the vitals throttle clock. Tests only. */
+export function __resetVitalsThrottleForTests() {
+  lastVitalsMetric = 0;
+}
 
 const closeCurrentSet = (
   session: WorkoutSession,
@@ -183,6 +192,31 @@ export const useWorkout = create<Store>((set, get) => ({
   },
   completeRest: () => set({ rest: null }),
   cancelRest: () => set({ rest: null }),
+  recordVitals: (reading) =>
+    set((state) => {
+      const session = state.session;
+      if (!session || session.status !== 'active') return {};
+      const now = Date.now();
+      // Throttle: at most one vitals sample batch per 5s.
+      if (now - lastVitalsMetric < 5000) return {};
+      const recorded_at = new Date().toISOString();
+      const samples: { recorded_at: string; metric_name: string; metric_value: number }[] = [];
+      const push = (name: string, value: number | null, confidence: number) => {
+        if (value != null && confidence > 0) {
+          samples.push({ recorded_at, metric_name: `vitals.${name}`, metric_value: value });
+          samples.push({
+            recorded_at,
+            metric_name: `vitals.${name}_confidence`,
+            metric_value: confidence,
+          });
+        }
+      };
+      push('pulse_bpm', reading.pulse_bpm, reading.pulse_confidence);
+      push('breathing_bpm', reading.breathing_bpm, reading.breathing_confidence);
+      if (!samples.length || session.metrics.length + samples.length > 29000) return {};
+      lastVitalsMetric = now;
+      return { session: { ...session, metrics: [...session.metrics, ...samples] } };
+    }),
   finish: () => {
     const current = get().session;
     if (!current) throw new Error('No active workout');
