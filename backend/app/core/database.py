@@ -8,8 +8,16 @@ class Base(DeclarativeBase):
     pass
 
 
+def _with_connect_timeout(url: str) -> str:
+    """Fail fast on unreachable databases instead of hanging deploys."""
+    if url.startswith("postgresql") and "connect_timeout" not in url:
+        sep = "&" if "?" in url else "?"
+        return f"{url}{sep}connect_timeout=10"
+    return url
+
+
 engine = create_engine(
-    settings.database_url,
+    _with_connect_timeout(settings.database_url),
     pool_pre_ping=True,
     connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
 )
