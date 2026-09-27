@@ -123,10 +123,10 @@ describe('squat tracking accuracy (synthetic frames)', () => {
     expect(flagged[0].guidance).not.toContain('press');
   });
 
-  it('rejects a partial rep just past the boundary (minimum 133 > 130)', () => {
-    const results = analyzeAll('squat', repSequence('squat', 133));
-    expect(completed(results)).toHaveLength(0);
-    expect(results.some((r) => faultCodes(r).includes('insufficient_depth'))).toBe(true);
+  it('counts a moderate partial rep with a depth cue under the looser range allowance', () => {
+    const reps = completed(analyzeAll('squat', repSequence('squat', 133)));
+    expect(reps).toHaveLength(1);
+    expect(faultCodes(reps[0])).toContain('insufficient_depth');
   });
 
   it('does not count an impossibly fast full-ROM rep', () => {
@@ -257,10 +257,10 @@ describe('deadlift tracking accuracy (synthetic frames)', () => {
     );
   });
 
-  it('rejects a partial hinge just past the boundary (minimum 138 > 135)', () => {
-    const results = analyzeAll('deadlift', repSequence('deadlift', 138));
-    expect(completed(results)).toHaveLength(0);
-    expect(results.some((r) => faultCodes(r).includes('insufficient_hinge'))).toBe(true);
+  it('counts a moderate partial hinge with a cue under the looser range allowance', () => {
+    const reps = completed(analyzeAll('deadlift', repSequence('deadlift', 138)));
+    expect(reps).toHaveLength(1);
+    expect(faultCodes(reps[0])).toContain('insufficient_hinge');
   });
 
   it('does not count an impossibly fast full-ROM hinge', () => {

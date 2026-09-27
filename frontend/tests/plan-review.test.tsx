@@ -59,6 +59,16 @@ it('continue in review mode starts the next incomplete exercise', () => {
   expect(screen.getByRole('heading', { name: 'Find your position.' })).toBeTruthy();
 });
 
+it('opens the next exercise camera setup directly when plan=next', () => {
+  usePlan.getState().completeExercise('squat');
+  useWorkout.getState().select('pushup');
+
+  renderSetup('/workout?plan=next');
+
+  expect(screen.getByRole('heading', { name: 'Find your position.' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: /^Push-up$/ })).toBeTruthy();
+});
+
 it('shows the plan-complete panel when every exercise is finished', () => {
   usePlan.getState().completeExercise('squat');
   usePlan.getState().completeExercise('pushup');

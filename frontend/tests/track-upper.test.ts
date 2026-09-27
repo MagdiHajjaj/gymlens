@@ -239,15 +239,17 @@ describe('dips tracking accuracy (synthetic)', () => {
     expect(completed(results)).toHaveLength(0);
   });
 
-  it('pins the count threshold: 124 counts with a cue, 128 does not count', () => {
+  it('counts a moderate partial dip with a cue under the looser range allowance', () => {
     const shallow = completed(drive('dips', downUp(168, 124, 16)));
     expect(shallow).toHaveLength(1);
     expect(faultCodes(shallow[0])).toContain('insufficient_depth');
-    expect(completed(drive('dips', downUp(168, 128, 16)))).toHaveLength(0);
+    const moderate = completed(drive('dips', downUp(168, 128, 16)));
+    expect(moderate).toHaveLength(1);
+    expect(faultCodes(moderate[0])).toContain('insufficient_depth');
   });
 
   it('completes when returning to a soft top instead of a hard lockout', () => {
-    // exit 155 -> return target 152; the old 160/157 pairing would strand this rep.
+    // The relaxed return target accepts a soft top instead of requiring lockout.
     const results = drive('dips', [
       { angle: 168, frames: 16 },
       { angle: 80, frames: 24 },
@@ -339,11 +341,13 @@ describe('pullup tracking accuracy (synthetic)', () => {
     expect(faultCodes(reps[0])).toContain('incomplete_pull');
   });
 
-  it('pins the count threshold: minimum 99 counts with a cue, 101 does not count', () => {
+  it('counts a moderate partial pull-up with a cue under the looser range allowance', () => {
     const shallow = completed(drive('pullup', downUp(180, 99, 16)));
     expect(shallow).toHaveLength(1);
     expect(faultCodes(shallow[0])).toContain('incomplete_pull');
-    expect(completed(drive('pullup', downUp(180, 101, 16)))).toHaveLength(0);
+    const moderate = completed(drive('pullup', downUp(180, 101, 16)));
+    expect(moderate).toHaveLength(1);
+    expect(faultCodes(moderate[0])).toContain('incomplete_pull');
   });
 
   it('does not count a quarter pull-up', () => {
@@ -352,7 +356,7 @@ describe('pullup tracking accuracy (synthetic)', () => {
   });
 
   it('completes when returning near but not fully to a dead hang', () => {
-    // exit 155 -> return target 152; the old 160/157 pairing would strand this rep.
+    // The relaxed return target accepts a near-dead-hang finish.
     const results = drive('pullup', [
       { angle: 180, frames: 16 },
       { angle: 60, frames: 24 },

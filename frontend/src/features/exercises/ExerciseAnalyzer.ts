@@ -24,16 +24,16 @@ export interface Thresholds {
 const defaults: Record<ExerciseId, Thresholds> = {
   // Squat: primary joint is the knee. Standing knee angle is ~170; a parallel
   // squat bottoms near ~90. depth 105 flags a slightly-shallow squat with a cue
-  // instead of dropping it; the rep counts while minimum <= exit - minimumRange
-  // (130), so a half-squat-depth rep still counts with coaching while a quarter
-  // rep (minimum > 130) does not count. 15 degrees of enter/exit hysteresis
+  // instead of dropping it; the rep counts with a forgiving 28-degree minimum
+  // excursion, so moderate partial reps still count with coaching while quarter
+  // reps do not. 15 degrees of enter/exit hysteresis
   // keeps smoothed landmark jitter (~+-4 deg) from starting phantom cycles.
   squat: {
     visibility: 0.6,
     enter: 150,
     exit: 165,
     depth: 105,
-    minimumRange: 35,
+    minimumRange: 28,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -47,7 +47,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 140,
     exit: 150,
     depth: 65,
-    minimumRange: 35,
+    minimumRange: 25,
     reversal: 8,
     minimumMs: 700,
     maximumMs: 15000,
@@ -61,7 +61,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 145,
     exit: 160,
     depth: 95,
-    minimumRange: 35,
+    minimumRange: 28,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -72,7 +72,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Romanian deadlift: primary joint is the hip. Standing hip angle is ~170-175,
   // a full hinge reaches ~90-100. depth 105 flags a shallow hinge; the rep still
-  // counts while minimum <= exit - minimumRange (135). maximumLean is a proxy for
+  // counts with a forgiving 24-degree minimum excursion. maximumLean is a proxy for
   // back rounding: a braced hinge keeps the torso at or above ~parallel, so torso
   // inclination past 80 suggests loss of neutral spine.
   deadlift: {
@@ -80,7 +80,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 150,
     exit: 165,
     depth: 105,
-    minimumRange: 30,
+    minimumRange: 24,
     reversal: 8,
     minimumMs: 900,
     maximumMs: 15000,
@@ -98,7 +98,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 150,
     exit: 165,
     depth: 100,
-    minimumRange: 25,
+    minimumRange: 20,
     reversal: 8,
     minimumMs: 900,
     maximumMs: 15000,
@@ -121,7 +121,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 140,
     exit: 150,
     depth: 100,
-    minimumRange: 30,
+    minimumRange: 22,
     reversal: 8,
     minimumMs: 700,
     maximumMs: 15000,
@@ -132,8 +132,8 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Glute bridge: primary joint is the hip, calibrated holding the top bridged
   // position (hip ~170+). The bottom rests near ~110. depth 125 flags a shallow
-  // lower (minimum > 125); the rep counts while minimum <= exit - minimumRange
-  // (140). minimumHipAlignment is reused here as a torso-inclination floor: a
+  // lower (minimum > 125); moderate partial reps count with a cue.
+  // minimumHipAlignment is reused here as a torso-inclination floor: a
   // braced bridge keeps the torso at ~35 degrees at the top, so inclination
   // dropping below 30 suggests the shoulders dragging toward the hips and the
   // low back overarching (approximate proxy, documented).
@@ -142,7 +142,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 150,
     exit: 165,
     depth: 125,
-    minimumRange: 25,
+    minimumRange: 20,
     reversal: 8,
     minimumMs: 900,
     maximumMs: 15000,
@@ -153,10 +153,9 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Bent-over row: primary joint is the elbow. Calibration is arms hanging
   // extended (~170+) from a ~45-degree hinge. A full pull reaches ~65; depth 100
-  // flags a short pull. The rep counts while minimum <= exit - minimumRange
-  // (120): a real-but-shallow pull bottoming near 113 still counts with the
-  // incomplete_pull cue instead of silently missing under landmark jitter,
-  // while a quarter pull (bottoming above ~125) still does not count.
+  // flags a short pull. A forgiving 30-degree excursion lets a real-but-shallow
+  // pull count with the incomplete_pull cue instead of silently missing under
+  // landmark jitter, while a quarter pull still does not count.
   // minimumHipAlignment is reused as a torso-inclination floor: the hinge holds
   // ~45 degrees, so inclination dropping below 30 means the lifter is standing
   // up to muscle the weight (approximate momentum proxy).
@@ -165,7 +164,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 140,
     exit: 160,
     depth: 100,
-    minimumRange: 40,
+    minimumRange: 30,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -176,11 +175,10 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Tricep dips: primary joint is the elbow, calibrated in the top support
   // position (~168). A full dip reaches ~80; depth 100 flags a shallow dip.
-  // exit 155 (was 160) loosens the return-to-top target to 152: lifters who
+  // exit 155 plus the shared tolerance loosens the return-to-top target: lifters who
   // finish reps with soft elbows instead of a hard lockout still complete the
-  // cycle. minimumRange 30 keeps the count threshold exactly where it was
-  // (155 - 30 = 125), so the human buffer for a real-but-shallow dip is
-  // unchanged -- only the top-return strictness moved.
+  // cycle. A 22-degree minimum excursion gives real-but-shallow dips a human
+  // buffer while the separate depth rule still adds a coaching cue.
   // maximumLean is a proxy for pitching forward: the torso hangs near vertical
   // (~8 degrees), so inclination past 35 suggests leaning over the hands.
   dips: {
@@ -188,7 +186,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 145,
     exit: 155,
     depth: 100,
-    minimumRange: 30,
+    minimumRange: 22,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -199,11 +197,10 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Pull-up: primary joint is the elbow, calibrated in a dead hang (~180). A
   // full pull reaches ~60; depth 70 flags chin-not-over-bar. exit 155 (was 160)
-  // loosens the return-to-hang target to 152 so continuous reps that stop a few
-  // degrees short of a dead hang still complete. minimumRange 55 keeps the
-  // count threshold exactly where it was (155 - 55 = 100): a real-but-slightly-
-  // shallow pull-up (minimum 71-100) still counts with the chin-over-bar cue,
-  // while anything above 100 stays uncounted. maximumLean is a
+  // plus the shared tolerance lets continuous reps that stop a few
+  // degrees short of a dead hang still complete. A 40-degree minimum excursion
+  // lets a real-but-shallow pull-up count with the chin-over-bar cue while a
+  // quarter pull remains uncounted. maximumLean is a
   // proxy for swinging: a still hang keeps the torso near vertical (~2 degrees),
   // so inclination past 25 suggests kipping/swinging (approximate proxy --
   // true oscillation would need time-series analysis).
@@ -212,7 +209,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 140,
     exit: 155,
     depth: 70,
-    minimumRange: 55,
+    minimumRange: 40,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -454,6 +451,8 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
 const fault = (code: string, message: string): FormFault => ({ code, message, severity: 'warning' });
 export class MovementAnalyzer implements ExerciseAnalyzer {
   private static readonly PHASE_HOLD_MS = 100;
+  /** Athletes rarely return to the exact calibration angle on every rep. */
+  private static readonly RETURN_TOLERANCE_DEGREES = 6;
   private static readonly PRESS_RACK_MAX = 135;
   readonly config: Thresholds;
   private readonly exercise: ExerciseConfig;
@@ -754,7 +753,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
         this.reset();
         return empty('Reset your starting position before your next rep.');
       }
-      const returnTarget = Math.min(this.config.exit, this.baseline) - 3;
+      const returnTarget =
+        Math.min(this.config.exit, this.baseline) - MovementAnalyzer.RETURN_TOLERANCE_DEGREES;
       const atEnd = movingUp ? value <= this.config.enter : value >= returnTarget;
       if (this.phase === 'concentric' && atEnd) {
         if (this.exitSince < 0) this.exitSince = frame.timestampMs;

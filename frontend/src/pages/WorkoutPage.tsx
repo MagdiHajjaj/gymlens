@@ -317,18 +317,25 @@ export function WorkoutPage() {
     await spokenSummary;
     setActive(false);
     setSaving(false);
-    // With a session plan, land on the plan review (checkmarks + next exercise)
-    // instead of the session report; it also covers the fully-complete state.
-    const hasPlan = usePlan.getState().plan.length > 0;
-    navigate(hasPlan ? '/workout?plan=review' : `/session/${completed.id}`);
+    const planState = usePlan.getState();
+    const nextExercise = planState.plan.find(
+      (item) => !planState.completedExerciseIds.includes(item.exerciseId),
+    );
+    if (nextExercise) {
+      // Bank this exercise under the shared workout, then open positioning for
+      // the next movement without making the athlete rebuild or review the plan.
+      useWorkout.getState().select(nextExercise.exerciseId);
+      navigate('/workout?plan=next');
+    } else if (planState.plan.length > 0) navigate('/workout?plan=review');
+    else navigate(`/session/${completed.id}`);
   }
   const exercise = exercises[selected];
   if (saving)
     return (
       <div className="page workout-page">
         <section className="panel workout-finishing" role="status" aria-live="polite">
-          <span className="eyebrow">WORKOUT COMPLETE</span>
-          <h1>Saving your workout…</h1>
+          <span className="eyebrow">EXERCISE COMPLETE</span>
+          <h1>Saving your exercise…</h1>
           <p>Keeping your exercises together in one workout history entry.</p>
         </section>
       </div>

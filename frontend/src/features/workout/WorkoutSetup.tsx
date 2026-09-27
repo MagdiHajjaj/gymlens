@@ -46,7 +46,8 @@ export function WorkoutSetup({
   const completedExerciseIds = usePlan((state) => state.completedExerciseIds);
   const hasPlan = plan.length > 0;
   const reviewRequested = searchParams.get('plan') === 'review';
-  const [preview, setPreview] = useState(false);
+  const continueRequested = searchParams.get('plan') === 'next' && hasPlan;
+  const [preview, setPreview] = useState(() => continueRequested);
   const [planning, setPlanning] = useState(() => reviewRequested && hasPlan);
   const [error, setError] = useState('');
   const [readiness, setReadiness] = useState<CameraReadiness>({
