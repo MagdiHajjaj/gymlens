@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, parseDayKey, workoutsByDay } from '../src/lib/calendarDays';
+import { dayKey, parseDayKey, workoutsByDay, monthNavLimits } from '../src/lib/calendarDays';
 import { groupWorkouts } from '../src/lib/workoutGroups';
 import type { WorkoutHistoryEntry } from '../src/types/workout';
 
@@ -42,5 +42,27 @@ describe('calendar day helpers', () => {
     expect(byDay.get('2026-09-27')![0].sessions).toHaveLength(2);
     expect(byDay.get('2026-09-25')).toHaveLength(1);
     expect(byDay.get('2026-09-26')).toBeUndefined();
+  });
+});
+
+describe('month navigation limits', () => {
+  it('blocks going back when today is more than a week into the month', () => {
+    // Sept 27 -> earliest is Sept 20, same month: no back navigation.
+    const limits = monthNavLimits(new Date(2026, 8, 27), { y: 2026, m: 8 });
+    expect(limits.canGoPrev).toBe(false);
+    expect(limits.canGoNext).toBe(false);
+  });
+
+  it('allows one month back when the week window spans two months', () => {
+    // Oct 3 -> earliest is Sept 26: September is viewable, August is not.
+    expect(monthNavLimits(new Date(2026, 9, 3), { y: 2026, m: 9 }).canGoPrev).toBe(true);
+    const sept = monthNavLimits(new Date(2026, 9, 3), { y: 2026, m: 8 });
+    expect(sept.canGoPrev).toBe(false);
+    expect(sept.canGoNext).toBe(true);
+  });
+
+  it('never allows navigating into the future', () => {
+    const limits = monthNavLimits(new Date(2026, 8, 27), { y: 2026, m: 8 });
+    expect(limits.canGoNext).toBe(false);
   });
 });

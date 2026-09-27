@@ -4,7 +4,7 @@ import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import { timeLabel } from '../lib/sessionBuffer';
 import type { WorkoutGroup } from '../lib/workoutGroups';
-import { dayKey, parseDayKey, workoutsByDay } from '../lib/calendarDays';
+import { dayKey, parseDayKey, workoutsByDay, monthNavLimits } from '../lib/calendarDays';
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
@@ -28,7 +28,7 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
     ...Array<null>(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  const canGoNext = view.y < now.getFullYear() || (view.y === now.getFullYear() && view.m < now.getMonth());
+  const { canGoPrev, canGoNext } = monthNavLimits(now, view);
   const shiftMonth = (dir: -1 | 1) =>
     setView((v) => {
       const d = new Date(v.y, v.m + dir, 1);
@@ -43,7 +43,12 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
       <div className="calendar-header">
         <h3>{monthLabel}</h3>
         <div className="calendar-nav">
-          <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+          <button
+            type="button"
+            onClick={() => shiftMonth(-1)}
+            disabled={!canGoPrev}
+            aria-label="Previous month"
+          >
             <ChevronLeft size={16} />
           </button>
           <button

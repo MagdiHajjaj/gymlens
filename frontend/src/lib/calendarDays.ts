@@ -22,3 +22,22 @@ export function workoutsByDay(workouts: WorkoutGroup[]): Map<string, WorkoutGrou
   });
   return map;
 }
+
+export interface MonthView {
+  y: number;
+  m: number;
+}
+
+/**
+ * Month navigation limits for the training calendar: never browse past the
+ * current month, and never further back than one week before today.
+ */
+export function monthNavLimits(now: Date, view: MonthView): { canGoPrev: boolean; canGoNext: boolean } {
+  const earliest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+  const canGoPrev =
+    view.y > earliest.getFullYear() ||
+    (view.y === earliest.getFullYear() && view.m > earliest.getMonth());
+  const canGoNext =
+    view.y < now.getFullYear() || (view.y === now.getFullYear() && view.m < now.getMonth());
+  return { canGoPrev, canGoNext };
+}
