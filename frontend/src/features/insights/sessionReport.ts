@@ -1,19 +1,19 @@
 import type { ExerciseId, RepEvent, WorkoutSession } from '../../types/workout';
 
 const cueNames: Record<string, string> = {
-  insufficient_depth: 'Depth cue',
-  excessive_forward_lean: 'Forward lean cue',
-  limited_range: 'Movement range cue',
-  upper_arm_movement: 'Upper-arm movement',
-  hip_alignment: 'Hip alignment cue',
-  excessive_back_rounding: 'Torso angle cue',
-  insufficient_hinge: 'Hinge depth cue',
-  knee_over_toes: 'Knee position estimate',
-  excessive_back_arch: 'Torso position cue',
-  incomplete_extension: 'Extension cue',
-  incomplete_pull: 'Pull range cue',
-  torso_rising: 'Torso movement',
-  excessive_swing: 'Body swing cue',
+  insufficient_depth: 'Shallow depth',
+  excessive_forward_lean: 'Forward lean',
+  limited_range: 'Limited range of motion',
+  upper_arm_movement: 'Upper arm moving',
+  hip_alignment: 'Hips out of alignment',
+  excessive_back_rounding: 'Back rounding',
+  insufficient_hinge: 'Shallow hinge',
+  knee_over_toes: 'Knees past toes',
+  excessive_back_arch: 'Back arching',
+  incomplete_extension: 'Incomplete extension',
+  incomplete_pull: 'Incomplete pull',
+  torso_rising: 'Torso lifting early',
+  excessive_swing: 'Body swing',
 };
 
 const nextActions: Record<string, string> = {
@@ -22,22 +22,22 @@ const nextActions: Record<string, string> = {
   excessive_forward_lean:
     'Pay attention to your torso position through the movement. Check the camera is side-on before comparing the next set.',
   limited_range:
-    'Complete the movement and return to your starting position at a comfortable range. Watch whether the range cue repeats.',
+    'Complete the movement and return to your starting position at a comfortable range. Watch whether the limited range repeats.',
   upper_arm_movement:
     'Keep your upper arm steady while you curl. Keep your shoulder, elbow, and wrist in view for the next set.',
   hip_alignment: 'Check your shoulder, hip, and ankle alignment in the camera preview before the next set.',
   excessive_back_rounding:
-    'Review your side-on camera position and torso movement. This cue estimates torso angle; it cannot confirm spinal rounding.',
+    'Review your side-on camera position and torso movement. This estimates torso angle; it cannot confirm spinal rounding.',
   insufficient_hinge:
-    'Keep your camera side-on and use a comfortable, repeatable hinge. Compare the hinge cue in your next set.',
+    'Keep your camera side-on and use a comfortable, repeatable hinge. Compare the hinge depth in your next set.',
   knee_over_toes:
     'Check your camera angle and review the flagged reps. A knee-position estimate alone does not establish incorrect technique.',
   excessive_back_arch:
     'Review your torso position in the side-on preview. This camera estimate cannot confirm spinal arching.',
   incomplete_extension:
-    'Return to your calibrated starting position within your comfortable range. Watch whether the extension cue repeats.',
+    'Return to your calibrated starting position within your comfortable range. Watch whether the incomplete extension repeats.',
   incomplete_pull:
-    'Use a comfortable, repeatable pulling movement and return to your starting position. Compare the pull-range cue next time.',
+    'Use a comfortable, repeatable pulling movement and return to your starting position. Compare the pull range next time.',
   torso_rising:
     'Watch for torso movement during the pull and keep your side view consistent for the next set.',
   excessive_swing: 'Check for body swing in your next set and keep your full movement visible to the camera.',
