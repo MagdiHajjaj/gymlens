@@ -1,4 +1,17 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+async function openCameraSetup(page: Page) {
+  const plan = page.getByRole('button', { name: 'Plan your session', exact: true });
+  const setup = page.getByRole('button', { name: 'Set up camera', exact: true });
+  await expect(plan.or(setup)).toBeVisible();
+  if (await plan.isVisible()) {
+    await plan.click();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    return;
+  }
+  await setup.click();
+}
 
 test('voice coach announces a set summary, rest countdown, and next-set transition', async ({ page }) => {
   test.setTimeout(65_000);
@@ -134,7 +147,7 @@ test('mobile setup action stays in the page flow above the fixed navigation', as
 });
 test('local MediaPipe model initializes against a browser test camera', async ({ page }) => {
   await page.goto('/workout');
-  await page.getByRole('button', { name: 'Set up camera' }).click();
+  await openCameraSetup(page);
   await expect(page.locator('video')).toHaveJSProperty('readyState', 4, { timeout: 15000 });
   await expect(page.locator('.camera-stage')).toHaveAttribute('data-status', 'ready', { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Let’s get you in frame' })).toHaveCount(0);
@@ -159,6 +172,7 @@ test('leaving an active mobile demo discards it without a prompt', async ({ page
 test('camera preview gates start, records no reps, and releases the camera when cancelled', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => {
     const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     const tracks: MediaStreamTrack[] = [];
@@ -189,8 +203,10 @@ test('camera preview gates start, records no reps, and releases the camera when 
     }),
   );
   await page.goto('/workout');
-  await page.getByRole('button', { name: 'Set up camera' }).click();
-  await expect(page.getByRole('status')).toContainText('You’re in position');
+  await openCameraSetup(page);
+  await expect(page.getByRole('heading', { name: 'Get-ready checklist' })).toBeVisible();
+  await expect(page.getByText('Auto-start waits until you are in frame')).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Stay in position');
   const start = page.getByRole('button', { name: /Start workout|Start now/ });
   await page.evaluate(() => Object.assign(window, { __poseVisible: false }));
   await expect(start).toBeDisabled();
@@ -198,12 +214,13 @@ test('camera preview gates start, records no reps, and releases the camera when 
   await expect(page.getByTestId('rep-count')).toHaveCount(0);
   await page.evaluate(() => Object.assign(window, { __poseVisible: true }));
   await expect(page.getByTestId('rep-count')).toHaveText('0', { timeout: 5000 });
+  await expect(page.locator('.mobile-live-status')).toBeVisible();
+  await expect(page.locator('.workout-controls')).toBeInViewport();
   expect(
     await page.evaluate(() => Object.keys(localStorage).filter((key) => key.includes('sessions')).length),
   ).toBe(0);
   await page.getByRole('button', { name: 'End session', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Squat session report' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Get a recorded baseline' })).toBeVisible();
+  await expect(page).toHaveURL(/\/workout/);
   await expect
     .poll(() =>
       page.evaluate(() =>

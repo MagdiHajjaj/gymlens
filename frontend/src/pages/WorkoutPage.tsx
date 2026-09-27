@@ -358,7 +358,7 @@ export function WorkoutPage() {
       />
     );
   return (
-    <div className="page workout-page">
+    <div className="page workout-page is-live-workout">
       <dialog
         ref={leaveDialog}
         className="workout-leave-dialog"
@@ -452,6 +452,21 @@ export function WorkoutPage() {
             <div className="mobile-rep-overlay" aria-hidden="true">
               <strong>{currentSetReps}</strong>
               <span>set reps</span>
+            </div>
+            <div className={`mobile-live-status is-${trackingState}`} role="status">
+              {trackingState === 'ready' ? <Check size={16} /> : <ScanLine size={16} />}
+              <div>
+                <strong>{trackingLabel}</strong>
+                <span>
+                  {rest
+                    ? `Next set in ${restRemaining}s`
+                    : paused
+                      ? 'Workout paused'
+                      : result?.trackingValid && result.calibrated
+                        ? cue || 'Ready for your next rep'
+                        : result?.guidance || exercise.calibrate}
+                </span>
+              </div>
             </div>
             {rest && (
               <div

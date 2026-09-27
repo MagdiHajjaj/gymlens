@@ -123,7 +123,7 @@ export function WorkoutSetup({
   }, [preview, ready]);
 
   return (
-    <div className="page workout-setup-page">
+    <div className={`page workout-setup-page${preview ? ' is-camera-preview' : ''}`}>
       <Link className="back-link" to="/">
         <ArrowLeft size={16} /> Back to overview
       </Link>
@@ -197,17 +197,53 @@ export function WorkoutSetup({
                   <ArrowLeft size={16} /> Change exercise
                 </Button>
               </div>
-              <CameraView
-                preview
-                voiceCoach={voiceCoach}
-                onDemo={() => onStart('demo')}
-                onReadiness={setReadiness}
-              />
-              <p className="preview-note" aria-live="polite">
-                {autoStartRemaining > 0
-                  ? `Starting automatically in ${autoStartRemaining}… Move out of frame to cancel.`
-                  : 'Your workout starts automatically when your position is ready.'}
-              </p>
+              <div className="setup-camera-frame">
+                <CameraView
+                  preview
+                  voiceCoach={voiceCoach}
+                  onDemo={() => onStart('demo')}
+                  onReadiness={setReadiness}
+                />
+                <div className={`setup-auto-start${ready ? ' is-ready' : ''}`} aria-live="polite">
+                  {autoStartRemaining > 0 ? (
+                    <>
+                      <strong>{autoStartRemaining}</strong>
+                      <span>Starting automatically</span>
+                    </>
+                  ) : (
+                    <span>{ready ? 'Starting…' : 'Auto-start waits until you are in frame'}</span>
+                  )}
+                </div>
+              </div>
+              <section className="setup-camera-checklist" aria-labelledby="camera-checklist-title">
+                <div>
+                  <span className="eyebrow">BEFORE YOU STEP BACK</span>
+                  <h3 id="camera-checklist-title">Get-ready checklist</h3>
+                </div>
+                <ul className="readiness-list" aria-label="Camera readiness">
+                  {[
+                    { label: 'Camera and tracker ready', complete: readiness.cameraReady },
+                    { label: 'Your full movement is visible', complete: readiness.trackingValid },
+                    { label: 'Starting position held', complete: ready },
+                  ].map(({ label, complete }) => (
+                    <li key={label} className={complete ? 'is-ready' : ''}>
+                      <span aria-hidden="true">{complete ? <Check size={14} /> : '•'}</span>
+                      {label}
+                      <span className="sr-only">{complete ? ': ready' : ': waiting'}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className={`setup-guidance ${ready ? 'is-ready' : ''}`} role="status">
+                  {ready
+                    ? autoStartRemaining > 0
+                      ? `Stay in position. Starting in ${autoStartRemaining}.`
+                      : 'You’re in position. Starting now.'
+                    : readiness.guidance || calibrationGuidance(exercise.calibrate)}
+                </p>
+                <Button className="full-width setup-primary" disabled={!ready} onClick={() => onStart('camera')}>
+                  <Play size={18} /> {autoStartRemaining > 0 ? `Start now (${autoStartRemaining})` : 'Start workout'}
+                </Button>
+              </section>
             </>
           ) : planning ? (
             reviewMode && allComplete ? (
@@ -279,7 +315,7 @@ export function WorkoutSetup({
           )}
         </section>
 
-        <aside className="panel workout-ready-panel">
+        <aside className={`panel workout-ready-panel${preview ? ' is-preview' : ''}`}>
           <div className={`position-guide ${exercise.color}`}>
             <ExerciseArt exercise={focusId} />
             <span>{focusId === 'curl' ? 'Face the camera' : 'Side view'}</span>
@@ -288,26 +324,7 @@ export function WorkoutSetup({
           <h2>{preview ? 'Get ready to move' : exercise.name}</h2>
           <p>{exercise.setup}</p>
           {preview ? (
-            <>
-              <ul className="readiness-list" aria-label="Camera readiness">
-                {[
-                  { label: 'Camera and tracker ready', complete: readiness.cameraReady },
-                  { label: 'Required joints visible', complete: readiness.trackingValid },
-                  { label: 'Starting position calibrated', complete: ready },
-                ].map(({ label, complete }) => (
-                  <li key={label} className={complete ? 'is-ready' : ''}>
-                    <span aria-hidden="true">{complete ? <Check size={14} /> : '•'}</span>
-                    {label}
-                    <span className="sr-only">{complete ? ': ready' : ': waiting'}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className={`setup-guidance ${ready ? 'is-ready' : ''}`} role="status">
-                {ready
-                  ? 'You’re in position. Start when you’re ready.'
-                  : readiness.guidance || calibrationGuidance(exercise.calibrate)}
-              </p>
-            </>
+            <p className="position-tip">Use the live checklist beside the camera, then step back until your full movement is visible.</p>
           ) : (
             <p className="position-tip">
               <strong>To calibrate:</strong> {calibrationGuidance(exercise.calibrate)}
@@ -338,11 +355,7 @@ export function WorkoutSetup({
             </label>
           </div>
 
-          {preview ? (
-            <Button className="full-width setup-primary" disabled={!ready} onClick={() => onStart('camera')}>
-              <Play size={18} /> {autoStartRemaining > 0 ? `Start now (${autoStartRemaining})` : 'Start workout'}
-            </Button>
-          ) : planning ? null : demo ? (
+          {preview ? null : planning ? null : demo ? (
             <>
               <div className="demo-setup-note">Demo mode uses sample footage. You won’t need a camera.</div>
               <Button className="full-width setup-primary" onClick={() => onStart('demo')}>
