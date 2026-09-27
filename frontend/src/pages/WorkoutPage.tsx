@@ -34,6 +34,7 @@ import {
 import { api } from '../lib/api';
 import { VitalsPill } from '../features/vitals/VitalsPill';
 import { VitalsLiveSection } from '../features/vitals/VitalsLiveSection';
+import { shouldRunVitals } from '../features/vitals/vitalsSessionPolicy';
 import { GUARDIAN_PHRASES, useVitalsGuardian } from '../features/vitals/useVitalsGuardian';
 import { useVitalsSession } from '../features/vitals/useVitalsSession';
 import type { WorkoutSession } from '../types/workout';
@@ -99,13 +100,17 @@ export function WorkoutPage() {
   // keep the full vitals history (see PR4).
   const vitalsVideoRef = useRef<HTMLVideoElement | null>(null);
   const workoutLive = session?.status === 'active' && !paused;
+  // Vitals only run on the live camera: in demo/upload sessions the video
+  // element plays sample footage, and measuring the footage subject's face
+  // would present someone else's pulse as the user's. Never fabricate vitals.
+  const vitalsLive = shouldRunVitals(session, Boolean(workoutLive));
   const vitals = useVitalsSession({
     videoRef: vitalsVideoRef,
-    active: Boolean(workoutLive),
+    active: vitalsLive,
     onReading: recordVitals,
   });
   const guardian = useVitalsGuardian({
-    active: Boolean(workoutLive),
+    active: vitalsLive,
     reading: vitals.reading,
     onElevated: () => {
       // Advisory nudge, not a medical directive. Banner always shows;
@@ -541,6 +546,7 @@ export function WorkoutPage() {
             status={vitals.status}
             reading={vitals.reading}
             guardian={guardian.state}
+            avgPulse={guardian.avgPulse}
           />
           <div className="workout-controls">
             <Button

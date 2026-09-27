@@ -10,6 +10,13 @@ interface VitalsLiveSectionProps {
   reading: VitalsReading | null;
   /** Rolling guardian state and average pulse. */
   guardian: GuardianState;
+  /**
+   * Rolling average pulse from the guardian. The section shows this instead
+   * of the latest single reading so the displayed number can never disagree
+   * with the alert state (no lone spike shown as fact while the guardian
+   * says "Monitoring").
+   */
+  avgPulse: number | null;
 }
 
 /**
@@ -18,12 +25,12 @@ interface VitalsLiveSectionProps {
  * service is idle or unavailable so a missing sidecar never clutters
  * the session.
  */
-export function VitalsLiveSection({ status, reading, guardian }: VitalsLiveSectionProps) {
+export function VitalsLiveSection({ status, reading, guardian, avgPulse }: VitalsLiveSectionProps) {
   if (status === 'idle' || status === 'unavailable' || status === 'busy') return null;
 
   const minConfidence = DEFAULT_THRESHOLDS.minConfidence;
   const elevated = guardian === 'elevated';
-  const pulse = reading && reading.pulse_confidence >= minConfidence ? reading.pulse_bpm : null;
+  const pulse = avgPulse;
   const breathing =
     reading && reading.breathing_confidence >= minConfidence ? reading.breathing_bpm : null;
 
