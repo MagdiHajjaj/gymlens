@@ -249,11 +249,10 @@ export function WorkoutSetup({
           ) : (
             <>
               <h2>Choose your exercise</h2>
-              {selectedIds.length > 1 && (
-                <p className="small-muted" role="status">
-                  {selectedIds.length} picked — tap to add or remove
-                </p>
-              )}
+              {/* Always rendered so picking a 2nd exercise doesn't shift the grid down. */}
+              <p className="small-muted picked-status" role="status">
+                {selectedIds.length > 1 ? `${selectedIds.length} picked — tap to add or remove` : ''}
+              </p>
               <div className="workout-exercise-options" role="group" aria-label="Exercise">
                 {(Object.keys(exercises) as ExerciseId[]).map((id) => {
                   const picked = selectedIds.includes(id);
