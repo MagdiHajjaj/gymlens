@@ -93,6 +93,8 @@ Unit tests cover geometry, full/shallow cycles, calibration, tracking loss, mini
 
 For the configured Vercel frontend and Render API workflow, follow the [production deployment guide](docs/deployment.md).
 
+After a Render deploy, verify `/health` and `/health/ready` before testing authenticated API routes.
+
 Run `npm run setup` then `npm run build`; host `frontend/dist` on HTTPS with app routes falling back to `index.html`. Preserve `/wasm/` and `/models/` assets. Deploy the Python API separately, install with `uv sync --locked --no-dev`, migrate Tiger Data, and run `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` from `backend/`.
 
 The API bounds bodies/batches and includes process-local rate limits for costly endpoints. For multiple workers/instances, enforce shared limits at the gateway. Configure exact HTTPS CORS origins and keep tokens and raw video out of logs.
