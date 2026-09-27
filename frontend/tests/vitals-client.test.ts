@@ -6,7 +6,7 @@ class MockWebSocket {
   static CONNECTING = 0;
   url: string;
   readyState = MockWebSocket.CONNECTING;
-  sent: unknown[] = [];
+  sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
@@ -15,7 +15,7 @@ class MockWebSocket {
     this.url = url;
     MockWebSocket.instances.push(this);
   }
-  send(data: unknown) {
+  send(data: string) {
     this.sent.push(data);
   }
   close() {
