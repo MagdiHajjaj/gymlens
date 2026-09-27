@@ -43,6 +43,12 @@ A 30–60s, well-lit, mostly-still face clip gives real pulse (~12s window)
 and breathing (~30s window) numbers. Without a visible face you still get
 `validation` events proving the pipeline runs.
 
+> The SDK pins its TLS certificates, so the smoke test needs direct
+> internet access — it fails behind TLS-intercepting proxies (e.g. dev
+> sandboxes). On headless Linux it also needs a D-Bus user session for
+> device-key provisioning, or the no-emd SDK variant. Render/your laptop
+> are fine; sandboxed CI is not.
+
 ## Deploy (Render)
 
 New **Web Service**: Node, build `npm install`, start `npm start`,

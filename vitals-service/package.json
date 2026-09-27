@@ -1,1 +1,20 @@
-{"dependencies":{"@smartspectra/node-sdk":"^3.3.0","jpeg-js":"^0.4.4","ws":"^8.18.3"},"description":"WebSocket sidecar: streams camera frames to Presage SmartSpectra and returns contactless vitals (pulse, breathing) with confidence","engines":{"node":">=20"},"name":"gymlens-vitals-service","private":true,"scripts":{"smoke":"node smoke.js","start":"node server.js"},"type":"module","version":"0.1.0"}
+{
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.3.0",
+    "jpeg-js": "^0.4.4",
+    "ws": "^8.18.3"
+  },
+  "description": "WebSocket sidecar: streams camera frames to Presage SmartSpectra and returns contactless vitals (pulse, breathing) with confidence",
+  "engines": {
+    "node": ">=20"
+  },
+  "name": "gymlens-vitals-service",
+  "private": true,
+  "scripts": {
+    "smoke": "node smoke.js",
+    "start": "node server.js",
+    "test": "node --import ./test/setup-mock.mjs --test 'test/*.test.js'"
+  },
+  "type": "module",
+  "version": "0.1.0"
+}
