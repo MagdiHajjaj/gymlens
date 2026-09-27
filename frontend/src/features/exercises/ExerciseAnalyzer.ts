@@ -466,6 +466,10 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
   private phase: ExerciseResult['phase'] = 'ready';
   private started = 0;
   private minimum = 180;
+  /** Largest tracked value during the cycle: the top/start position, so ROM = maximum - minimum. */
+  private maximum = 180;
+  /** Timestamp the rep reversed direction (eccentric -> concentric), for tempo splits. */
+  private reversalAt = -1;
   private maximumLean = 0;
   private enterSince = -1;
   private reversalSince = -1;
@@ -495,6 +499,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     this.baseline = 180;
     this.phase = 'ready';
     this.minimum = 180;
+    this.maximum = 180;
+    this.reversalAt = -1;
     this.maximumLean = 0;
     this.enterSince = -1;
     this.reversalSince = -1;
@@ -710,6 +716,8 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
           this.phase = 'eccentric';
           this.started = this.enterSince;
           this.minimum = movingUp ? 180 : value;
+          this.maximum = movingUp ? 180 - value : value;
+          this.reversalAt = -1;
           this.maximumLean = 0;
           this.reversalSince = -1;
           this.exitSince = -1;
@@ -719,7 +727,9 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     }
     if (this.phase !== 'ready') {
       const movingUp = this.id === 'press' && this.pressDirection === 'up';
-      this.minimum = movingUp ? Math.min(this.minimum, 180 - value) : Math.min(this.minimum, value);
+      const tracked = movingUp ? 180 - value : value;
+      this.minimum = Math.min(this.minimum, tracked);
+      this.maximum = Math.max(this.maximum, tracked);
       this.maximumLean = Math.max(this.maximumLean, torsoAngle);
       for (const check of this.exercise.cycleFaults) {
         let hit = false;
@@ -745,6 +755,7 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
           if (this.reversalSince < 0) this.reversalSince = frame.timestampMs;
           if (frame.timestampMs - this.reversalSince >= MovementAnalyzer.PHASE_HOLD_MS) {
             this.phase = 'concentric';
+            this.reversalAt = this.reversalSince;
             this.exitSince = -1;
           }
         } else this.reversalSince = -1;
@@ -775,9 +786,21 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
             this.cycleFaults.set(f.code, f);
           }
           result.faults = [...this.cycleFaults.values()];
+          // Eccentric = lowering into the rep, concentric = driving back out.
+          // reversalAt is only missing if the phase machine skipped the flip,
+          // in which case the split is omitted rather than fabricated.
+          const eccentricMs =
+            this.reversalAt >= this.started ? Math.round(this.reversalAt - this.started) : undefined;
+          const concentricMs =
+            this.reversalAt >= this.started
+              ? Math.round(frame.timestampMs - this.reversalAt)
+              : undefined;
           result.repMetrics = {
             min_angle: Math.round(this.minimum),
+            max_angle: Math.round(this.maximum),
             duration_ms: Math.round(duration),
+            ...(eccentricMs !== undefined ? { eccentric_ms: eccentricMs } : {}),
+            ...(concentricMs !== undefined ? { concentric_ms: concentricMs } : {}),
             ...(this.exercise.trackMaxLean ? { max_torso_lean: Math.round(this.maximumLean) } : {}),
           };
         } else {

@@ -285,7 +285,7 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       expect(result?.calibrated).toBe(id !== 'press');
       expect(Object.keys(result?.jointAngles ?? {}).sort()).toEqual([...expected[id]].sort());
     });
-    it('records min angle and duration for every completed rep', () => {
+    it('records min angle, max angle, duration, and tempo split for every completed rep', () => {
       const analyzer = new MovementAnalyzer(id);
       const reps = fixture(id)
         .map((f) => analyzer.analyze(f))
@@ -294,6 +294,15 @@ describe.each<ExerciseId>(['squat', 'curl', 'pushup', 'deadlift', 'lunge', 'pres
       for (const rep of reps) {
         expect(rep.repMetrics?.min_angle).toBeGreaterThan(0);
         expect(rep.repMetrics?.duration_ms).toBeGreaterThan(0);
+        // max_angle is the top/start position: range of motion is max - min.
+        expect(rep.repMetrics?.max_angle).toBeGreaterThan(rep.repMetrics?.min_angle ?? 0);
+        // eccentric + concentric should account for the whole rep (within rounding).
+        const eccentric = rep.repMetrics?.eccentric_ms ?? 0;
+        const concentric = rep.repMetrics?.concentric_ms ?? 0;
+        const duration = rep.repMetrics?.duration_ms ?? 0;
+        expect(eccentric).toBeGreaterThan(0);
+        expect(concentric).toBeGreaterThan(0);
+        expect(Math.abs(eccentric + concentric - duration)).toBeLessThanOrEqual(2);
       }
       if (id === 'deadlift') expect(reps[0].repMetrics?.max_torso_lean).toBeGreaterThan(0);
     });
