@@ -357,9 +357,15 @@ it('coaching requires persistence and obeys message cooldowns', () => {
   expect(engine.next(result, 500, context)).toBeNull();
   expect(engine.next(result, 1000, context)).toBe('Keep your chest a little more upright.');
   expect(engine.next(result, 2000, context)).toBeNull();
-  // A repeated fault rotates to its alternate phrasing instead of looping.
-  expect(engine.next(result, 12000, context)).toBe('Chest up — stay tall through the rep.');
-  expect(engine.next(result, 23000, context)).toBe('Keep your chest a little more upright.');
+  // A repeated fault cycles variants with a lengthening cooldown (10s, 20s, 40s).
+  expect(engine.next(result, 12000, context)).toBeNull();
+  expect(engine.next(result, 21000, context)).toBe('Chest up — stay tall through the rep.');
+  expect(engine.next(result, 22000, context)).toBeNull();
+  expect(engine.next(result, 61000, context)).toBe('Eyes forward, chest proud as you stand.');
+  // After repeated occurrences the coach switches to a drill cue, then retires.
+  expect(engine.next(result, 101000, context)).toBe(
+    'Pause at the bottom and feel your chest staying tall before you drive up.',
+  );
   expect(engine.next({ ...result, trackingValid: false }, 34000, context)).toBeNull();
 });
 it('coaches the lowering phase when the lift is much faster than the descent', () => {
