@@ -1,4 +1,5 @@
 import type { Insight, WorkoutSession, WorkoutHistoryEntry } from '../types/workout';
+import type { ExerciseId } from '../types/workout';
 import type { BackendGoalId } from '../features/goals/goals';
 export interface AthleteProfile {
   id: string;
@@ -23,6 +24,21 @@ export type AthleteProfileInput = Pick<
   | 'weight_kg'
   | 'weekly_workout_target'
 >;
+
+export interface ScheduledWorkout {
+  id: string;
+  /** Local calendar day, YYYY-MM-DD. */
+  scheduled_date: string;
+  name: string | null;
+  exercises: ExerciseId[];
+  created_at: string;
+}
+
+export interface ScheduledWorkoutInput {
+  scheduled_date: string;
+  name?: string;
+  exercises: ExerciseId[];
+}
 let getToken: (() => Promise<string>) | undefined;
 export function setTokenProvider(provider?: () => Promise<string>) {
   getToken = provider;
@@ -42,6 +58,7 @@ async function request<T>(
   options: RequestInit = {},
   blob = false,
   authentication: 'required' | 'optional' = 'required',
+  expectBody = true,
 ): Promise<T> {
   if (!getToken && authentication === 'required') throw new Error('Sign in to connect your workout history.');
   const token = getToken ? await getToken() : undefined;
@@ -63,6 +80,7 @@ async function request<T>(
       response.status,
     );
   }
+  if (!expectBody) return undefined as T;
   return (blob ? response.blob() : response.json()) as Promise<T>;
 }
 export const api = {
@@ -95,6 +113,16 @@ export const api = {
       '/api/platform/tiger',
     ),
   history: (offset = 0) => request<WorkoutHistoryEntry[]>(`/api/workouts?offset=${offset}&limit=50`),
+  scheduled: {
+    list: () => request<ScheduledWorkout[]>('/api/scheduled'),
+    create: (input: ScheduledWorkoutInput) =>
+      request<ScheduledWorkout>('/api/scheduled', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    remove: (id: string) =>
+      request<void>(`/api/scheduled/${id}`, { method: 'DELETE' }, false, 'required', false),
+  },
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
   speech: (text: string) =>

@@ -1,22 +1,65 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, ChevronLeft, ChevronRight, Play, Plus, Trash2 } from 'lucide-react';
 import { exercises } from '../features/exercises/ExerciseRegistry';
+import { usePlan } from '../features/workout/planStore';
 import { timeLabel } from '../lib/sessionBuffer';
 import type { WorkoutGroup } from '../lib/workoutGroups';
-import { dayKey, parseDayKey, workoutsByDay } from '../lib/calendarDays';
+import { api, type ScheduledWorkout } from '../lib/api';
+import type { ExerciseId } from '../types/workout';
+import { dayKey, parseDayKey, workoutsByDay, canGoNextMonth, selectableWindow } from '../lib/calendarDays';
+import { Button } from './ui/button';
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
+interface WorkoutCalendarProps {
+  workouts: WorkoutGroup[];
+  scheduled?: ScheduledWorkout[];
+  /** Only signed-in users can schedule (it needs the backend). */
+  canSchedule?: boolean;
+  onScheduledChange?: () => void;
+}
+
+export function WorkoutCalendar({
+  workouts,
+  scheduled = [],
+  canSchedule = false,
+  onScheduledChange,
+}: WorkoutCalendarProps) {
   const now = new Date();
   const todayKey = dayKey(now);
+  const navigate = useNavigate();
   const byDay = useMemo(() => workoutsByDay(workouts), [workouts]);
+  const scheduledByDay = useMemo(() => {
+    const map = new Map<string, ScheduledWorkout[]>();
+    scheduled.forEach((item) => {
+      map.set(item.scheduled_date, [...(map.get(item.scheduled_date) ?? []), item]);
+    });
+    return map;
+  }, [scheduled]);
   const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
-  // Default to the most recent training day so the calendar opens on something meaningful.
-  const [selected, setSelected] = useState<string | null>(
-    () => workouts[0]?.startedAt ? dayKey(new Date(workouts[0].startedAt)) : todayKey,
-  );
+  const { minKey } = selectableWindow(now);
+  // Default to the most recent training day within the selectable week so the
+  // calendar opens on something meaningful.
+  const [selected, setSelected] = useState<string | null>(() => {
+    const recent = workouts.find(
+      (w) => w.startedAt && dayKey(new Date(w.startedAt)) >= minKey,
+    );
+    return recent?.startedAt ? dayKey(new Date(recent.startedAt)) : todayKey;
+  });
+
+  // Schedule-form state, reset whenever the selected day changes.
+  const [scheduling, setScheduling] = useState(false);
+  const [schedName, setSchedName] = useState('');
+  const [schedExercises, setSchedExercises] = useState<ExerciseId[]>([]);
+  const [schedSaving, setSchedSaving] = useState(false);
+  const [schedError, setSchedError] = useState('');
+  useEffect(() => {
+    setScheduling(false);
+    setSchedName('');
+    setSchedExercises([]);
+    setSchedError('');
+  }, [selected]);
 
   const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString('en', {
     month: 'long',
@@ -28,7 +71,7 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
     ...Array<null>(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  const canGoNext = view.y < now.getFullYear() || (view.y === now.getFullYear() && view.m < now.getMonth());
+  const canGoNext = canGoNextMonth(now, view);
   const shiftMonth = (dir: -1 | 1) =>
     setView((v) => {
       const d = new Date(v.y, v.m + dir, 1);
@@ -36,7 +79,50 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
     });
 
   const selectedWorkouts = selected ? (byDay.get(selected) ?? []) : [];
+  const selectedScheduled = selected ? (scheduledByDay.get(selected) ?? []) : [];
   const selectedDate = selected ? parseDayKey(selected) : null;
+  const selectedDisabled = !selected || selected < minKey;
+
+  const toggleSchedExercise = (id: ExerciseId) =>
+    setSchedExercises((prev) =>
+      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id],
+    );
+
+  const saveScheduled = async () => {
+    if (!selected || schedExercises.length === 0 || schedSaving) return;
+    setSchedSaving(true);
+    setSchedError('');
+    try {
+      await api.scheduled.create({
+        scheduled_date: selected,
+        name: schedName.trim() || undefined,
+        exercises: schedExercises,
+      });
+      setScheduling(false);
+      setSchedName('');
+      setSchedExercises([]);
+      onScheduledChange?.();
+    } catch {
+      setSchedError('Could not save that session. Try again.');
+    } finally {
+      setSchedSaving(false);
+    }
+  };
+
+  const deleteScheduled = async (id: string) => {
+    try {
+      await api.scheduled.remove(id);
+      onScheduledChange?.();
+    } catch {
+      setSchedError('Could not delete that session. Try again.');
+    }
+  };
+
+  const startScheduled = (item: ScheduledWorkout) => {
+    usePlan.getState().setPlan(item.exercises);
+    if (item.name) usePlan.getState().setWorkoutName(item.name);
+    navigate('/workout');
+  };
 
   return (
     <div className="workout-calendar">
@@ -66,20 +152,25 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
           if (day === null) return <span key={`blank-${i}`} aria-hidden="true" />;
           const key = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const count = byDay.get(key)?.length ?? 0;
+          const schedCount = scheduledByDay.get(key)?.length ?? 0;
           const isToday = key === todayKey;
           const isSelected = selected === key;
+          const isDisabled = key < minKey;
           return (
             <button
               key={key}
               type="button"
               role="gridcell"
-              className={`cal-day${count ? ' has-workout' : ''}${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
+              className={`cal-day${count ? ' has-workout' : ''}${schedCount ? ' has-scheduled' : ''}${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
               aria-pressed={isSelected}
-              aria-label={`${monthLabel} ${day}${count ? `, ${count} workout${count === 1 ? '' : 's'}` : ', rest day'}`}
+              aria-disabled={isDisabled}
+              disabled={isDisabled}
+              aria-label={`${monthLabel} ${day}${count ? `, ${count} workout${count === 1 ? '' : 's'}` : ', rest day'}${schedCount ? `, ${schedCount} scheduled` : ''}`}
               onClick={() => setSelected(key)}
             >
               {day}
               {count > 0 && <span className="cal-dot" aria-hidden="true" />}
+              {schedCount > 0 && <span className="cal-sched" aria-hidden="true" />}
             </button>
           );
         })}
@@ -93,6 +184,41 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
               day: 'numeric',
             })}
           </p>
+        )}
+        {canSchedule && selectedScheduled.length > 0 && (
+          <div className="sched-section">
+            <p className="sched-heading">Scheduled</p>
+            <ul className="sched-list">
+              {selectedScheduled.map((item) => {
+                const exerciseNames = item.exercises.map((id) => exercises[id].name).join(' · ');
+                return (
+                  <li key={item.id} className="sched-card">
+                    <div className="sched-info">
+                      <strong>{item.name || exerciseNames}</strong>
+                      {item.name && <small>{exerciseNames}</small>}
+                    </div>
+                    <div className="sched-actions">
+                      <button
+                        type="button"
+                        className="sched-start"
+                        onClick={() => startScheduled(item)}
+                      >
+                        <Play size={14} fill="currentColor" /> Start
+                      </button>
+                      <button
+                        type="button"
+                        className="sched-delete"
+                        aria-label={`Delete scheduled session ${item.name || exerciseNames}`}
+                        onClick={() => deleteScheduled(item.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
         {selectedWorkouts.length > 0 ? (
           <ul className="calendar-workout-list">
@@ -132,6 +258,57 @@ export function WorkoutCalendar({ workouts }: { workouts: WorkoutGroup[] }) {
           <p className="small-muted">Rest day — nothing recorded.</p>
         ) : (
           <p className="small-muted">Finish a workout and it’ll land on your calendar.</p>
+        )}
+        {canSchedule && !selectedDisabled && !scheduling && (
+          <button type="button" className="sched-add" onClick={() => setScheduling(true)}>
+            <Plus size={14} /> Schedule a session
+          </button>
+        )}
+        {canSchedule && !selectedDisabled && scheduling && (
+          <form
+            className="sched-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveScheduled();
+            }}
+          >
+            <label className="sched-field">
+              <span>Name (optional)</span>
+              <input
+                type="text"
+                value={schedName}
+                maxLength={80}
+                placeholder="Leg day"
+                onChange={(e) => setSchedName(e.target.value)}
+              />
+            </label>
+            <div className="movement-chips" role="group" aria-label="Pick exercises">
+              {(Object.keys(exercises) as ExerciseId[]).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`movement-chip${schedExercises.includes(id) ? ' is-active' : ''}`}
+                  aria-pressed={schedExercises.includes(id)}
+                  onClick={() => toggleSchedExercise(id)}
+                >
+                  {exercises[id].name}
+                </button>
+              ))}
+            </div>
+            {schedError && (
+              <p className="small-muted" role="alert">
+                {schedError}
+              </p>
+            )}
+            <div className="sched-form-actions">
+              <Button type="submit" disabled={schedExercises.length === 0 || schedSaving}>
+                {schedSaving ? 'Saving…' : 'Save session'}
+              </Button>
+              <button type="button" className="text-link" onClick={() => setScheduling(false)}>
+                Cancel
+              </button>
+            </div>
+          </form>
         )}
       </div>
     </div>

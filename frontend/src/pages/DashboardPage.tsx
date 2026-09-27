@@ -1,4 +1,5 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ArrowUpRight,
   ArrowRight,
@@ -15,18 +16,35 @@ import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
 import { WorkoutCalendar } from '../components/WorkoutCalendar';
 import { useSessions } from '../lib/useSessions';
+import { api, type ScheduledWorkout } from '../lib/api';
+import { useIdentity } from '../features/auth/AuthProvider';
 import { duration } from '../lib/sessionBuffer';
 import { groupWorkouts } from '../lib/workoutGroups';
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { authenticated } = useIdentity();
   // Keep the deterministic e2e demo flag when entering demo mode from here.
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
   const { sessions, error } = useSessions();
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const completedWorkouts = groupWorkouts(completed);
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
+  const [scheduled, setScheduled] = useState<ScheduledWorkout[]>([]);
+  const refreshScheduled = useCallback(() => {
+    if (!authenticated) {
+      setScheduled([]);
+      return;
+    }
+    api.scheduled
+      .list()
+      .then(setScheduled)
+      .catch(() => {});
+  }, [authenticated]);
+  useEffect(() => {
+    refreshScheduled();
+  }, [refreshScheduled]);
   return (
     <div className="page dashboard-page">
       <div className="page-heading">
@@ -149,7 +167,12 @@ export function DashboardPage() {
               Cloud history unavailable. Showing this browser’s sessions.
             </p>
           )}
-          <WorkoutCalendar workouts={completedWorkouts} />
+          <WorkoutCalendar
+            workouts={completedWorkouts}
+            scheduled={scheduled}
+            canSchedule={authenticated}
+            onScheduledChange={refreshScheduled}
+          />
         </section>
         <aside className="tip-card">
           <span className="eyebrow">

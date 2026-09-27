@@ -13,12 +13,13 @@ from app import services
 from app.core.config import settings
 from app.core.database import Base, engine, get_db
 from app.core.security import current_subject, optional_subject
-from app.models import MovementMetric, RepEvent, SessionInsight, User, Workout
+from app.models import MovementMetric, RepEvent, ScheduledWorkout, SessionInsight, User, Workout
 from app.schemas import (
     MetricBatch,
     MetricSummary,
     ProfileUpdate,
     RepBatch,
+    ScheduledWorkoutCreate,
     SpeechRequest,
     WorkoutCreate,
     WorkoutFinish,
@@ -362,6 +363,60 @@ def finish(
     workout.total_reps = len(workout.reps)
     db.commit()
     return serialize(workout)
+
+
+def serialize_scheduled(row):
+    return {
+        "id": row.id,
+        "scheduled_date": row.scheduled_date.isoformat(),
+        "name": row.name,
+        "exercises": row.exercises,
+        "created_at": utc(row.created_at),
+    }
+
+
+@app.post("/api/scheduled", status_code=201)
+def schedule_workout(
+    payload: ScheduledWorkoutCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    row = ScheduledWorkout(
+        user_id=user.id,
+        scheduled_date=payload.scheduled_date,
+        name=payload.name,
+        exercises=list(payload.exercises),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return serialize_scheduled(row)
+
+
+@app.get("/api/scheduled")
+def list_scheduled(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    rows = db.scalars(
+        select(ScheduledWorkout)
+        .where(ScheduledWorkout.user_id == user.id)
+        .order_by(ScheduledWorkout.scheduled_date, ScheduledWorkout.created_at)
+    )
+    return [serialize_scheduled(row) for row in rows]
+
+
+@app.delete("/api/scheduled/{scheduled_id}", status_code=204)
+def delete_scheduled(
+    scheduled_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)
+):
+    row = db.scalar(
+        select(ScheduledWorkout).where(
+            ScheduledWorkout.id == str(scheduled_id), ScheduledWorkout.user_id == user.id
+        )
+    )
+    if not row:
+        raise HTTPException(404, "Scheduled workout not found")
+    db.delete(row)
+    db.commit()
+    return Response(status_code=204)
 
 
 @app.post("/api/coaching/speech")

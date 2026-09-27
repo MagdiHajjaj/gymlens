@@ -22,3 +22,25 @@ export function workoutsByDay(workouts: WorkoutGroup[]): Map<string, WorkoutGrou
   });
   return map;
 }
+
+export interface MonthView {
+  y: number;
+  m: number;
+}
+
+/**
+ * The calendar never lets you browse past the current month.
+ */
+export function canGoNextMonth(now: Date, view: MonthView): boolean {
+  return view.y < now.getFullYear() || (view.y === now.getFullYear() && view.m < now.getMonth());
+}
+
+/**
+ * Only the last 7 days (including today) are selectable. You can scroll back
+ * through the months to look at history, but older days are dimmed and
+ * non-interactive.
+ */
+export function selectableWindow(now: Date): { minKey: string; maxKey: string } {
+  const min = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+  return { minKey: dayKey(min), maxKey: dayKey(now) };
+}
