@@ -23,11 +23,14 @@ export function VitalsPanel({
   status,
   reading,
   compact = false,
+  pulseOnly = false,
 }: {
   status: VitalsStatus;
   reading: VitalsReading | null;
   /** Compact layout for the mobile rest flow (PR3 reuses this). */
   compact?: boolean;
+  /** Pulse-first mobile mode: hide the breathing metric. */
+  pulseOnly?: boolean;
 }) {
   let body: React.ReactNode;
   switch (status) {
@@ -44,16 +47,18 @@ export function VitalsPanel({
               unit="bpm"
             />
           </div>
-          <div className="vitals-metric">
-            <span className="vitals-metric-label">
-              <Wind size={15} /> Breathing
-            </span>
-            <MetricValue
-              value={reading?.breathing_bpm ?? null}
-              confidence={reading?.breathing_confidence ?? 0}
-              unit="/min"
-            />
-          </div>
+          {!pulseOnly && (
+            <div className="vitals-metric">
+              <span className="vitals-metric-label">
+                <Wind size={15} /> Breathing
+              </span>
+              <MetricValue
+                value={reading?.breathing_bpm ?? null}
+                confidence={reading?.breathing_confidence ?? 0}
+                unit="/min"
+              />
+            </div>
+          )}
         </div>
       );
       break;
