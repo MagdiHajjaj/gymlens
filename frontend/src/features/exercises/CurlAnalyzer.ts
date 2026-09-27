@@ -3,7 +3,23 @@ import type { ExerciseResult, PoseFrame } from '../../types/workout';
 
 type CurlRep = { metrics: Record<string, number>; faults: ExerciseResult['faults'] };
 
-/** Each arm has its own calibration and cycle; one arm never borrows the other's state. */
+/**
+ * Each arm has its own calibration and cycle; one arm never borrows the other's state.
+ *
+ * Bilateral counting contract (deliberate — proven by track-arms.test.ts):
+ * - One counted rep = one completed cycle on EACH arm (arm_side 2, metrics
+ *   averaged, faults merged by code). Simultaneous curls (L+R together) and
+ *   alternating curls (L,R,L,R -> 2 reps) both count correctly.
+ * - A single arm's completed cycle waits in `pending` for the other arm; it
+ *   is never counted alone and never counted twice (consumed on pairing,
+ *   FIFO). A lone visible arm therefore counts nothing until both arms
+ *   complete — the on-screen guidance says exactly that.
+ * - Pending reps never expire: a pair always represents two real arm cycles,
+ *   even if the pairing spans a rest break. Total counted reps = arm cycles / 2.
+ * - A brief (<=200ms) occlusion swallows frames without disturbing the arm's
+ *   cycle state; a longer loss resets that arm only (recalibration required),
+ *   leaving the other arm's cycle untouched.
+ */
 export class CurlAnalyzer implements ExerciseAnalyzer {
   readonly id = 'curl' as const;
   private analyzers: MovementAnalyzer[];
