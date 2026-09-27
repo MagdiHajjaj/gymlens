@@ -959,33 +959,32 @@ img.exercise-art {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
 }
-.cal-dow {
-  text-align: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: #96a08c;
-  padding: 4px 0;
-}
 .cal-day {
   position: relative;
-  aspect-ratio: 1;
+  min-height: 68px;
   border: none;
   background: transparent;
-  border-radius: 9px;
-  font-size: 12px;
+  border-radius: 12px;
+  font-size: 13px;
   color: #4c5f4a;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding-bottom: 8px;
+  justify-content: flex-start;
+  gap: 1px;
+  padding: 8px 2px;
 }
-.cal-day:not(:disabled):hover {
+.cal-day:hover {
   background: #e9efe0;
 }
-.cal-day:disabled {
-  opacity: 0.35;
-  cursor: default;
+.cal-dow-letter {
+  font-size: 10px;
+  font-weight: 600;
+  color: #96a08c;
+}
+.cal-day.is-selected .cal-dow-letter {
+  color: #cdd8bd;
 }
 .cal-day.has-workout {
   background: #e4ecd4;
@@ -1002,16 +1001,30 @@ img.exercise-art {
 .cal-day.is-selected:hover {
   background: #2c3f2e;
 }
-.cal-dot {
-  position: absolute;
-  bottom: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
+.cal-bars {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5px;
+  margin-top: 4px;
+}
+.cal-bar {
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
   background: #6d8a52;
 }
-.cal-day.is-selected .cal-dot {
+.cal-day.is-selected .cal-bar {
   background: var(--lime);
+}
+.cal-more {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #6d8a52;
+}
+.cal-day.is-selected .cal-more {
+  color: var(--lime);
 }
 .cal-sched {
   position: absolute;
@@ -2713,6 +2726,8 @@ td strong {
   }
   .bottom-tabs {
     display: flex;
+    flex-direction: row;
+    margin: 0;
     position: fixed;
     bottom: calc(14px + env(safe-area-inset-bottom));
     left: 50%;
