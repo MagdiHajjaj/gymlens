@@ -1,4 +1,4 @@
-import type { Insight, WorkoutSession, WorkoutHistoryEntry } from '../types/workout';
+import type { HistorySummary, Insight, WorkoutSession, WorkoutHistoryEntry } from '../types/workout';
 import type { ExerciseId } from '../types/workout';
 import type { BackendGoalId } from '../features/goals/goals';
 export interface AthleteProfile {
@@ -125,6 +125,7 @@ export const api = {
   },
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
+  historySummary: () => request<HistorySummary>('/api/history/summary', { method: 'POST' }),
   speech: (text: string) =>
     request<Blob>(
       '/api/coaching/speech',

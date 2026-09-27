@@ -55,6 +55,13 @@ export interface Insight {
   next_focus: string;
   source: 'gemini' | 'statistics';
 }
+export interface HistorySummary {
+  recap: string;
+  highlights: string[];
+  trends: string[];
+  next_focus: string;
+  source?: 'gemini' | 'statistics';
+}
 export interface WorkoutSetRange {
   set_number: number;
   start_rep: number;
@@ -76,7 +83,7 @@ export interface WorkoutSession {
   ended_at?: string;
   total_reps: number;
   status: 'active' | 'completed';
-  source: 'camera' | 'demo' | 'upload';
+  source: 'camera' | 'demo' | 'upload' | 'import';
   reps: RepEvent[];
   metrics: MetricSample[];
   set_ranges?: WorkoutSetRange[];

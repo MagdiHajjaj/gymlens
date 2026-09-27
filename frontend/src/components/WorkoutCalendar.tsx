@@ -7,7 +7,7 @@ import { timeLabel } from '../lib/sessionBuffer';
 import type { WorkoutGroup } from '../lib/workoutGroups';
 import { api, type ScheduledWorkout } from '../lib/api';
 import type { ExerciseId } from '../types/workout';
-import { dayKey, parseDayKey, workoutsByDay, canGoNextMonth, selectableWindow } from '../lib/calendarDays';
+import { dayKey, parseDayKey, workoutsByDay, weekDays, weekLabel } from '../lib/calendarDays';
 import { Button } from './ui/button';
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -37,14 +37,17 @@ export function WorkoutCalendar({
     });
     return map;
   }, [scheduled]);
-  const [view, setView] = useState({ y: now.getFullYear(), m: now.getMonth() });
-  const { minKey } = selectableWindow(now);
-  // Default to the most recent training day within the selectable week so the
+  // Anchor = the date in the middle of the visible week. Starts at today,
+  // so the strip shows 3 days before and 3 days after the current day.
+  const [anchor, setAnchor] = useState(
+    () => new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
+  const days = useMemo(() => weekDays(anchor), [anchor]);
+  // Default to the most recent training day in the visible week so the
   // calendar opens on something meaningful.
   const [selected, setSelected] = useState<string | null>(() => {
-    const recent = workouts.find(
-      (w) => w.startedAt && dayKey(new Date(w.startedAt)) >= minKey,
-    );
+    const keys = new Set(weekDays(now).map(dayKey));
+    const recent = workouts.find((w) => w.startedAt && keys.has(dayKey(new Date(w.startedAt))));
     return recent?.startedAt ? dayKey(new Date(recent.startedAt)) : todayKey;
   });
 
@@ -61,27 +64,12 @@ export function WorkoutCalendar({
     setSchedError('');
   }, [selected]);
 
-  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString('en', {
-    month: 'long',
-    year: 'numeric',
-  });
-  const firstDow = new Date(view.y, view.m, 1).getDay();
-  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
-  const cells: (number | null)[] = [
-    ...Array<null>(firstDow).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  const canGoNext = canGoNextMonth(now, view);
-  const shiftMonth = (dir: -1 | 1) =>
-    setView((v) => {
-      const d = new Date(v.y, v.m + dir, 1);
-      return { y: d.getFullYear(), m: d.getMonth() };
-    });
+  const shiftWeek = (dir: -1 | 1) =>
+    setAnchor((a) => new Date(a.getFullYear(), a.getMonth(), a.getDate() + dir * 7));
 
   const selectedWorkouts = selected ? (byDay.get(selected) ?? []) : [];
   const selectedScheduled = selected ? (scheduledByDay.get(selected) ?? []) : [];
   const selectedDate = selected ? parseDayKey(selected) : null;
-  const selectedDisabled = !selected || selected < minKey;
 
   const toggleSchedExercise = (id: ExerciseId) =>
     setSchedExercises((prev) =>
@@ -127,35 +115,23 @@ export function WorkoutCalendar({
   return (
     <div className="workout-calendar">
       <div className="calendar-header">
-        <h3>{monthLabel}</h3>
+        <h3>{weekLabel(days)}</h3>
         <div className="calendar-nav">
-          <button type="button" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+          <button type="button" onClick={() => shiftWeek(-1)} aria-label="Previous week">
             <ChevronLeft size={16} />
           </button>
-          <button
-            type="button"
-            onClick={() => shiftMonth(1)}
-            disabled={!canGoNext}
-            aria-label="Next month"
-          >
+          <button type="button" onClick={() => shiftWeek(1)} aria-label="Next week">
             <ChevronRight size={16} />
           </button>
         </div>
       </div>
       <div className="calendar-grid" role="grid" aria-label="Workout calendar">
-        {DOW.map((d) => (
-          <span key={d} className="cal-dow" aria-hidden="true">
-            {d}
-          </span>
-        ))}
-        {cells.map((day, i) => {
-          if (day === null) return <span key={`blank-${i}`} aria-hidden="true" />;
-          const key = `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        {days.map((date) => {
+          const key = dayKey(date);
           const count = byDay.get(key)?.length ?? 0;
           const schedCount = scheduledByDay.get(key)?.length ?? 0;
           const isToday = key === todayKey;
           const isSelected = selected === key;
-          const isDisabled = key < minKey;
           return (
             <button
               key={key}
@@ -163,13 +139,21 @@ export function WorkoutCalendar({
               role="gridcell"
               className={`cal-day${count ? ' has-workout' : ''}${schedCount ? ' has-scheduled' : ''}${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
               aria-pressed={isSelected}
-              aria-disabled={isDisabled}
-              disabled={isDisabled}
-              aria-label={`${monthLabel} ${day}${count ? `, ${count} workout${count === 1 ? '' : 's'}` : ', rest day'}${schedCount ? `, ${schedCount} scheduled` : ''}`}
+              aria-label={`${date.toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}${count ? `, ${count} workout${count === 1 ? '' : 's'}` : ', rest day'}${schedCount ? `, ${schedCount} scheduled` : ''}`}
               onClick={() => setSelected(key)}
             >
-              {day}
-              {count > 0 && <span className="cal-dot" aria-hidden="true" />}
+              <span className="cal-dow-letter" aria-hidden="true">
+                {DOW[date.getDay()]}
+              </span>
+              <span aria-hidden="true">{date.getDate()}</span>
+              {count > 0 && (
+                <span className="cal-bars" aria-hidden="true">
+                  {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+                    <span key={i} className="cal-bar" />
+                  ))}
+                  {count > 3 && <span className="cal-more">+{count - 3}</span>}
+                </span>
+              )}
               {schedCount > 0 && <span className="cal-sched" aria-hidden="true" />}
             </button>
           );
@@ -259,12 +243,12 @@ export function WorkoutCalendar({
         ) : (
           <p className="small-muted">Finish a workout and it’ll land on your calendar.</p>
         )}
-        {canSchedule && !selectedDisabled && !scheduling && (
+        {canSchedule && !scheduling && (
           <button type="button" className="sched-add" onClick={() => setScheduling(true)}>
             <Plus size={14} /> Schedule a session
           </button>
         )}
-        {canSchedule && !selectedDisabled && scheduling && (
+        {canSchedule && scheduling && (
           <form
             className="sched-form"
             onSubmit={(e) => {

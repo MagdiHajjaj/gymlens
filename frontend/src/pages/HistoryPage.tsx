@@ -10,6 +10,7 @@ import { timeLabel } from '../lib/sessionBuffer';
 import { Button } from '../components/ui/button';
 import { groupWorkouts } from '../lib/workoutGroups';
 import { filterWorkouts } from '../lib/filterWorkouts';
+import { HistorySummaryCard } from '../components/HistorySummaryCard';
 
 export function HistoryPage() {
   const { sessions, loading, error, retry } = useSessions();
@@ -95,6 +96,7 @@ export function HistoryPage() {
           </Button>
         </div>
       )}
+      {authenticated && <HistorySummaryCard />}
       <div className="history-session-list" aria-busy={loading}>
         {filtered.map((workout) => {
           const local = workout.sessions.some((session) => session.local !== false);
@@ -125,7 +127,9 @@ export function HistoryPage() {
                     ? 'Demo · sample data'
                     : session.source === 'upload'
                       ? 'Video analysis'
-                      : 'Camera workout'}
+                      : session.source === 'import'
+                        ? 'Imported'
+                        : 'Camera workout'}
                 </span>
               </div>
               {workout.sessions.length > 1 ? (

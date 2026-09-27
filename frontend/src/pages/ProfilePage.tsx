@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Database, LockKeyhole, Save, UserRound } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useIdentity } from '../features/auth/AuthProvider';
@@ -205,6 +206,10 @@ export function ProfilePage() {
           <div className="profile-data-row"><span>Identity</span><strong>Auth0</strong></div>
           <div className="profile-data-row"><span>Profile</span><strong>Tiger PostgreSQL</strong></div>
           <div className="profile-data-row"><span>Camera video</span><strong>Never uploaded</strong></div>
+          <div className="profile-data-row">
+            <span>Past workouts</span>
+            <strong><Link to="/import">Import history</Link></strong>
+          </div>
         </aside>
       </div>
     </div>

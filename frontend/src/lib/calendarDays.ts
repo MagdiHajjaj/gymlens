@@ -29,18 +29,23 @@ export interface MonthView {
 }
 
 /**
- * The calendar never lets you browse past the current month.
+ * The 7 calendar days shown in the week strip: 3 days before the anchor,
+ * the anchor itself in the middle, and 3 days after.
  */
-export function canGoNextMonth(now: Date, view: MonthView): boolean {
-  return view.y < now.getFullYear() || (view.y === now.getFullYear() && view.m < now.getMonth());
+export function weekDays(anchor: Date): Date[] {
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 3 + i),
+  );
 }
 
-/**
- * Only the last 7 days (including today) are selectable. You can scroll back
- * through the months to look at history, but older days are dimmed and
- * non-interactive.
- */
-export function selectableWindow(now: Date): { minKey: string; maxKey: string } {
-  const min = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-  return { minKey: dayKey(min), maxKey: dayKey(now) };
+/** Header label for the week strip, e.g. "September 24 – 30, 2026". */
+export function weekLabel(days: Date[]): string {
+  const first = days[0];
+  const last = days[days.length - 1];
+  const firstPart = first.toLocaleDateString('en', { month: 'long', day: 'numeric' });
+  const lastPart =
+    first.getMonth() === last.getMonth()
+      ? last.toLocaleDateString('en', { day: 'numeric' })
+      : last.toLocaleDateString('en', { month: 'long', day: 'numeric' });
+  return `${firstPart} – ${lastPart}, ${last.getFullYear()}`;
 }

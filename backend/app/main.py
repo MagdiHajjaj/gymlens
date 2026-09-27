@@ -15,6 +15,7 @@ from app.core.database import Base, engine, get_db
 from app.core.security import current_subject, optional_subject
 from app.models import MovementMetric, RepEvent, ScheduledWorkout, SessionInsight, User, Workout
 from app.schemas import (
+    HistorySummary,
     MetricBatch,
     MetricSummary,
     ProfileUpdate,
@@ -453,3 +454,13 @@ def insights(session_id: UUID, refresh: bool = False, db: Session = Depends(get_
     db.add(SessionInsight(session_id=workout.id, summary_json=summary))
     db.commit()
     return summary
+
+
+@app.post("/api/history/summary")
+def history_summary(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """AI coaching summary over the user's recent training history."""
+    services.rate_limit(user.id, "history-summary", 3)
+    stats = services.history_stats(db, user.id)
+    if stats.get("total_sessions", 0) == 0:
+        raise HTTPException(404, "No training history yet")
+    return services.generate_history_summary(stats)

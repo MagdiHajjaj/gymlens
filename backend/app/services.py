@@ -17,7 +17,7 @@ from app.models import SessionInsight, Workout
 from google.genai import types
 
 from app.core.config import settings
-from app.schemas import Insight
+from app.schemas import HistorySummary, Insight
 
 _lock = Lock()
 _requests: OrderedDict = OrderedDict()
@@ -464,4 +464,109 @@ def generate_insight(workout, user=None, history=None) -> dict:
     except Exception:
         raise HTTPException(
             503, "Insights are temporarily unavailable. Your workout is saved; retry later."
+        ) from None
+
+
+def history_stats(db, user_id: str, days: int = 60) -> dict:
+    """Aggregate training evidence for an AI whole-history summary."""
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import func
+
+    cutoff = datetime.now().astimezone() - timedelta(days=days)
+    rows = db.scalars(
+        select(Workout)
+        .where(
+            Workout.user_id == user_id,
+            Workout.source != "demo",
+            Workout.started_at >= cutoff,
+        )
+        .order_by(Workout.started_at.desc())
+    ).all()
+    sessions = [w for w in rows if w.status == "completed"]
+    if not sessions:
+        return {"total_sessions": 0}
+
+    per_exercise: dict[str, dict[str, int]] = {}
+    active_days: set[str] = set()
+    weekly = [0] * 8
+    total_minutes = 0.0
+    now = datetime.now().astimezone()
+    for w in sessions:
+        started = w.started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=now.tzinfo)
+        key = started.date().isoformat()
+        active_days.add(key)
+        entry = per_exercise.setdefault(w.exercise, {"sessions": 0, "reps": 0})
+        entry["sessions"] += 1
+        entry["reps"] += w.total_reps or 0
+        week_idx = min((now.date() - started.date()).days // 7, 7)
+        weekly[7 - week_idx] += 1
+        if w.ended_at:
+            ended = w.ended_at
+            if ended.tzinfo is None:
+                ended = ended.replace(tzinfo=now.tzinfo)
+            total_minutes += max((ended - started).total_seconds() / 60, 0)
+
+    # Current streak: consecutive active days ending today or yesterday.
+    streak = 0
+    cursor = now.date()
+    if cursor.isoformat() not in active_days:
+        cursor -= timedelta(days=1)
+    while cursor.isoformat() in active_days:
+        streak += 1
+        cursor -= timedelta(days=1)
+
+    favorite = max(per_exercise.items(), key=lambda kv: kv[1]["sessions"])[0]
+    return {
+        "window_days": days,
+        "total_sessions": len(sessions),
+        "active_days": len(active_days),
+        "current_streak_days": streak,
+        "total_minutes": round(total_minutes),
+        "sessions_per_week_last_8_weeks": weekly,
+        "per_exercise": per_exercise,
+        "favorite_exercise": favorite,
+        "imported_sessions": sum(1 for w in sessions if w.source == "import"),
+    }
+
+
+def generate_history_summary(stats: dict) -> dict:
+    if not settings.gemini_api_key:
+        raise HTTPException(503, "Gemini is not configured. Measured statistics remain available.")
+    evidence = json.dumps(stats)
+    try:
+        with genai.Client(api_key=settings.gemini_api_key) as client:
+            response = client.models.generate_content(
+                model=settings.gemini_model,
+                contents=(
+                    "Coach this athlete on their recent training history using ONLY the "
+                    "aggregated measurements below. Cite specific numbers (sessions, streaks, "
+                    "weekly counts) behind every observation. "
+                    "recap: 2-4 sentences on what their training actually looked like. "
+                    "highlights: the most notable positive patterns. "
+                    "trends: patterns worth watching (consistency gaps, imbalances across "
+                    "exercises, fading or rising weekly volume). "
+                    "next_focus: the single most useful thing to target next, grounded in the data. "
+                    "Vary your phrasing; never pad with generic encouragement. "
+                    "If every session is imported, say the history was imported rather than tracked live. "
+                    "\n\nTraining evidence:\n" + evidence
+                ),
+                config=types.GenerateContentConfig(
+                    system_instruction="You are a concise strength coach reviewing an athlete's "
+                    "training history. Only use the supplied aggregate measurements. Do not invent "
+                    "measurements, assess health, or claim injury prevention. "
+                    "No recorded session is not proof of no training, only of no recorded training. "
+                    "Ground every claim in the evidence and cite numbers. Keep each field concise.",
+                    temperature=0.7,
+                    response_mime_type="application/json",
+                    response_json_schema=HistorySummary.model_json_schema(),
+                ),
+            )
+            result = HistorySummary.model_validate_json(response.text or "")
+            return {**result.model_dump(), "source": "gemini"}
+    except Exception:
+        raise HTTPException(
+            503, "History summary is temporarily unavailable. Your history is saved; retry later."
         ) from None

@@ -44,7 +44,7 @@ class WorkoutCreate(StrictModel):
     workout_id: UUID
     workout_name: str | None = Field(default=None, min_length=1, max_length=80)
     exercise: Exercise
-    source: Literal["camera", "upload"]
+    source: Literal["camera", "upload", "import"]
     started_at: AwareDatetime
 
 
@@ -357,4 +357,11 @@ class Insight(StrictModel):
     recap: str = Field(min_length=1, max_length=800)
     strengths: list[str] = Field(max_length=5)
     improvements: list[str] = Field(max_length=5)
+    next_focus: str = Field(min_length=1, max_length=400)
+
+
+class HistorySummary(StrictModel):
+    recap: str = Field(min_length=1, max_length=1200)
+    highlights: list[str] = Field(max_length=5)
+    trends: list[str] = Field(max_length=5)
     next_focus: str = Field(min_length=1, max_length=400)

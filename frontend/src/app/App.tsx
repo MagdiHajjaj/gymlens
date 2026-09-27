@@ -17,6 +17,7 @@ const SessionPage = lazyRoute(() => import('../pages/SessionPage').then((m) => (
 const WorkoutReportPage = lazyRoute(() =>
   import('../pages/WorkoutReportPage').then((m) => ({ default: m.WorkoutReportPage })),
 );
+const ImportPage = lazyRoute(() => import('../pages/ImportPage').then((m) => ({ default: m.ImportPage })));
 function Layout() {
   return (
     <Shell>
@@ -35,6 +36,7 @@ const router = createBrowserRouter(
       <Route path="/history" element={<HistoryPage />} />
       <Route path="/session/:id" element={<SessionPage />} />
       <Route path="/report/:workoutId" element={<WorkoutReportPage />} />
+      <Route path="/import" element={<ImportPage />} />
       <Route
         path="*"
         element={
