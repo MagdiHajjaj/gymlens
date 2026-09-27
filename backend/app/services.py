@@ -303,6 +303,13 @@ def _workout_summary(workout, user=None) -> dict:
             "cleanReps": sum(1 for rep in reps if not rep.faults_json),
             "longestCleanStreak": _clean_streak(reps),
         },
+        "training": {
+            "weightKg": getattr(workout, "weight_kg", None),
+            "targetSets": getattr(workout, "target_sets", None),
+            "targetRepsPerSet": getattr(workout, "target_reps", None),
+            "completedSets": len(getattr(workout, "set_ranges", None) or []),
+            "sets": getattr(workout, "set_ranges", None) or [],
+        },
         "range": {
             "averageMinAngle": round(average_min, 1) if average_min is not None else None,
             "minAngleStdDev": round(stddev, 1) if stddev is not None else None,

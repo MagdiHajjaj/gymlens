@@ -105,6 +105,11 @@ it('uses the plan rep target when beginning a session for a planned exercise', (
   useWorkout.getState().begin('camera');
 
   expect(useWorkout.getState().targetReps).toBe(12);
+  expect(useWorkout.getState().session).toMatchObject({
+    weight_kg: 20,
+    target_sets: 3,
+    target_reps: 12,
+  });
 });
 
 it('keeps the global rep target when the exercise has no plan item', () => {

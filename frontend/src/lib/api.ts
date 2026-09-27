@@ -139,6 +139,9 @@ export const api = {
         id: session.id,
         workout_id: session.workout_id,
         workout_name: session.workout_name,
+        weight_kg: session.weight_kg,
+        target_sets: session.target_sets,
+        target_reps: session.target_reps,
         exercise: session.exercise,
         source: session.source,
         started_at: session.started_at,
@@ -157,7 +160,7 @@ export const api = {
       });
     return request<WorkoutSession>(`/api/workouts/${session.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ ended_at: session.ended_at }),
+      body: JSON.stringify({ ended_at: session.ended_at, set_ranges: session.set_ranges ?? [] }),
     });
   },
 };

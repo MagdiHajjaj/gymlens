@@ -6,7 +6,17 @@ import pytest
 def create(client):
     start = datetime.now(timezone.utc) - timedelta(minutes=2)
     session_id = str(uuid4())
-    payload = {"id": session_id, "workout_id": session_id, "workout_name": "Leg day", "exercise": "squat", "source": "camera", "started_at": start.isoformat()}
+    payload = {
+        "id": session_id,
+        "workout_id": session_id,
+        "workout_name": "Leg day",
+        "weight_kg": 60,
+        "target_sets": 3,
+        "target_reps": 8,
+        "exercise": "squat",
+        "source": "camera",
+        "started_at": start.isoformat(),
+    }
     response = client.post("/api/workouts", json=payload)
     assert response.status_code == 201, response.text
     return payload
@@ -53,6 +63,9 @@ def test_complete_workout_idempotency_and_persistence(client):
     assert finish.json()["total_reps"] == 1
     assert finish.json()["workout_id"] == workout["workout_id"]
     assert finish.json()["workout_name"] == "Leg day"
+    assert finish.json()["weight_kg"] == 60
+    assert finish.json()["target_sets"] == 3
+    assert finish.json()["target_reps"] == 8
     assert finish.json()["status"] == "completed"
     detail = client.get(f"/api/workouts/{sid}").json()
     assert len(detail["reps"]) == 1
@@ -60,6 +73,61 @@ def test_complete_workout_idempotency_and_persistence(client):
     assert datetime.fromisoformat(detail["started_at"]).utcoffset() == timedelta(0)
     assert len(client.get("/api/workouts").json()) == 1
     assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": [rep(2)]}).status_code == 409
+
+
+def test_completed_set_ranges_are_validated_and_persisted(client):
+    workout = create(client)
+    sid = workout["id"]
+    rows = [rep(1), rep(2), rep(3)]
+    assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": rows}).status_code == 200
+    ended_at = datetime.now(timezone.utc)
+    ranges = [
+        {
+            "set_number": 1,
+            "start_rep": 1,
+            "end_rep": 2,
+            "completed_at": rows[1]["completed_at"],
+            "rest_seconds": 60,
+        },
+        {
+            "set_number": 2,
+            "start_rep": 3,
+            "end_rep": 3,
+            "completed_at": rows[2]["completed_at"],
+        },
+    ]
+    response = client.patch(
+        f"/api/workouts/{sid}", json={"ended_at": ended_at.isoformat(), "set_ranges": ranges}
+    )
+    assert response.status_code == 200, response.text
+    saved = response.json()["set_ranges"]
+    assert [{k: v for k, v in item.items() if k != "completed_at"} for item in saved] == [
+        {k: v for k, v in item.items() if k != "completed_at"} for item in ranges
+    ]
+    assert [datetime.fromisoformat(item["completed_at"]) for item in saved] == [
+        datetime.fromisoformat(item["completed_at"]) for item in ranges
+    ]
+    assert client.get("/api/workouts").json()[0]["set_ranges"] == saved
+
+
+def test_set_ranges_must_cover_reps_once(client):
+    workout = create(client)
+    sid = workout["id"]
+    rows = [rep(1), rep(2)]
+    assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": rows}).status_code == 200
+    response = client.patch(
+        f"/api/workouts/{sid}",
+        json={
+            "ended_at": datetime.now(timezone.utc).isoformat(),
+            "set_ranges": [{
+                "set_number": 1,
+                "start_rep": 1,
+                "end_rep": 1,
+                "completed_at": rows[0]["completed_at"],
+            }],
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_every_session_route_enforces_ownership(client, switch_user):

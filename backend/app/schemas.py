@@ -43,13 +43,25 @@ class WorkoutCreate(StrictModel):
     id: UUID
     workout_id: UUID
     workout_name: str | None = Field(default=None, min_length=1, max_length=80)
+    weight_kg: float | None = Field(default=None, ge=0, le=1000)
+    target_sets: int | None = Field(default=None, ge=1, le=100)
+    target_reps: int | None = Field(default=None, ge=1, le=500)
     exercise: Exercise
     source: Literal["camera", "upload"]
     started_at: AwareDatetime
 
 
+class WorkoutSetRange(StrictModel):
+    set_number: int = Field(ge=1, le=100)
+    start_rep: int = Field(ge=1, le=5000)
+    end_rep: int = Field(ge=1, le=5000)
+    completed_at: AwareDatetime
+    rest_seconds: int | None = Field(default=None, ge=0, le=3600)
+
+
 class WorkoutFinish(StrictModel):
     ended_at: AwareDatetime
+    set_ranges: list[WorkoutSetRange] = Field(default_factory=list, max_length=100)
 
 
 class ScheduledWorkoutCreate(StrictModel):

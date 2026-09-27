@@ -68,6 +68,10 @@ export interface WorkoutSession {
   workout_id?: string;
   /** Athlete-visible name shared by every exercise in the workout. */
   workout_name?: string | null;
+  /** Exercise load and planned volume captured when the session starts. */
+  weight_kg?: number | null;
+  target_sets?: number | null;
+  target_reps?: number | null;
   exercise: ExerciseId;
   started_at: string;
   /** Stamped when pose tracking first goes live (calibrated); the session

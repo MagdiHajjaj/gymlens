@@ -105,6 +105,10 @@ def serialize(workout, detail=True):
         "id": workout.id,
         "workout_id": workout.workout_id,
         "workout_name": workout.workout_name,
+        "weight_kg": workout.weight_kg,
+        "target_sets": workout.target_sets,
+        "target_reps": workout.target_reps,
+        "set_ranges": workout.set_ranges or [],
         "exercise": workout.exercise,
         "source": workout.source,
         "started_at": utc(workout.started_at),
@@ -211,6 +215,9 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
             existing.exercise != payload.exercise
             or existing.workout_id != str(payload.workout_id)
             or existing.workout_name != payload.workout_name
+            or existing.weight_kg != payload.weight_kg
+            or existing.target_sets != payload.target_sets
+            or existing.target_reps != payload.target_reps
             or existing.source != payload.source
             or utc(existing.started_at) != payload.started_at
         ):
@@ -222,6 +229,10 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
         id=str(payload.id),
         workout_id=str(payload.workout_id),
         workout_name=payload.workout_name,
+        weight_kg=payload.weight_kg,
+        target_sets=payload.target_sets,
+        target_reps=payload.target_reps,
+        set_ranges=[],
         user_id=user.id,
         exercise=payload.exercise,
         source=payload.source,
@@ -358,7 +369,23 @@ def finish(
     numbers = sorted(r.rep_number for r in workout.reps)
     if numbers != list(range(1, len(numbers) + 1)):
         raise HTTPException(422, "Rep sequence has gaps; upload missing reps before finishing")
+    for item in payload.set_ranges:
+        check_time(item.completed_at, workout)
+        if item.completed_at > payload.ended_at:
+            raise HTTPException(422, "Set cannot finish after the session")
+    ranges = [item.model_dump(mode="json", exclude_none=True) for item in payload.set_ranges]
+    if ranges:
+        if [item["set_number"] for item in ranges] != list(range(1, len(ranges) + 1)):
+            raise HTTPException(422, "Set numbers must be sequential")
+        covered = []
+        for item in ranges:
+            if item["start_rep"] > item["end_rep"]:
+                raise HTTPException(422, "Set start cannot follow set end")
+            covered.extend(range(item["start_rep"], item["end_rep"] + 1))
+        if covered != numbers:
+            raise HTTPException(422, "Set ranges must cover every rep exactly once")
     workout.ended_at = payload.ended_at
+    workout.set_ranges = ranges
     workout.status = "completed"
     workout.total_reps = len(workout.reps)
     db.commit()

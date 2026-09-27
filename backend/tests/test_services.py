@@ -408,6 +408,21 @@ def test_workout_summary_totals_and_clean_streak():
     assert summary["repCountUnit"] == "movement cycles"
 
 
+def test_workout_summary_includes_load_plan_and_completed_sets():
+    workout = make_workout(reps=[])
+    workout.weight_kg = 42.5
+    workout.target_sets = 3
+    workout.target_reps = 8
+    workout.set_ranges = [{"set_number": 1, "start_rep": 1, "end_rep": 8}]
+    assert services._workout_summary(workout)["training"] == {
+        "weightKg": 42.5,
+        "targetSets": 3,
+        "targetRepsPerSet": 8,
+        "completedSets": 1,
+        "sets": workout.set_ranges,
+    }
+
+
 def test_workout_summary_range_trend_best_rep_and_rom():
     workout = make_workout(
         reps=[make_rep(n, full_metrics(angle), [{"code": "insufficient_depth", "message": "Deeper", "severity": "warning"}] if n == 6 else [])

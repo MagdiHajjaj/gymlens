@@ -96,6 +96,9 @@ export const useWorkout = create<Store>((set, get) => ({
         workout_name: planItem
           ? planState.workoutName.trim() || `${exercises[selectedId].name} workout`
           : `${exercises[selectedId].name} workout`,
+        weight_kg: planItem?.weightKg ?? null,
+        target_sets: planItem?.sets ?? null,
+        target_reps: planItem?.reps ?? get().targetReps,
         exercise: selectedId,
         source,
         started_at: new Date().toISOString(),
