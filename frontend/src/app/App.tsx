@@ -11,8 +11,10 @@ import {
 import { Suspense } from 'react';
 import { Shell } from '../components/layout/Shell';
 import { DashboardPage } from '../pages/DashboardPage';
-import { HistoryPage } from '../pages/HistoryPage';
 const WorkoutPage = lazyRoute(() => import('../pages/WorkoutPage').then((m) => ({ default: m.WorkoutPage })));
+const HistoryPage = lazyRoute(() =>
+  import('../pages/HistoryPage').then((m) => ({ default: m.HistoryPage })),
+);
 const SessionPage = lazyRoute(() => import('../pages/SessionPage').then((m) => ({ default: m.SessionPage })));
 const WorkoutReportPage = lazyRoute(() =>
   import('../pages/WorkoutReportPage').then((m) => ({ default: m.WorkoutReportPage })),

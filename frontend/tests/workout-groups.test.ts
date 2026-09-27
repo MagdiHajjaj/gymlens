@@ -56,6 +56,12 @@ describe('workout history filter', () => {
     expect(result[0].name).toBe('Pull power');
   });
 
+  it('searches exercise names even when the workout has a saved name', () => {
+    const result = filterWorkouts(mixed, { query: 'bicep curl', exercise: null });
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Pull power');
+  });
+
   it('searches exercise names when the workout has no saved name', () => {
     const result = filterWorkouts(mixed, { query: 'squat', exercise: null });
     expect(result).toHaveLength(1);

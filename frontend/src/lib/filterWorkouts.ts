@@ -19,9 +19,13 @@ export function filterWorkouts(workouts: WorkoutGroup[], filter: WorkoutFilter):
     if (filter.exercise && !workout.sessions.some((row) => row.exercise === filter.exercise))
       return false;
     if (!q) return true;
-    const displayName = (
-      workout.name || workout.sessions.map((row) => exercises[row.exercise].name).join(' · ')
-    ).toLowerCase();
-    return displayName.includes(q);
+    const searchable = [
+      workout.name,
+      ...workout.sessions.map((row) => exercises[row.exercise].name),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return searchable.includes(q);
   });
 }

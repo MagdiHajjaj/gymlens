@@ -108,7 +108,7 @@ test('missing details do not produce invented technique or timing findings', asy
   await expect(page.getByRole('heading', { name: 'No rep-level findings yet' })).toBeVisible();
 });
 
-test('history filters by movement chips, excludes legacy demos, and repeats on mobile', async ({
+test('history searches and filters by exercise, excludes legacy demos, and repeats on mobile', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -119,16 +119,17 @@ test('history filters by movement chips, excludes legacy demos, and repeats on m
   ]);
   await page.goto('/history');
   await expect(page.getByRole('article')).toHaveCount(2);
-  await expect(page.getByRole('combobox', { name: 'Filter session type' })).toHaveCount(0);
-  await expect(page.getByRole('combobox', { name: 'Filter workout split' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Push', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No sessions match these filters.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Pull', exact: true }).click();
+  const exerciseFilter = page.getByRole('combobox', {
+    name: 'Filter workout history by exercise',
+  });
+  await exerciseFilter.selectOption('curl');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Bicep curl');
+  await page.getByRole('searchbox', { name: 'Search workouts by name or exercise' }).fill('squat');
+  await expect(page.getByRole('heading', { name: 'No workouts match these filters.' })).toBeVisible();
   await page.getByRole('button', { name: 'Clear filters' }).click();
   await expect(page.getByRole('article')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Legs', exact: true }).click();
+  await page.getByRole('searchbox', { name: 'Search workouts by name or exercise' }).fill('squat');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('Camera workout');
   await expect(page.getByText(/sample data/i)).toHaveCount(0);
@@ -196,6 +197,44 @@ test('bilateral curl reports retain the combined rep count', async ({ page }) =>
   await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
   await expect(page.locator('.session-key-stats')).toContainText('One rep is a completed cycle from both arms');
   await expect(page.locator('.session-key-stats dd').first()).toHaveText('6');
+});
+
+test('history plots recorded load and switches exercises independently from list filters', async ({
+  page,
+}) => {
+  await seed(page, [
+    {
+      ...recordedSession,
+      id: 'squat-old',
+      workout_id: 'squat-old-workout',
+      started_at: '2026-09-01T12:00:00Z',
+      ended_at: '2026-09-01T12:02:00Z',
+      weight_kg: 50,
+    },
+    {
+      ...recordedSession,
+      id: 'squat-new',
+      workout_id: 'squat-new-workout',
+      weight_kg: 55,
+    },
+    {
+      ...recordedSession,
+      id: 'curl-weight',
+      workout_id: 'curl-weight-workout',
+      exercise: 'curl',
+      weight_kg: 12,
+    },
+  ]);
+
+  await page.goto('/history');
+  const chart = page.getByRole('img', { name: 'Squat recorded weight over time' });
+  await expect(chart).toBeVisible();
+  await expect(page.locator('.history-progress-summary')).toContainText('55 kg latest');
+  await expect(page.locator('.history-progress-summary')).toContainText('+5.0 kg');
+  await page.getByRole('combobox', { name: 'Choose exercise for weight progress' }).selectOption('curl');
+  await expect(page.getByRole('img', { name: 'Bicep curl recorded weight over time' })).toBeVisible();
+  await expect(page.locator('.history-progress-summary')).toContainText('12 kg latest');
+  await expect(page.getByRole('article')).toHaveCount(3);
 });
 
 test('legacy curl reports explain missing arm labels without showing a false imbalance', async ({ page }) => {

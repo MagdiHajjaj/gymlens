@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, History, Repeat2, Search } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useSessions } from '../lib/useSessions';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
@@ -10,6 +19,7 @@ import { timeLabel } from '../lib/sessionBuffer';
 import { Button } from '../components/ui/button';
 import { groupWorkouts } from '../lib/workoutGroups';
 import { filterWorkouts } from '../lib/filterWorkouts';
+import { weightProgress } from '../lib/weightProgress';
 
 export function HistoryPage() {
   const { sessions, loading, error, retry } = useSessions();
@@ -18,6 +28,7 @@ export function HistoryPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [exerciseFilter, setExerciseFilter] = useState<ExerciseId | null>(null);
+  const [progressExercise, setProgressExercise] = useState<ExerciseId | null>(null);
   const workouts = groupWorkouts(
     [...sessions].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)),
   );
@@ -25,6 +36,24 @@ export function HistoryPage() {
   const historyExercises = (Object.keys(exercises) as ExerciseId[]).filter((id) =>
     sessions.some((session) => session.exercise === id),
   );
+  const weightedExercises = (Object.keys(exercises) as ExerciseId[]).filter((id) =>
+    sessions.some(
+      (session) =>
+        session.exercise === id &&
+        session.status === 'completed' &&
+        typeof session.weight_kg === 'number' &&
+        session.weight_kg > 0,
+    ),
+  );
+  const selectedProgressExercise =
+    progressExercise && weightedExercises.includes(progressExercise)
+      ? progressExercise
+      : (weightedExercises[0] ?? null);
+  const progress = selectedProgressExercise
+    ? weightProgress(sessions, selectedProgressExercise)
+    : [];
+  const progressChange =
+    progress.length > 1 ? progress[progress.length - 1].weightKg - progress[0].weightKg : null;
   const hasFilter = query.trim() !== '' || exerciseFilter !== null;
   const filtered = filterWorkouts(workouts, { query, exercise: exerciseFilter });
   const clearFilters = () => {
@@ -50,42 +79,91 @@ export function HistoryPage() {
           </Link>
         </Button>
       </div>
-      <div className="history-filters">
-        <p role="status">
-          {loading
-            ? 'Updating history…'
-            : `${filtered.length} ${filtered.length === 1 ? 'workout' : 'workouts'}`}
-        </p>
-        {hasFilter && (
-          <Button size="small" variant="ghost" onClick={clearFilters}>
-            Clear filters
-          </Button>
-        )}
-      </div>
-      <div className="history-search">
-        <Search size={16} aria-hidden />
-        <input
-          type="search"
-          placeholder="Search workouts…"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          aria-label="Search workouts by name or exercise"
-        />
-      </div>
-      {historyExercises.length > 1 && (
-        <div className="movement-chips" role="group" aria-label="Filter by exercise">
-          {historyExercises.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className={`movement-chip${exerciseFilter === id ? ' is-active' : ''}`}
-              aria-pressed={exerciseFilter === id}
-              onClick={() => setExerciseFilter(exerciseFilter === id ? null : id)}
-            >
-              {exercises[id].name}
-            </button>
-          ))}
+      <section className="history-filter-panel" aria-label="Filter workout history">
+        <div className="history-search">
+          <Search size={16} aria-hidden />
+          <input
+            type="search"
+            placeholder="Search by workout or exercise…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Search workouts by name or exercise"
+          />
         </div>
+        <label>
+          <span>Exercise</span>
+          <select
+            value={exerciseFilter ?? ''}
+            onChange={(event) =>
+              setExerciseFilter((event.target.value || null) as ExerciseId | null)
+            }
+            aria-label="Filter workout history by exercise"
+          >
+            <option value="">All exercises</option>
+            {historyExercises.map((id) => (
+              <option key={id} value={id}>
+                {exercises[id].name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="history-filter-status">
+          <p role="status">
+            {loading
+              ? 'Updating history…'
+              : `${filtered.length} ${filtered.length === 1 ? 'workout' : 'workouts'}`}
+          </p>
+          {hasFilter && (
+            <Button size="small" variant="ghost" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
+        </div>
+      </section>
+      {selectedProgressExercise && (
+        <section className="panel history-progress" aria-labelledby="weight-progress-title">
+          <div className="history-progress-heading">
+            <div>
+              <span className="eyebrow">LOAD PROGRESS</span>
+              <h2 id="weight-progress-title">Weight over time</h2>
+              <p>Recorded workout load for completed sessions.</p>
+            </div>
+            <label>
+              <span>Exercise</span>
+              <select
+                value={selectedProgressExercise}
+                onChange={(event) => setProgressExercise(event.target.value as ExerciseId)}
+                aria-label="Choose exercise for weight progress"
+              >
+                {weightedExercises.map((id) => (
+                  <option key={id} value={id}>
+                    {exercises[id].name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="history-progress-summary">
+            <strong>{progress[progress.length - 1]?.weightKg} kg latest</strong>
+            <span>
+              {progressChange === null
+                ? 'Add another weighted session to see your change.'
+                : `${progressChange >= 0 ? '+' : ''}${progressChange.toFixed(1)} kg from first recorded session`}
+            </span>
+          </div>
+          <div className="history-progress-chart" role="img" aria-label={`${exercises[selectedProgressExercise].name} recorded weight over time`}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={progress} margin={{ top: 10, right: 12, bottom: 0, left: -12 }}>
+                <CartesianGrid strokeDasharray="3 4" vertical={false} />
+                <XAxis dataKey="date" />
+                <YAxis domain={['dataMin - 5', 'dataMax + 5']} tickFormatter={(value) => `${value} kg`} />
+                <Tooltip formatter={(value) => [`${value} kg`, 'Weight']} />
+                <Line dataKey="weightKg" name="Weight" stroke="#285b3f" strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="report-note">Bodyweight sessions and workouts without a recorded load are excluded.</p>
+        </section>
       )}
       {error && (
         <div className="notice error" role="alert">
