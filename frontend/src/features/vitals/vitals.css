@@ -1,0 +1,85 @@
+.vitals-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vitals-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vitals-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.vitals-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vitals-metric-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vitals-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.vitals-value small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  margin-left: 4px;
+}
+
+.vitals-measuring {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted, #6b7280);
+  animation: vitals-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes vitals-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.vitals-note {
+  font-size: 14px;
+  color: var(--muted, #6b7280);
+  margin: 0;
+}
+
+.vitals-footnote {
+  font-size: 11px;
+  color: var(--muted, #6b7280);
+  margin: 0;
+}
+
+/* Compact variant for the mobile rest flow. */
+.vitals-panel.vitals-compact {
+  padding: 14px 16px;
+}
+
+.vitals-panel.vitals-compact .vitals-value {
+  font-size: 22px;
+}

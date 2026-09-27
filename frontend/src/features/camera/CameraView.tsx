@@ -34,6 +34,7 @@ export function CameraView({
   onFinish,
   preview = false,
   onReadiness,
+  videoRef,
 }: {
   onDemo: () => void;
   voiceCoach: VoiceCoach;
@@ -42,8 +43,11 @@ export function CameraView({
   onFinish?: () => void;
   preview?: boolean;
   onReadiness?: (readiness: CameraReadiness) => void;
+  /** Optional external ref to the <video> element (used by vitals frame capture). */
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
 }) {
-  const video = useRef<HTMLVideoElement>(null);
+  const internalVideo = useRef<HTMLVideoElement>(null);
+  const video = videoRef ?? internalVideo;
   const canvas = useRef<HTMLCanvasElement>(null);
   const storedSession = useWorkout((s) => s.session);
   const selected = useWorkout((s) => s.selected);
