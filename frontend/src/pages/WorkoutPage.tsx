@@ -31,6 +31,8 @@ import {
   trackingStatusText,
 } from '../features/camera/measurementDisplay';
 import { api } from '../lib/api';
+import { VitalsPanel } from '../features/vitals/VitalsPanel';
+import { useVitalsSession } from '../features/vitals/useVitalsSession';
 import type { WorkoutSession } from '../types/workout';
 
 const COUNTDOWN_CALLOUTS = new Set([10, 5, 4, 3, 2, 1]);
@@ -87,6 +89,9 @@ export function WorkoutPage() {
   }, [blocker.state]);
   const announcedCountdown = useRef(new Set<number>());
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
+  // Vitals: measure during rest via the shared camera video element.
+  const vitalsVideoRef = useRef<HTMLVideoElement | null>(null);
+  const vitals = useVitalsSession({ videoRef: vitalsVideoRef, active: Boolean(rest) });
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
   const trackedReps = session?.total_reps ?? 0;
   const planItem = plan.find((item) => item.exerciseId === selected);
@@ -448,6 +453,7 @@ export function WorkoutPage() {
               voiceCoach={voiceCoach}
               videoFile={session?.source === 'upload' ? videoFile : null}
               onFinish={() => void end()}
+              videoRef={vitalsVideoRef}
             />
             <div className="mobile-rep-overlay" aria-hidden="true">
               <strong>{currentSetReps}</strong>
@@ -620,6 +626,7 @@ export function WorkoutPage() {
                               : 'Returning'}
             </div>
           </section>
+          <VitalsPanel status={vitals.status} reading={vitals.reading} />
           {plan.length > 1 && (
             <section className="panel workout-plan-panel" aria-label="Workout plan">
               <div className="workout-plan-heading">
