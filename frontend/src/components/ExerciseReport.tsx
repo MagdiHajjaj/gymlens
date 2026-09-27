@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'recharts';
 import { Button } from './ui/button';
+import { VitalsReportBlock } from './VitalsReportBlock';
 import { useIdentity } from '../features/auth/AuthProvider';
 import { exercises } from '../features/exercises/ExerciseRegistry';
 import {
@@ -358,6 +359,8 @@ export function ExerciseReport({
           </p>
         </section>
       </div>
+
+      <VitalsReportBlock metrics={session.metrics} />
 
       <section className="panel report-sets" aria-labelledby={`report-sets-title-${session.id}`}>
         <h2 id={`report-sets-title-${session.id}`}>Your recorded sets</h2>

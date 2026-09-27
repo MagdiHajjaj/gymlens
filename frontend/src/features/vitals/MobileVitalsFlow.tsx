@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { HeartPulse } from 'lucide-react';
 import { VitalsPanel } from './VitalsPanel';
 import { useVitalsSession } from './useVitalsSession';
+import type { VitalsReading } from './vitalsClient';
 import { Button } from '../../components/ui/button';
 import './vitals.css';
 
@@ -18,9 +19,11 @@ const MEASURE_SECONDS = 12; // pulse needs ~12s
 export function MobileVitalsFlow({
   videoRef,
   restActive,
+  onReading,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   restActive: boolean;
+  onReading?: (reading: VitalsReading) => void;
 }) {
   const [checking, setChecking] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(MEASURE_SECONDS);
@@ -30,6 +33,7 @@ export function MobileVitalsFlow({
     active: checking && restActive,
     frameWidth: 240, // smaller frames: less battery/thermal load
     frameIntervalMs: 200, // 5fps is plenty for pulse
+    onReading,
   });
 
   // Auto-stop after the pulse window.

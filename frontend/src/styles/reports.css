@@ -657,3 +657,34 @@
     flex: 1;
   }
 }
+
+.report-vitals h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.report-vitals-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report-vitals-grid span {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #6b7280);
+}
+
+.report-vitals-grid strong {
+  font-size: 24px;
+}
