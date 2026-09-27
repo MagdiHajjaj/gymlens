@@ -285,22 +285,21 @@ export const FAULT_PHRASES: Partial<Record<ExerciseId, FaultPhrase[]>> = {
   ],
 };
 
-const WARM_COUNT_PHRASES = [
-  '1.',
-  '2. Settle into your pace.',
-  '3. Stay controlled.',
-  '4. Keep the rhythm.',
-  '5. Control the return.',
-] as const;
-const COUNT_PHRASES = new Map([
-  ...WARM_COUNT_PHRASES.map((phrase, index) => [index + 1, phrase] as const),
-  [10, '10. Keep the rhythm.'] as const,
-]);
+/**
+ * Milestone rep callouts: the coach confirms the count every 5 reps instead of
+ * narrating every rep. Taglines rotate so milestones don't sound identical;
+ * every other milestone is a bare number. All forms are allowlisted by the
+ * backend speech grammar (bare numbers by pattern, taglines by exact match).
+ */
+const MILESTONE_TAGLINES = ['Keep the rhythm.', 'Stay controlled.', 'Steady pace.'] as const;
 
 export function repCountCue(totalReps: number, exercise: ExerciseId, repsCompleted = 1): VoiceCue | null {
-  if (totalReps < 1 || (totalReps > 5 && totalReps % 5 !== 0)) return null;
+  if (totalReps < 5 || totalReps % 5 !== 0) return null;
+  const slot = totalReps / 5;
+  const tagline = MILESTONE_TAGLINES[slot % MILESTONE_TAGLINES.length];
+  const text = slot % 2 === 0 ? `${totalReps}.` : `${totalReps}. ${tagline}`;
   return {
-    text: COUNT_PHRASES.get(totalReps) ?? `${totalReps}.`,
+    text,
     kind: 'rep',
     priority: PRIORITY.rep,
     metadata: { totalReps, repsCompleted, exercise },
@@ -311,6 +310,10 @@ export function selectedExerciseWarmPhrases(exercise: ExerciseId): string[] {
   return [
     ...coachingPhrases(exercise),
     ...(FAULT_PHRASES[exercise] ?? []).map(({ message }) => message),
-    ...WARM_COUNT_PHRASES,
+    '5. Stay controlled.',
+    '10.',
+    '15. Keep the rhythm.',
+    '20.',
+    'Rep 1 complete.',
   ];
 }

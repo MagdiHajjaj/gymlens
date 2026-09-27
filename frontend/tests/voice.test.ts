@@ -1,12 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VoiceCoach } from '../src/features/coaching/VoiceCoach';
 import { api, ApiError } from '../src/lib/api';
-import {
-  FeedbackEngine,
-  predictNextRepCues,
-  readyCue,
-  repCompleteCue,
-} from '../src/features/coaching/FeedbackEngine';
+import { FeedbackEngine, predictNextRepCues } from '../src/features/coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../src/features/coaching/Phrasebook';
 import type { ExerciseId, ExerciseResult } from '../src/types/workout';
 
@@ -204,9 +199,9 @@ it('reuses warmed blobs and bounds each background warm-up', async () => {
   expect(speech).toHaveBeenCalledTimes(6);
 });
 
-it('speaks setup guidance and rep counts independent of feedback cooldowns', () => {
+it('speaks setup guidance once per episode instead of nagging', () => {
   const engine = new FeedbackEngine();
-  const result: ExerciseResult = {
+  const setup: ExerciseResult = {
     trackingValid: false,
     calibrated: false,
     phase: 'ready',
@@ -215,20 +210,19 @@ it('speaks setup guidance and rep counts independent of feedback cooldowns', () 
     faults: [],
     guidance: 'Keep your wrist visible.',
   };
-  expect(engine.next(result, 0, { exercise: 'curl', totalReps: 0 })).toBe(result.guidance);
-  expect(engine.next(result, 1000, { exercise: 'curl', totalReps: 0 })).toBeNull();
-  expect(
-    engine.next({ ...result, trackingValid: true, calibrated: true, repCompleted: true }, 1000, {
-      exercise: 'squat',
-      totalReps: 1,
-    }),
-  ).toBe('1.');
-  expect(
-    engine.next({ ...result, trackingValid: true, calibrated: true, repCompleted: true }, 2000, {
-      exercise: 'squat',
-      totalReps: 6,
-    }),
-  ).toBe('Rep 6 complete.');
+  const ctx = { exercise: 'curl', totalReps: 0 } as const;
+  // Speaks the first time, then stays quiet while the same problem persists.
+  expect(engine.next(setup, 0, ctx)).toBe(setup.guidance);
+  expect(engine.next(setup, 1_000, ctx)).toBeNull();
+  expect(engine.next(setup, 16_000, ctx)).toBeNull();
+  // A genuinely different instruction means the situation changed — it speaks.
+  const changed: ExerciseResult = { ...setup, guidance: 'Move your wrist back into frame.' };
+  expect(engine.next(changed, 17_000, ctx)).toBe(changed.guidance);
+  // After healthy tracking the slate is clean, so a recurring problem speaks again.
+  const healthy: ExerciseResult = { ...setup, trackingValid: true, calibrated: true, guidance: '' };
+  engine.next(healthy, 18_000, ctx);
+  engine.next(healthy, 29_000, ctx);
+  expect(engine.next(setup, 30_000, ctx)).toBe(setup.guidance);
 });
 
 it('prioritizes active faults over simultaneous rep totals', () => {
@@ -272,9 +266,11 @@ it('speaks a specific reason when a rep is not counted', () => {
   });
 });
 
-it('warms count and exercise-specific fault phrases for every exercise', () => {
+it('warms milestone and exercise-specific fault phrases for every exercise', () => {
   const phrases = selectedExerciseWarmPhrases('deadlift' as ExerciseId);
-  expect(phrases).toContain('1.');
+  expect(phrases).toContain('5. Stay controlled.');
+  expect(phrases).toContain('10.');
+  expect(phrases).toContain('Rep 1 complete.');
   expect(phrases).toContain('Keep your back flat — hinge at the hips, chest proud.');
   expect(phrases).toContain('Hinge deeper at the hips within your comfortable range.');
 });
@@ -306,7 +302,7 @@ it('unlocks one reusable audio element from the mobile tap', async () => {
   expect(audio.pause).toHaveBeenCalledOnce();
 });
 
-it('announces every completed rep count', () => {
+it('counts only at milestones instead of narrating every rep', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {
     trackingValid: true,
@@ -317,25 +313,22 @@ it('announces every completed rep count', () => {
     faults: [],
     guidance: 'Keep your movement steady and controlled.',
   };
-  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 6 })).toBe('Rep 6 complete.');
+  const ctx = { exercise: 'squat', totalReps: 0 } as const;
+  // The first rep confirms the tracker is counting, then clean reps stay silent.
+  expect(engine.next(completed, 0, { ...ctx, totalReps: 1 })).toBe('Rep 1 complete.');
+  expect(engine.next(completed, 3_000, { ...ctx, totalReps: 2 })).toBeNull();
+  expect(engine.next(completed, 6_000, { ...ctx, totalReps: 3 })).toBeNull();
+  expect(engine.next(completed, 9_000, { ...ctx, totalReps: 4 })).toBeNull();
+  // Milestones speak, rotating their taglines so they don't sound identical.
+  expect(engine.next(completed, 12_000, { ...ctx, totalReps: 5 })).toBe('5. Stay controlled.');
+  expect(engine.next(completed, 15_000, { ...ctx, totalReps: 6 })).toBeNull();
+  expect(engine.next(completed, 18_000, { ...ctx, totalReps: 10 })).toBe('10.');
+  expect(engine.next(completed, 21_000, { ...ctx, totalReps: 15 })).toBe('15. Keep the rhythm.');
+  expect(engine.next(completed, 24_000, { ...ctx, totalReps: 20 })).toBe('20.');
+  expect(engine.next(completed, 27_000, { ...ctx, totalReps: 25 })).toBe('25. Steady pace.');
 });
 
-it('speaks measured movement guidance after a phase remains stable', () => {
-  const engine = new FeedbackEngine();
-  const moving: ExerciseResult = {
-    trackingValid: true,
-    calibrated: true,
-    phase: 'eccentric',
-    repCompleted: false,
-    jointAngles: { elbow_angle: 110 },
-    faults: [],
-    guidance: 'Curl toward your shoulders. Keep each elbow under its shoulder and your wrists straight.',
-  };
-  expect(engine.next(moving, 0, { exercise: 'curl', totalReps: 0 })).toBeNull();
-  expect(engine.next(moving, 400, { exercise: 'curl', totalReps: 0 })).toBe(moving.guidance);
-});
-
-it('restarts spoken rep numbers at one for the next set', () => {
+it('drives milestone counts from the set rep number', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {
     trackingValid: true,
@@ -346,10 +339,63 @@ it('restarts spoken rep numbers at one for the next set', () => {
     faults: [],
     guidance: '',
   };
-  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 9, setReps: 1 })).toBe('1.');
+  // totalReps is 9 but this is set rep 5 — the milestone fires on the set count.
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 9, setReps: 5 })).toBe(
+    '5. Stay controlled.',
+  );
 });
 
-it('grounds the rep-completion cue in the rep’s measured angle', () => {
+it('keeps a normal phase silent and only coaches a stuck phase', () => {
+  const engine = new FeedbackEngine();
+  const moving: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'eccentric',
+    repCompleted: false,
+    jointAngles: { elbow_angle: 110 },
+    faults: [],
+    guidance: 'Curl toward your shoulders. Keep each elbow under its shoulder and your wrists straight.',
+  };
+  const ctx = { exercise: 'curl', totalReps: 0 } as const;
+  expect(engine.next(moving, 0, ctx)).toBeNull();
+  // A normal rep phase stays silent — no narrating on a 350ms timer.
+  expect(engine.next(moving, 400, ctx)).toBeNull();
+  expect(engine.next(moving, 1_900, ctx)).toBeNull();
+  // Held far past a normal phase length, it coaches once per stuck episode.
+  expect(engine.next(moving, 2_000, ctx)).toBe(moving.guidance);
+  expect(engine.next(moving, 9_000, ctx)).toBeNull();
+});
+
+it('measures "stuck" against the athlete’s own rep pace', () => {
+  const engine = new FeedbackEngine();
+  const rep: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: '',
+    repMetrics: { min_angle: 90, duration_ms: 4_000 },
+  };
+  const ctx = { exercise: 'curl', totalReps: 0 } as const;
+  engine.next(rep, 0, { ...ctx, totalReps: 1 });
+  engine.next(rep, 5_000, { ...ctx, totalReps: 2 });
+  engine.next(rep, 10_000, { ...ctx, totalReps: 3 });
+  // The athlete's pace is 4s/rep, so a phase must outlast ~3s (not the 2s
+  // floor) before the coach calls it stuck.
+  const moving: ExerciseResult = {
+    ...rep,
+    repCompleted: false,
+    phase: 'eccentric',
+    guidance: 'Lower the dumbbells slowly. Keep your elbows under your wrists.',
+  };
+  expect(engine.next(moving, 15_000, ctx)).toBeNull();
+  expect(engine.next(moving, 17_400, ctx)).toBeNull();
+  expect(engine.next(moving, 18_000, ctx)).toBe(moving.guidance);
+});
+
+it('stays silent on a clean measured rep instead of parroting the angle', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {
     trackingValid: true,
@@ -361,12 +407,11 @@ it('grounds the rep-completion cue in the rep’s measured angle', () => {
     guidance: 'Keep your movement steady and controlled.',
     repMetrics: { min_angle: 92, duration_ms: 2100 },
   };
-  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 7 })).toBe(
-    'Rep 7 complete. Bottom angle 92 degrees.',
-  );
+  // Measured data feeds the comparative insights, not per-rep narration.
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 7 })).toBeNull();
 });
 
-it('never invents an angle when the completed rep has no measurements', () => {
+it('stays silent when the completed rep has no measurements', () => {
   const engine = new FeedbackEngine();
   const completed: ExerciseResult = {
     trackingValid: true,
@@ -379,39 +424,10 @@ it('never invents an angle when the completed rep has no measurements', () => {
     repMetrics: { min_angle: NaN },
   };
   const cue = engine.next(completed, 0, { exercise: 'squat', totalReps: 7 });
-  expect(cue).toBe('Rep 7 complete.');
-  expect(cue).not.toContain('degrees');
+  expect(cue).toBeNull();
 });
 
-it('repCompleteCue falls back to a plain callout without a rep number or metrics', () => {
-  const result = {
-    trackingValid: true,
-    calibrated: true,
-    phase: 'concentric',
-    repCompleted: true,
-    jointAngles: {},
-    faults: [],
-    guidance: '',
-  } as ExerciseResult;
-  expect(repCompleteCue(result, 0)).toBe('Rep complete.');
-  expect(repCompleteCue(result, 4)).toBe('Rep 4 complete.');
-});
-
-it('announces readiness while waiting between reps', () => {
-  const engine = new FeedbackEngine();
-  const idle: ExerciseResult = {
-    trackingValid: true,
-    calibrated: true,
-    phase: 'ready',
-    repCompleted: false,
-    jointAngles: {},
-    faults: [],
-    guidance: 'Keep your movement steady and controlled.',
-  };
-  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 0 })).toBe('Ready.');
-});
-
-it('grounds the idle cue in the measured session total', () => {
+it('coaches setup during a pause instead of restating the rep count', () => {
   const engine = new FeedbackEngine();
   const idle: ExerciseResult = {
     trackingValid: true,
@@ -423,12 +439,14 @@ it('grounds the idle cue in the measured session total', () => {
     guidance: 'Keep your movement steady and controlled.',
     completedReps: [],
   };
-  // No rep completed in this frame — the idle cue must use the session total
-  // from context, not this frame's (empty) rep count.
-  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 2 })).toBe('Ready. 2 reps so far.');
+  const ctx = { exercise: 'squat', totalReps: 7 } as const;
+  // A pause gets the pose reminder — never "Ready. 7 reps so far."
+  expect(engine.next(idle, 0, ctx)).toBe('Stand tall and brace your core for the next squat.');
+  expect(engine.next(idle, 31_000, ctx)).toBeNull();
+  expect(engine.next(idle, 46_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
 });
 
-it('alternates idle coaching between rep count and a pose reminder', () => {
+it('resets the idle reminder cooldown', () => {
   const engine = new FeedbackEngine();
   const idle: ExerciseResult = {
     trackingValid: true,
@@ -440,35 +458,10 @@ it('alternates idle coaching between rep count and a pose reminder', () => {
     guidance: 'Keep your movement steady and controlled.',
     completedReps: [],
   };
-  const ctx = { exercise: 'squat', totalReps: 2 } as const;
-  expect(engine.next(idle, 0, ctx)).toBe('Ready. 2 reps so far.');
-  expect(engine.next(idle, 31_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
-  expect(engine.next(idle, 62_000, ctx)).toBe('Ready. 2 reps so far.');
-});
-
-it('resets the idle cue alternation', () => {
-  const engine = new FeedbackEngine();
-  const idle: ExerciseResult = {
-    trackingValid: true,
-    calibrated: true,
-    phase: 'ready',
-    repCompleted: false,
-    jointAngles: {},
-    faults: [],
-    guidance: 'Keep your movement steady and controlled.',
-    completedReps: [],
-  };
-  const ctx = { exercise: 'squat', totalReps: 2 } as const;
-  expect(engine.next(idle, 0, ctx)).toBe('Ready. 2 reps so far.');
-  expect(engine.next(idle, 31_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
+  const ctx = { exercise: 'squat', totalReps: 7 } as const;
+  expect(engine.next(idle, 0, ctx)).toBe('Stand tall and brace your core for the next squat.');
   engine.reset();
-  expect(engine.next(idle, 62_000, ctx)).toBe('Ready. 2 reps so far.');
-});
-
-it('readyCue uses singular and plural rep counts', () => {
-  expect(readyCue(0)).toBe('Ready.');
-  expect(readyCue(1)).toBe('Ready. 1 rep so far.');
-  expect(readyCue(7)).toBe('Ready. 7 reps so far.');
+  expect(engine.next(idle, 1_000, ctx)).toBe('Stand tall and brace your core for the next squat.');
 });
 
 it('prefetches cloud audio into the cache without speaking', async () => {
@@ -504,7 +497,7 @@ it('a later speak reuses prefetched audio instead of refetching', async () => {
   expect(speech).toHaveBeenCalledTimes(1);
 });
 
-it('predicts the next rep cue texts from the just-completed rep', () => {
+it('predicts milestone and first-rep cue texts for prefetch', () => {
   const completed: ExerciseResult = {
     trackingValid: true,
     calibrated: true,
@@ -516,14 +509,13 @@ it('predicts the next rep cue texts from the just-completed rep', () => {
     repMetrics: { min_angle: 90, duration_ms: 2100 },
   };
   expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 5 })).toEqual([
-    '5. Control the return.',
-    'Rep 5 complete. Bottom angle 90 degrees.',
+    '5. Stay controlled.',
   ]);
-  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 7 })).toEqual([
-    'Rep 7 complete. Bottom angle 90 degrees.',
+  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 1 })).toEqual([
+    'Rep 1 complete.',
   ]);
-  const noMetrics: ExerciseResult = { ...completed, repMetrics: undefined };
-  expect(predictNextRepCues(noMetrics, { exercise: 'squat', nextSetReps: 7 })).toEqual(['Rep 7 complete.']);
+  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 7 })).toEqual([]);
+  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 10 })).toEqual(['10.']);
 });
 
 function measuredRep(minAngle: number, durationMs: number): ExerciseResult {
@@ -573,10 +565,8 @@ it('needs three baseline reps before offering comparative insights', () => {
   const engine = new FeedbackEngine();
   engine.next(measuredRep(95, 2100), 0, { exercise: 'squat', totalReps: 6 });
   engine.next(measuredRep(95, 2100), 3000, { exercise: 'squat', totalReps: 7 });
-  // Only two baselines recorded: the standout rep gets the plain grounded cue.
-  expect(engine.next(measuredRep(80, 2100), 6000, { exercise: 'squat', totalReps: 8 })).toBe(
-    'Rep 8 complete. Bottom angle 80 degrees.',
-  );
+  // Only two baselines recorded: the standout rep stays silent.
+  expect(engine.next(measuredRep(80, 2100), 6000, { exercise: 'squat', totalReps: 8 })).toBeNull();
 });
 
 it('does not repeat the same insight inside its cooldown', () => {
@@ -587,9 +577,8 @@ it('does not repeat the same insight inside its cooldown', () => {
   expect(engine.next(measuredRep(80, 2100), 18000, { exercise: 'squat', totalReps: 6 })).toBe(
     'Rep 6 — best range yet. Hold that standard.',
   );
-  expect(engine.next(measuredRep(79, 2100), 24000, { exercise: 'squat', totalReps: 7 })).toBe(
-    'Rep 7 complete. Bottom angle 79 degrees.',
-  );
+  // Inside the insight cooldown, a clean rep stays silent instead of narrating.
+  expect(engine.next(measuredRep(79, 2100), 24000, { exercise: 'squat', totalReps: 7 })).toBeNull();
   expect(engine.next(measuredRep(70, 2100), 18000 + 121_000, { exercise: 'squat', totalReps: 8 })).toBe(
     'Rep 8 — best range yet. Hold that standard.',
   );
@@ -602,7 +591,6 @@ it('reset clears the comparative baseline', () => {
   }
   engine.reset();
   engine.next(measuredRep(95, 2100), 18000, { exercise: 'squat', totalReps: 1 });
-  expect(engine.next(measuredRep(80, 2100), 21000, { exercise: 'squat', totalReps: 2 })).toBe(
-    '2. Settle into your pace.',
-  );
+  // The standout rep would earn praise with a baseline, but reset wiped it.
+  expect(engine.next(measuredRep(80, 2100), 21000, { exercise: 'squat', totalReps: 2 })).toBeNull();
 });
