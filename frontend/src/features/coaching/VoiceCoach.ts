@@ -116,6 +116,19 @@ export class VoiceCoach {
     return promise;
   }
 
+  /**
+   * Warm the cloud cache for one phrase without speaking it. Best-effort and
+   * silent: a cache hit, an in-flight request, a rate limit, or a network
+   * failure all result in a no-op, and the later speak() falls back to its
+   * normal fetch path. Used to speculatively pre-generate the next rep's cue
+   * while the user is still moving, so playback starts instantly on completion.
+   */
+  prefetch(text: string, authenticated: boolean) {
+    void authenticated;
+    if (!text || this.cache.has(text) || this.cloudInflight.has(text)) return;
+    void this.fetchCloud(text).catch(() => {});
+  }
+
   async warmPhrases(phrases: string[], authenticated: boolean) {
     const limit = authenticated ? 4 : 2;
     const unique = [...new Set(phrases)].filter((phrase) => !this.cache.has(phrase)).slice(0, limit);
