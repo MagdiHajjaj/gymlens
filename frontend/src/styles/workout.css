@@ -113,30 +113,40 @@
   border-color: #41623c;
 }
 .workout-ready-panel .position-guide {
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
+  position: relative;
+  height: 210px;
+  overflow: hidden;
   border-radius: 10px;
   margin-bottom: 22px;
   background: #eef2e6;
 }
-.position-guide > svg {
-  width: 150px;
-  height: 160px;
-}
-.position-guide > img {
-  width: 130px;
+.position-guide > .exercise-art {
+  display: block;
+  width: 100%;
   height: 100%;
-  object-fit: contain;
-  border-radius: 10px;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.position-guide > .exercise-art-fallback {
+  display: grid;
+  place-items: center;
+  color: #41623c;
+  font-weight: 600;
 }
 .position-guide > span {
-  font-size: 12px;
-  border: 1px solid #cbd6c1;
-  padding: 7px 10px;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1;
+  padding: 8px 12px;
+  border: 1px solid #ffffffb8;
   border-radius: 20px;
+  background: #fbfcf6e8;
+  box-shadow: 0 4px 18px #18302224;
+  color: #31513d;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(6px);
 }
 .workout-ready-panel h2 {
   margin: 8px 0 12px;
@@ -440,10 +450,7 @@
     aspect-ratio: 1 / 1;
   }
   .workout-ready-panel .position-guide {
-    height: 140px;
-  }
-  .position-guide > svg {
-    height: 125px;
+    height: 190px;
   }
   .workout-page .rep-number {
     font-size: 88px;
