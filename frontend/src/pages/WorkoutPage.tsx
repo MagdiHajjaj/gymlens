@@ -39,6 +39,9 @@ export function WorkoutPage() {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const identity = useIdentity();
+  const plan = usePlan((state) => state.plan);
+  const completedExerciseIds = usePlan((state) => state.completedExerciseIds);
+  const workoutName = usePlan((state) => state.workoutName);
   const {
     selected,
     session,
@@ -86,6 +89,11 @@ export function WorkoutPage() {
   const [voiceCoach] = useState(() => new VoiceCoach(setVoiceStatus));
   const currentSetReps = Math.max(0, (session?.total_reps ?? 0) - currentSetStartRep + 1);
   const trackedReps = session?.total_reps ?? 0;
+  const planItem = plan.find((item) => item.exerciseId === selected);
+  const setsRemaining = planItem
+    ? Math.max(0, planItem.sets - (session?.set_ranges?.length ?? 0))
+    : 0;
+  const repsRemaining = planItem ? Math.max(0, targetReps - currentSetReps) : 0;
   // The visible clock only runs once tracking has actually started — the
   // "find your position" calibration window doesn't count as workout time.
   const trackingStarted = Boolean(session?.tracking_started_at);
@@ -403,7 +411,8 @@ export function WorkoutPage() {
                 ? 'VIDEO ANALYSIS'
                 : 'WORKOUT IN PROGRESS'}
           </span>
-          <h1>{exercise.name}</h1>
+            <h1>{exercise.name}</h1>
+            {plan.length > 1 && <p className="workout-session-name">{workoutName}</p>}
         </div>
         <div className="session-clock">
           <span className={paused ? '' : 'live-dot'} />
@@ -596,6 +605,45 @@ export function WorkoutPage() {
                               : 'Returning'}
             </div>
           </section>
+          {plan.length > 1 && (
+            <section className="panel workout-plan-panel" aria-label="Workout plan">
+              <div className="workout-plan-heading">
+                <div>
+                  <span className="eyebrow">WORKOUT PLAN</span>
+                  <strong>{workoutName || 'Your session'}</strong>
+                </div>
+                <span className="workout-plan-count">
+                  {Math.max(0, completedExerciseIds.length)} / {plan.length}
+                </span>
+              </div>
+              <ul className="workout-plan-list">
+                {plan.map((item, index) => {
+                  const complete = completedExerciseIds.includes(item.exerciseId);
+                  const current = item.exerciseId === selected;
+                  const remainingSets = current
+                    ? setsRemaining
+                    : item.sets;
+                  return (
+                    <li key={item.exerciseId} className={`${current ? 'is-current' : ''} ${complete ? 'is-complete' : ''}`}>
+                      <span className="workout-plan-check" aria-hidden="true">
+                        {complete ? <Check size={14} /> : index + 1}
+                      </span>
+                      <span className="workout-plan-item">
+                        <strong>{exercises[item.exerciseId].name}</strong>
+                        <small>
+                          {complete
+                            ? 'Completed'
+                            : current
+                              ? `${remainingSets} ${remainingSets === 1 ? 'set' : 'sets'} left · ${repsRemaining} reps left`
+                              : `${item.sets} ${item.sets === 1 ? 'set' : 'sets'} · ${item.reps} reps`}
+                        </small>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           <section className="coach-panel">
             <span className="eyebrow">
               <Volume2 size={14} /> YOUR COACH
