@@ -21,7 +21,7 @@ interface Store {
   currentSetStartRep: number;
   select: (id: ExerciseId) => void;
   toggleExercise: (id: ExerciseId) => void;
-  begin: (source: 'camera' | 'demo' | 'upload') => void;
+  begin: (source: 'camera' | 'demo' | 'upload', opts?: { preCalibrated?: boolean }) => void;
   ingest: (result: ExerciseResult, timestamp: number) => void;
   pause: () => void;
   toggleVoice: () => void;
@@ -76,7 +76,7 @@ export const useWorkout = create<Store>((set, get) => ({
       if (selectedIds.length === 0) return {};
       return { selectedIds, selected: selectedIds[0] };
     }),
-  begin: (source) => {
+  begin: (source, opts) => {
     lastMetric = 0;
     const selectedId = get().selected;
     // A planned exercise brings its own rep target; otherwise the global target stands.
@@ -94,6 +94,7 @@ export const useWorkout = create<Store>((set, get) => ({
         reps: [],
         metrics: [],
         local: true,
+        preCalibrated: opts?.preCalibrated ?? false,
       },
       targetReps: planItem ? planItem.reps : get().targetReps,
       result: null,

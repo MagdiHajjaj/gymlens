@@ -6,7 +6,13 @@ type CurlRep = { metrics: Record<string, number>; faults: ExerciseResult['faults
 /** Each arm has its own calibration and cycle; one arm never borrows the other's state. */
 export class CurlAnalyzer implements ExerciseAnalyzer {
   readonly id = 'curl' as const;
-  private analyzers = [new MovementAnalyzer('curl', {}, 0), new MovementAnalyzer('curl', {}, 1)];
+  private analyzers: MovementAnalyzer[];
+  constructor(preCalibrated = false) {
+    this.analyzers = [
+      new MovementAnalyzer('curl', {}, 0, preCalibrated),
+      new MovementAnalyzer('curl', {}, 1, preCalibrated),
+    ];
+  }
   private lastSeen = [-Infinity, -Infinity];
   private pending: { side: number; rep: CurlRep }[] = [];
   reset() {
@@ -39,7 +45,8 @@ export class CurlAnalyzer implements ExerciseAnalyzer {
           guidance: 'Reacquiring arm.',
         };
       }
-      if (frame.timestampMs - this.lastSeen[side] > 200) analyzer.reset();
+      if (this.lastSeen[side] > -Infinity && frame.timestampMs - this.lastSeen[side] > 200)
+        analyzer.reset();
       if (visible) this.lastSeen[side] = frame.timestampMs;
       return analyzer.analyze(frame);
     });

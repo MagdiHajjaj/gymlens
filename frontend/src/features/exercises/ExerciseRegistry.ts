@@ -125,8 +125,8 @@ export const exercises = {
     calibrate: 'Hang with arms extended',
   },
 } as const;
-export const createAnalyzer = (id: ExerciseId) =>
-  id === 'curl' ? new CurlAnalyzer() : new MovementAnalyzer(id);
+export const createAnalyzer = (id: ExerciseId, preCalibrated = false) =>
+  id === 'curl' ? new CurlAnalyzer(preCalibrated) : new MovementAnalyzer(id, {}, undefined, preCalibrated);
 
 /** Exercise ids in a movement pattern, in registry order. */
 export const exercisesForMovement = (movement: ExerciseMovement): ExerciseId[] =>

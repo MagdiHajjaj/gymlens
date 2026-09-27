@@ -453,9 +453,14 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
     readonly id: ExerciseId,
     options: Partial<Thresholds> = {},
     private readonly fixedSide?: number,
+    preCalibrated = false,
   ) {
     this.config = { ...defaults[id], ...options };
     this.exercise = configs[id];
+    // A session that starts from an already-calibrated camera preview skips the
+    // hold-still calibration: the user proved their start position seconds ago.
+    // Calibration stores no per-user biometrics, so carrying it over is safe.
+    this.armed = preCalibrated;
   }
   reset() {
     this.smoother.reset();
