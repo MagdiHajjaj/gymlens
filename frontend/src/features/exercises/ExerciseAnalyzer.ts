@@ -22,12 +22,18 @@ export interface Thresholds {
   minimumHipAlignment: number;
 }
 const defaults: Record<ExerciseId, Thresholds> = {
+  // Squat: primary joint is the knee. Standing knee angle is ~170; a parallel
+  // squat bottoms near ~90. depth 105 flags a slightly-shallow squat with a cue
+  // instead of dropping it; the rep counts while minimum <= exit - minimumRange
+  // (130), so a half-squat-depth rep still counts with coaching while a quarter
+  // rep (minimum > 130) does not count. 15 degrees of enter/exit hysteresis
+  // keeps smoothed landmark jitter (~+-4 deg) from starting phantom cycles.
   squat: {
     visibility: 0.6,
     enter: 150,
     exit: 165,
     depth: 105,
-    minimumRange: 25,
+    minimumRange: 35,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -66,7 +72,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Romanian deadlift: primary joint is the hip. Standing hip angle is ~170-175,
   // a full hinge reaches ~90-100. depth 105 flags a shallow hinge; the rep still
-  // counts while minimum <= exit - minimumRange (140). maximumLean is a proxy for
+  // counts while minimum <= exit - minimumRange (135). maximumLean is a proxy for
   // back rounding: a braced hinge keeps the torso at or above ~parallel, so torso
   // inclination past 80 suggests loss of neutral spine.
   deadlift: {
@@ -74,7 +80,7 @@ const defaults: Record<ExerciseId, Thresholds> = {
     enter: 150,
     exit: 165,
     depth: 105,
-    minimumRange: 25,
+    minimumRange: 30,
     reversal: 8,
     minimumMs: 900,
     maximumMs: 15000,
@@ -761,9 +767,24 @@ export class MovementAnalyzer implements ExerciseAnalyzer {
             ...(this.exercise.trackMaxLean ? { max_torso_lean: Math.round(this.maximumLean) } : {}),
           };
         } else {
-          result.guidance = duration < this.config.minimumMs
-            ? `Rep not counted: keep the press moving for at least ${this.config.minimumMs / 1000} seconds.`
-            : `Rep not counted: press overhead until your arms are straight, then return to your shoulders.`;
+          // A rep that fails to count must never be a silent miss: a partial-ROM
+          // cycle carries the exercise's depth fault (so it reaches the session
+          // report and coaching), and the guidance names the reason per exercise
+          // instead of reusing the press-specific copy.
+          const tooFast = duration < this.config.minimumMs;
+          if (!tooFast) {
+            const f = fault(this.exercise.depthFault.code, this.exercise.depthFault.message);
+            this.cycleFaults.set(f.code, f);
+            result.faults = [...this.cycleFaults.values()];
+          }
+          result.guidance =
+            this.id === 'press'
+              ? tooFast
+                ? `Rep not counted: keep the press moving for at least ${this.config.minimumMs / 1000} seconds.`
+                : `Rep not counted: press overhead until your arms are straight, then return to your shoulders.`
+              : tooFast
+                ? `Rep not counted: slow down — take at least ${this.config.minimumMs / 1000} seconds per rep.`
+                : `Rep not counted: ${this.exercise.depthFault.message}`;
         }
         this.phase = 'ready';
         this.enterSince = -1;
