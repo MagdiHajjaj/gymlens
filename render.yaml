@@ -5,7 +5,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: pip install uv && uv sync --locked --no-dev
-    preDeployCommand: uv run alembic upgrade head
+    preDeployCommand: echo '--- running migrations ---' && uv run alembic upgrade head && echo '--- migrations done ---'
     startCommand: exec uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health/ready
     autoDeployTrigger: commit
