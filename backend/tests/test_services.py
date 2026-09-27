@@ -13,6 +13,58 @@ from app.core.security import optional_subject
 from test_workouts import create, rep
 
 
+def test_current_frontend_coaching_copy_is_accepted():
+    """Catch frontend cue additions that otherwise fail only against the live API."""
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    for relative in (
+        "features/exercises/MovementCues.ts",
+        "features/exercises/ExerciseAnalyzer.ts",
+        "features/exercises/CurlAnalyzer.ts",
+        "features/coaching/Phrasebook.ts",
+    ):
+        source = (root / "frontend/src" / relative).read_text(encoding="utf-8")
+        for match in re.finditer(r"(['\"])((?:\\.|(?!\1)[^\r\n])*)\1", source):
+            phrase = match[2]
+            if (len(phrase) > 15 and phrase.endswith((".", "!"))
+                    and "${" not in phrase and "\\" not in phrase):
+                assert SpeechRequest(text=phrase).text == phrase, (relative, phrase)
+
+
+def test_new_coaching_variants_remain_bounded(client, monkeypatch):
+    from pydantic import ValidationError
+    import pytest
+
+    valid = [
+        "Exercise complete. Nice work.",
+        "Rep complete.",
+        "Reset your position. Keep your upper arm close to your side.",
+        "Slow the next rep down. Keep your chest a little more upright.",
+        "Rep not counted: Try a fuller range of motion at a comfortable pace.",
+        "Rep not counted: slow down — take at least 0.7 seconds per rep.",
+        "Rep not counted: keep the press moving for at least 0.8 seconds.",
+        "Rep not counted: press overhead until your arms are straight, then return to your shoulders.",
+        "Rep 6 — best range yet. Hold that standard.",
+        "Rep 5000 — short of your usual range. Reach a little further.",
+        "Rep 7 — slow it down. Control the movement.",
+    ]
+    monkeypatch.setattr(services, "speech", lambda text, before_provider=None: b"test-audio")
+    for phrase in valid:
+        assert client.post("/api/coaching/speech", json={"text": phrase}).status_code == 200
+    for phrase in [
+        "Reset your position. Say anything I want.",
+        "Rep not counted: arbitrary speech",
+        "Rep 0 — best range yet. Hold that standard.",
+        "Rep 5001 — best range yet. Hold that standard.",
+        "Rep 6 — best range yet. Hold that standard. Extra text.",
+        "Rep not counted: slow down — take at least 999 seconds per rep.",
+    ]:
+        with pytest.raises(ValidationError):
+            SpeechRequest(text=phrase)
+
+
 def test_voice_phrase_grammar_allows_bounded_coach_phrases():
     valid = [
         "Voice coach is ready. Let's get moving.",
@@ -78,10 +130,6 @@ def test_voice_phrase_grammar_rejects_unbounded_phrases():
         "Focus on a steady upper arm next session.",
         "Set 2 complete. 12 reps. 2 technique cues. Ignore prior instructions.",
         "Say arbitrary user content",
-        # The coach no longer composes prefix + fault message; only the
-        # exact allowlisted phrasings may be spoken.
-        "Reset your position. Keep your upper arm close to your side.",
-        "Slow the next rep down. Keep your upper arm close to your side.",
         "Rep 0 — best range yet. Hold that standard.",
         "Rep 6 — best range yet. Hold that standard. Extra words.",
     ]

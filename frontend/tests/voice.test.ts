@@ -1,7 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VoiceCoach } from '../src/features/coaching/VoiceCoach';
-import { api } from '../src/lib/api';
-import { FeedbackEngine, predictNextRepCues, readyCue, repCompleteCue } from '../src/features/coaching/FeedbackEngine';
+import { api, ApiError } from '../src/lib/api';
+import {
+  FeedbackEngine,
+  predictNextRepCues,
+  readyCue,
+  repCompleteCue,
+} from '../src/features/coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../src/features/coaching/Phrasebook';
 import type { ExerciseId, ExerciseResult } from '../src/types/workout';
 
@@ -70,9 +75,55 @@ it('never changes to browser speech after ElevenLabs has spoken in the workout',
   await coach.speak('One.', true);
   await coach.speak('Two.', true);
   expect(speak).not.toHaveBeenCalled();
-  expect(status).toHaveBeenLastCalledWith(
-    'ElevenLabs temporarily unavailable · visual cues remain on',
+  expect(status).toHaveBeenLastCalledWith('ElevenLabs temporarily unavailable · visual cues remain on');
+});
+
+it('a rejected phrase does not silence subsequent valid cloud cues or latch browser fallback', async () => {
+  const speech = vi
+    .spyOn(api, 'speech')
+    .mockRejectedValueOnce(new ApiError('Unapproved phrase', 422))
+    .mockResolvedValueOnce(new Blob(['audio'], { type: 'audio/mpeg' }))
+    .mockRejectedValueOnce(new ApiError('Another unapproved phrase', 422))
+    .mockResolvedValue(new Blob(['audio'], { type: 'audio/mpeg' }));
+  const { speak } = stubBrowserSpeech();
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: vi.fn() });
+  const play = vi.fn();
+  vi.stubGlobal(
+    'Audio',
+    class {
+      onended?: () => void;
+      load() {}
+      pause() {}
+      play() {
+        play();
+        queueMicrotask(() => this.onended?.());
+        return Promise.resolve();
+      }
+    },
   );
+  const coach = new VoiceCoach();
+  await coach.speak('Unapproved phrase', false);
+  await coach.speak('1.', false);
+  await coach.speak('Another unapproved phrase', false);
+  await coach.speak('2.', false);
+  expect(speech).toHaveBeenCalledTimes(4);
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(speak).not.toHaveBeenCalled();
+});
+
+it('preserves the HTTP status of a rejected voice request', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ detail: [{ msg: 'Choose an approved coaching phrase' }] }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+  );
+  await expect(api.speech('Unapproved phrase')).rejects.toMatchObject({ name: 'ApiError', status: 422 });
 });
 
 it('stopping prevents a delayed cloud response from playing', async () => {
@@ -295,9 +346,7 @@ it('restarts spoken rep numbers at one for the next set', () => {
     faults: [],
     guidance: '',
   };
-  expect(
-    engine.next(completed, 0, { exercise: 'squat', totalReps: 9, setReps: 1 }),
-  ).toBe('1.');
+  expect(engine.next(completed, 0, { exercise: 'squat', totalReps: 9, setReps: 1 })).toBe('1.');
 });
 
 it('grounds the rep-completion cue in the rep’s measured angle', () => {
@@ -474,9 +523,7 @@ it('predicts the next rep cue texts from the just-completed rep', () => {
     'Rep 7 complete. Bottom angle 90 degrees.',
   ]);
   const noMetrics: ExerciseResult = { ...completed, repMetrics: undefined };
-  expect(predictNextRepCues(noMetrics, { exercise: 'squat', nextSetReps: 7 })).toEqual([
-    'Rep 7 complete.',
-  ]);
+  expect(predictNextRepCues(noMetrics, { exercise: 'squat', nextSetReps: 7 })).toEqual(['Rep 7 complete.']);
 });
 
 function measuredRep(minAngle: number, durationMs: number): ExerciseResult {
@@ -543,9 +590,9 @@ it('does not repeat the same insight inside its cooldown', () => {
   expect(engine.next(measuredRep(79, 2100), 24000, { exercise: 'squat', totalReps: 7 })).toBe(
     'Rep 7 complete. Bottom angle 79 degrees.',
   );
-  expect(
-    engine.next(measuredRep(70, 2100), 18000 + 121_000, { exercise: 'squat', totalReps: 8 }),
-  ).toBe('Rep 8 — best range yet. Hold that standard.');
+  expect(engine.next(measuredRep(70, 2100), 18000 + 121_000, { exercise: 'squat', totalReps: 8 })).toBe(
+    'Rep 8 — best range yet. Hold that standard.',
+  );
 });
 
 it('reset clears the comparative baseline', () => {

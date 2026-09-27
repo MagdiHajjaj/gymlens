@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
@@ -179,6 +181,14 @@ PHRASES = {
     "No swinging — strict curls only.",
 }
 
+# Exact frontend coaching copy, including alternate exercise cues. This stays
+# bounded to approved application text rather than allowing arbitrary speech.
+PHRASES.update(json.loads(Path(__file__).with_name("coaching_phrases.json").read_text(encoding="utf-8")))
+REJECTED_TEMPO_PHRASE = re.compile(
+    r"Rep not counted: (?:keep the press moving for at least |slow down — take at least )"
+    r"(?:0\.[1-9]|[1-9](?:\.[1-9])?|10) seconds(?: per rep)?\."
+)
+
 SET_FOCUS_PHRASES = {
     "Sit a little deeper next set.",
     "Keep your chest more upright next set.",
@@ -302,6 +312,9 @@ def approved_speech(value: str) -> bool:
     )
     return (
         value in PHRASES
+        or any(value.startswith(prefix) and value[len(prefix) :] in PHRASES
+               for prefix in ("Reset your position. ", "Slow the next rep down. ", "Rep not counted: "))
+        or bool(REJECTED_TEMPO_PHRASE.fullmatch(value))
         or bool(NUMERIC_PHRASE.fullmatch(value))
         or bool(REST_PHRASE.fullmatch(value))
         or bool(SET_GO_PHRASE.fullmatch(value))

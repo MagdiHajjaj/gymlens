@@ -1,4 +1,4 @@
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 
 interface SpeakOptions {
   priority?: number;
@@ -15,8 +15,7 @@ interface SpeechRequest {
 const CLOUD_LIMIT = 40;
 const CLOUD_WINDOW_MS = 60_000;
 const CLOUD_COOLDOWN_MS = 60_000;
-const SILENT_WAV =
-  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
+const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
 
 export class VoiceCoach {
   constructor(private report: (status: string) => void = () => {}) {}
@@ -46,8 +45,8 @@ export class VoiceCoach {
     const AudioContextClass =
       typeof window === 'undefined'
         ? undefined
-        : window.AudioContext ??
-          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        : (window.AudioContext ??
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext);
     if (AudioContextClass) {
       if (!this.audioContext) this.audioContext = new AudioContextClass();
       void this.audioContext.resume().catch(() => {});
@@ -253,8 +252,12 @@ export class VoiceCoach {
       } finally {
         URL.revokeObjectURL(url);
       }
-    } catch {
+    } catch (error) {
       if (!this.isCurrent(request)) return;
+      if (error instanceof ApiError && error.status === 422) {
+        this.report('This coaching phrase is unavailable · visual cues remain on');
+        return;
+      }
       // Once this workout has spoken with ElevenLabs, keep the voice consistent.
       // A transient provider/rate/network failure may skip a cue, but the next
       // cue retries after cooldown instead of suddenly becoming a system voice.
@@ -328,7 +331,10 @@ export class VoiceCoach {
       const blob = await api.speech(text);
       return blob;
     } catch (error) {
-      this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
+      // Invalid phrases and authentication errors are not provider outages.
+      // Let the next valid cue try again instead of silencing the whole coach.
+      if (!(error instanceof ApiError) || error.status === 429 || error.status >= 500)
+        this.cloudCooldownUntil = Date.now() + CLOUD_COOLDOWN_MS;
       throw error;
     }
   }

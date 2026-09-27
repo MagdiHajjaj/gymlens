@@ -52,6 +52,8 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
   });
   await page.goto('/workout?mode=demo&synthetic=1');
   await page.getByRole('button', { name: 'Bicep curl', exact: true }).click();
+  // Exercise selection now supports multiple picks; remove the default squat.
+  await page.getByRole('button', { name: 'Squat', exact: true }).click();
   await page.getByRole('button', { name: 'Start video demo', exact: true }).click();
   await page.getByRole('button', { name: 'Voice off', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Voice on', exact: true })).toHaveAttribute(
@@ -69,8 +71,10 @@ test('curl heatmap responds to movement and voice can be enabled and tested', as
   await expect(page.locator('.arm-tracking > div').nth(0)).toContainText('1 rep');
   await expect(page.locator('.arm-tracking > div').nth(1)).toContainText('1 rep');
   await page.getByRole('button', { name: 'Exit demo', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Exit demo without saving?' })
+    .getByRole('button', { name: 'Exit demo', exact: true }).click();
   await expect(page).toHaveURL(/\/workout$/);
-  await expect(page.getByRole('button', { name: 'Set up camera', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Plan your session', exact: true })).toBeVisible();
 });
 test('guest demo exits without creating a report or history entry', async ({ page }) => {
   const errors: string[] = [];

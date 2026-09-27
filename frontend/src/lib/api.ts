@@ -28,6 +28,15 @@ export function setTokenProvider(provider?: () => Promise<string>) {
   getToken = provider;
 }
 const base = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -47,10 +56,11 @@ async function request<T>(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(
+    throw new ApiError(
       typeof body.detail === 'string'
         ? body.detail
         : `Request failed (${response.status}). Please try again.`,
+      response.status,
     );
   }
   return (blob ? response.blob() : response.json()) as Promise<T>;
@@ -88,7 +98,12 @@ export const api = {
   detail: (id: string) => request<WorkoutSession>(`/api/workouts/${id}`),
   insights: (id: string) => request<Insight>(`/api/workouts/${id}/insights`, { method: 'POST' }),
   speech: (text: string) =>
-    request<Blob>('/api/coaching/speech', { method: 'POST', body: JSON.stringify({ text }) }, true, 'optional'),
+    request<Blob>(
+      '/api/coaching/speech',
+      { method: 'POST', body: JSON.stringify({ text }) },
+      true,
+      'optional',
+    ),
   async save(session: WorkoutSession) {
     const created = await request<WorkoutSession>('/api/workouts', {
       method: 'POST',
