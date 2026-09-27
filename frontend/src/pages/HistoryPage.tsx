@@ -1,28 +1,36 @@
-import { MovementChips } from '../components/MovementChips';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, History, Repeat2 } from 'lucide-react';
+import { ArrowRight, History, Repeat2, Search } from 'lucide-react';
 import { useSessions } from '../lib/useSessions';
 import { useIdentity } from '../features/auth/AuthProvider';
-import { exercises, type ExerciseMovement } from '../features/exercises/ExerciseRegistry';
+import { exercises } from '../features/exercises/ExerciseRegistry';
+import type { ExerciseId } from '../types/workout';
 import { useWorkout } from '../features/workout/workoutStore';
 import { timeLabel } from '../lib/sessionBuffer';
 import { Button } from '../components/ui/button';
 import { groupWorkouts } from '../lib/workoutGroups';
+import { filterWorkouts } from '../lib/filterWorkouts';
 
 export function HistoryPage() {
   const { sessions, loading, error, retry } = useSessions();
   const { authenticated } = useIdentity();
   const select = useWorkout((state) => state.select);
   const navigate = useNavigate();
-  const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
-  const filtered = sessions
-    .filter(
-      (session) =>
-        movementFilter === null || exercises[session.exercise].movement === movementFilter,
-    )
-    .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
-  const workouts = groupWorkouts(filtered);
+  const [query, setQuery] = useState('');
+  const [exerciseFilter, setExerciseFilter] = useState<ExerciseId | null>(null);
+  const workouts = groupWorkouts(
+    [...sessions].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)),
+  );
+  // Only offer exercises the user has actually done, in registry order.
+  const historyExercises = (Object.keys(exercises) as ExerciseId[]).filter((id) =>
+    sessions.some((session) => session.exercise === id),
+  );
+  const hasFilter = query.trim() !== '' || exerciseFilter !== null;
+  const filtered = filterWorkouts(workouts, { query, exercise: exerciseFilter });
+  const clearFilters = () => {
+    setQuery('');
+    setExerciseFilter(null);
+  };
 
   return (
     <div className="page workout-history-page">
@@ -46,15 +54,39 @@ export function HistoryPage() {
         <p role="status">
           {loading
             ? 'Updating history…'
-            : `${workouts.length} ${workouts.length === 1 ? 'workout' : 'workouts'}`}
+            : `${filtered.length} ${filtered.length === 1 ? 'workout' : 'workouts'}`}
         </p>
-        {movementFilter !== null && (
-          <Button size="small" variant="ghost" onClick={() => setMovementFilter(null)}>
+        {hasFilter && (
+          <Button size="small" variant="ghost" onClick={clearFilters}>
             Clear filters
           </Button>
         )}
       </div>
-      <MovementChips value={movementFilter} onChange={setMovementFilter} showCounts={false} />
+      <div className="history-search">
+        <Search size={16} aria-hidden />
+        <input
+          type="search"
+          placeholder="Search workouts…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="Search workouts by name or exercise"
+        />
+      </div>
+      {historyExercises.length > 1 && (
+        <div className="movement-chips" role="group" aria-label="Filter by exercise">
+          {historyExercises.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`movement-chip${exerciseFilter === id ? ' is-active' : ''}`}
+              aria-pressed={exerciseFilter === id}
+              onClick={() => setExerciseFilter(exerciseFilter === id ? null : id)}
+            >
+              {exercises[id].name}
+            </button>
+          ))}
+        </div>
+      )}
       {error && (
         <div className="notice error" role="alert">
           <span>Account history couldn’t load. Showing any sessions saved in this browser.</span>
@@ -64,7 +96,7 @@ export function HistoryPage() {
         </div>
       )}
       <div className="history-session-list" aria-busy={loading}>
-        {workouts.map((workout) => {
+        {filtered.map((workout) => {
           const local = workout.sessions.some((session) => session.local !== false);
           const session = workout.sessions[0];
           const exerciseNames = workout.sessions.map((row) => exercises[row.exercise].name);
@@ -190,26 +222,26 @@ export function HistoryPage() {
             </article>
           );
         })}
-        {!loading && !workouts.length && (
+        {!loading && !filtered.length && (
           <section className="panel history-empty">
             <History size={30} />
             <h2>
-              {movementFilter !== null
-                ? 'No sessions match these filters.'
+              {hasFilter
+                ? 'No workouts match these filters.'
                 : error
                   ? 'No browser sessions available.'
                   : 'Your first session belongs here.'}
             </h2>
             <p>
-              {movementFilter !== null
-                ? 'Try another movement, or clear the filter.'
+              {hasFilter
+                ? 'Try a different search, or clear the filter.'
                 : error
                   ? 'Retry account history to check your saved workouts.'
                   : 'Complete a workout to see your report here.'}
             </p>
-            {movementFilter !== null ? (
-              <Button variant="secondary" onClick={() => setMovementFilter(null)}>
-                Show all sessions
+            {hasFilter ? (
+              <Button variant="secondary" onClick={clearFilters}>
+                Show all workouts
               </Button>
             ) : (
               <Button asChild>
