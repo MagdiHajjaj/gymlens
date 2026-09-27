@@ -261,7 +261,10 @@ export function WorkoutPage() {
     setError('');
     setElapsed(0);
     setCue('');
-    begin(source);
+    // Camera sessions always launch from the setup preview, whose Start button and
+    // auto-start only fire once the position is calibrated — so the session can
+    // skip the hold-still calibration and start tracking immediately.
+    begin(source, { preCalibrated: source === 'camera' });
     setActive(true);
   }
   async function end() {

@@ -78,6 +78,12 @@ export interface WorkoutSession {
   insight?: Insight | null;
   local?: boolean;
   synced_id?: string;
+  /**
+   * The session started from an already-calibrated camera preview, so its
+   * analyzer skips the hold-still calibration. Never persisted: it only
+   * describes how this live session began.
+   */
+  preCalibrated?: boolean;
 }
 
 // The account history endpoint omits rep/metric details; browser copies may

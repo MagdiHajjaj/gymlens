@@ -47,7 +47,9 @@ export function CameraView({
   const canvas = useRef<HTMLCanvasElement>(null);
   const storedSession = useWorkout((s) => s.session);
   const selected = useWorkout((s) => s.selected);
-  const session = preview ? { id: 'preview', exercise: selected, source: 'camera' } : storedSession!;
+  const session = preview
+    ? { id: 'preview', exercise: selected, source: 'camera' as const, preCalibrated: false }
+    : storedSession!;
   const storedPaused = useWorkout((s) => s.paused);
   const paused = !preview && storedPaused;
   const { authenticated } = useIdentity();
@@ -65,7 +67,7 @@ export function CameraView({
       lastInference = -1,
       lastUi = -1,
       wasPaused = false;
-    const analyzer = createAnalyzer(session.exercise),
+    const analyzer = createAnalyzer(session.exercise, session.preCalibrated ?? false),
       stabilizer = new PoseStabilizer(),
       feedback = new FeedbackEngine(),
       voice = voiceCoach;
