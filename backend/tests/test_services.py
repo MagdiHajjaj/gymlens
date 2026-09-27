@@ -222,7 +222,11 @@ def test_gemini_structured_validation_and_saved_result(client, monkeypatch):
     response = client.post(f"/api/workouts/{sid}/insights")
     assert response.status_code == 200, response.text
     assert response.json()["source"] == "gemini"
-    assert '"totalReps": 1' in calls[0]["contents"]
+    payload = json.loads(calls[0]["contents"].split("statistics: ", 1)[1])
+    assert payload["exercise"] == "squat"
+    assert payload["totals"]["reps"] == 1
+    assert payload["range"]["averageMinAngle"] == 92
+    assert payload["tempo"]["averageMs"] == 2500
     config = calls[0]["config"]
     assert config.response_schema is None
     assert config.response_json_schema["additionalProperties"] is False
@@ -254,6 +258,143 @@ def test_invalid_gemini_output_is_not_saved(client, monkeypatch):
     monkeypatch.setattr(services.genai, "Client", InvalidClient)
     assert client.post(f"/api/workouts/{sid}/insights").status_code == 503
     assert client.get(f"/api/workouts/{sid}").json()["insight"] is None
+
+
+def make_rep(number, metrics, faults=()):
+    return SimpleNamespace(rep_number=number, metrics_json=metrics, faults_json=list(faults))
+
+
+def make_workout(exercise="squat", source="camera", reps=()):
+    return SimpleNamespace(exercise=exercise, source=source, reps=list(reps))
+
+
+def full_metrics(min_angle, number=1):
+    return {
+        "min_angle": min_angle,
+        "max_angle": min_angle + 75,
+        "duration_ms": 2400,
+        "eccentric_ms": 1200,
+        "concentric_ms": 1200,
+    }
+
+
+def test_workout_summary_totals_and_clean_streak():
+    workout = make_workout(
+        reps=[
+            make_rep(1, full_metrics(90)),
+            make_rep(2, full_metrics(92), [{"code": "insufficient_depth", "message": "Deeper", "severity": "warning"}]),
+            make_rep(3, full_metrics(91)),
+            make_rep(4, full_metrics(93)),
+            make_rep(5, full_metrics(92)),
+        ]
+    )
+    summary = services._workout_summary(workout)
+    assert summary["exercise"] == "squat"
+    assert summary["totals"] == {"reps": 5, "measuredReps": 5, "cleanReps": 4, "longestCleanStreak": 3}
+    assert summary["repCountUnit"] == "movement cycles"
+
+
+def test_workout_summary_range_trend_best_rep_and_rom():
+    workout = make_workout(
+        reps=[make_rep(n, full_metrics(angle), [{"code": "insufficient_depth", "message": "Deeper", "severity": "warning"}] if n == 6 else [])
+              for n, angle in enumerate([90, 92, 94, 96, 98, 100], start=1)]
+    )
+    summary = services._workout_summary(workout)
+    assert summary["range"]["averageMinAngle"] == 95.0
+    assert summary["range"]["averageRom"] == 75.0
+    # Best rep is the deepest clean rep; rep 6 has a fault so rep 1 wins.
+    assert summary["range"]["bestRep"] == {"rep": 1, "minAngle": 90}
+    trend = summary["range"]["trend"]
+    assert trend["firstReps"] == [1, 2]
+    assert trend["lastReps"] == [5, 6]
+    assert trend["change"] == 8.0  # depth faded across the session
+    assert summary["range"]["minAngleStdDev"] > 0
+
+
+def test_workout_summary_tempo_splits():
+    workout = make_workout(
+        reps=[
+            make_rep(1, {"min_angle": 90, "duration_ms": 2000, "eccentric_ms": 1200, "concentric_ms": 800}),
+            make_rep(2, {"min_angle": 92, "duration_ms": 3000, "eccentric_ms": 1800, "concentric_ms": 1200}),
+        ]
+    )
+    tempo = services._workout_summary(workout)["tempo"]
+    assert tempo == {
+        "averageMs": 2500,
+        "spreadMs": 1000,
+        "averageEccentricMs": 1500,
+        "averageConcentricMs": 1000,
+    }
+
+
+def test_workout_summary_fault_timing_and_percent():
+    workout = make_workout(
+        reps=[
+            make_rep(n, full_metrics(90), [{"code": "knee_over_toes", "message": "Knee", "severity": "warning"}] if n <= 2 else [])
+            for n in range(1, 7)
+        ]
+        + [
+            make_rep(n, full_metrics(90), [{"code": "excessive_forward_lean", "message": "Chest", "severity": "warning"}])
+            for n in (1, 6)
+        ]
+    )
+    faults = {fault["code"]: fault for fault in services._workout_summary(workout)["faults"]}
+    assert faults["knee_over_toes"]["timing"] == "early"
+    assert faults["knee_over_toes"]["percent"] == 25
+    assert faults["knee_over_toes"]["reps"] == [1, 2]
+    assert faults["excessive_forward_lean"]["timing"] == "throughout"
+    # Tied counts sort alphabetically by code.
+    ordered = [fault["code"] for fault in services._workout_summary(workout)["faults"]]
+    assert ordered == ["excessive_forward_lean", "knee_over_toes"]
+
+
+def test_workout_summary_notes_missing_metrics():
+    workout = make_workout(
+        reps=[
+            make_rep(1, {"duration_ms": 2000}),
+            make_rep(2, {"min_angle": 90, "duration_ms": 2000}),
+        ]
+    )
+    summary = services._workout_summary(workout)
+    assert summary["totals"]["measuredReps"] == 1
+    assert any("min_angle missing on 1 of 2 reps" in note for note in summary["notes"])
+    assert any("range-of-motion" in note for note in summary["notes"])
+    assert any("tempo split" in note for note in summary["notes"])
+    assert summary["range"]["trend"] is None  # too few measurements for a trend
+
+
+def test_workout_summary_arm_side_rep_unit():
+    workout = make_workout(
+        exercise="curl",
+        reps=[make_rep(1, {**full_metrics(60), "arm_side": 2})],
+    )
+    assert services._workout_summary(workout)["repCountUnit"] == "individual arm repetitions"
+
+
+def test_rep_schema_accepts_new_tempo_and_rom_metrics(client):
+    sid = create(client)["id"]
+    payload = {
+        "reps": [
+            {
+                "rep_number": 1,
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "metrics_json": {
+                    "min_angle": 92,
+                    "max_angle": 168,
+                    "duration_ms": 2500,
+                    "eccentric_ms": 1300,
+                    "concentric_ms": 1200,
+                },
+                "faults_json": [],
+            }
+        ]
+    }
+    response = client.post(f"/api/workouts/{sid}/reps/batch", json=payload)
+    assert response.status_code == 200, response.text
+    stored = client.get(f"/api/workouts/{sid}").json()["reps"][0]["metrics_json"]
+    assert stored["max_angle"] == 168
+    assert stored["eccentric_ms"] == 1300
+    assert stored["concentric_ms"] == 1200
 
 
 def test_costly_endpoint_provider_miss_rate_limit(client, monkeypatch):

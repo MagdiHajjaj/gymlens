@@ -1,7 +1,8 @@
 import hashlib
 import json
+import math
 import time
-from collections import Counter, OrderedDict
+from collections import OrderedDict
 from concurrent.futures import Future
 from pathlib import Path
 from threading import Lock
@@ -125,24 +126,170 @@ def speech(text: str, before_provider: Callable[[], None] | None = None) -> byte
                 del _speech_inflight[text]
 
 
+def _rep_metric(rep, key):
+    value = rep.metrics_json.get(key)
+    return value if isinstance(value, (int, float)) and math.isfinite(value) else None
+
+
+def _finite(values):
+    return [value for value in values if value is not None]
+
+
+def _average(values):
+    return sum(values) / len(values) if values else None
+
+
+def _stddev(values):
+    if len(values) < 2:
+        return None
+    mean = sum(values) / len(values)
+    return math.sqrt(sum((value - mean) ** 2 for value in values) / len(values))
+
+
+def _clean_streak(reps):
+    longest = current = 0
+    for rep in reps:
+        if rep.faults_json:
+            current = 0
+        else:
+            current += 1
+            longest = max(longest, current)
+    return longest
+
+
+def _fault_code(fault):
+    return fault["code"] if isinstance(fault, dict) else fault.code
+
+
+def _fault_timing(rep_numbers, total):
+    thirds = set()
+    for number in rep_numbers:
+        ratio = number / max(total, 1)
+        thirds.add("early" if ratio <= 1 / 3 else "late" if ratio > 2 / 3 else "middle")
+    return "throughout" if len(thirds) > 1 else next(iter(thirds), "throughout")
+
+
+def _summarize_faults(reps, total):
+    by_code = {}
+    for rep in reps:
+        seen = set()
+        for fault in rep.faults_json:
+            code = _fault_code(fault)
+            if code in seen:
+                continue
+            seen.add(code)
+            entry = by_code.setdefault(code, {"reps": []})
+            entry["reps"].append(rep.rep_number)
+    summaries = []
+    for code, entry in by_code.items():
+        rep_numbers = sorted(entry["reps"])
+        summaries.append(
+            {
+                "code": code,
+                "count": len(rep_numbers),
+                "percent": round(len(rep_numbers) / total * 100) if total else 0,
+                "reps": rep_numbers,
+                "timing": _fault_timing(rep_numbers, total),
+            }
+        )
+    return sorted(summaries, key=lambda row: (-row["count"], row["code"]))
+
+
+def _depth_trend(measured):
+    """First-third vs last-third minimum-angle averages; None when too few measurements."""
+    if len(measured) < 3:
+        return None
+    group = max(1, len(measured) // 3)
+    first = measured[:group]
+    last = measured[-group:]
+    first_average = _average([value for _, value in first])
+    last_average = _average([value for _, value in last])
+    if first_average is None or last_average is None:
+        return None
+    return {
+        "firstReps": [number for number, _ in first],
+        "firstAverage": round(first_average, 1),
+        "lastReps": [number for number, _ in last],
+        "lastAverage": round(last_average, 1),
+        "change": round(last_average - first_average, 1),
+    }
+
+
+def _workout_summary(workout) -> dict:
+    """The full measured picture of a workout, sent to Gemini for coaching analysis."""
+    reps = sorted(workout.reps, key=lambda rep: rep.rep_number)
+    total = len(reps)
+    measured = []
+    clean_measured = []
+    for rep in reps:
+        value = _rep_metric(rep, "min_angle")
+        if value is None:
+            continue
+        measured.append((rep.rep_number, value))
+        if not rep.faults_json:
+            clean_measured.append((rep.rep_number, value))
+    roms = []
+    for rep in reps:
+        low = _rep_metric(rep, "min_angle")
+        high = _rep_metric(rep, "max_angle")
+        if low is not None and high is not None and high >= low:
+            roms.append(high - low)
+    durations = _finite(_rep_metric(rep, "duration_ms") for rep in reps)
+    eccentric = _finite(_rep_metric(rep, "eccentric_ms") for rep in reps)
+    concentric = _finite(_rep_metric(rep, "concentric_ms") for rep in reps)
+    best = min(clean_measured, key=lambda row: row[1], default=None)
+    min_values = [value for _, value in measured]
+
+    notes = []
+    if total and len(measured) < total:
+        notes.append(f"min_angle missing on {total - len(measured)} of {total} reps")
+    if total and not roms:
+        notes.append("no range-of-motion data recorded (older app version)")
+    if total and not eccentric:
+        notes.append("no eccentric/concentric tempo split recorded (older app version)")
+
+    average_min = _average(min_values)
+    average_rom = _average(roms)
+    average_duration = _average(durations)
+    stddev = _stddev(min_values)
+    return {
+        "exercise": workout.exercise,
+        "source": workout.source,
+        "repCountUnit": "individual arm repetitions"
+        if any("arm_side" in rep.metrics_json for rep in reps)
+        else "movement cycles",
+        "totals": {
+            "reps": total,
+            "measuredReps": len(measured),
+            "cleanReps": sum(1 for rep in reps if not rep.faults_json),
+            "longestCleanStreak": _clean_streak(reps),
+        },
+        "range": {
+            "averageMinAngle": round(average_min, 1) if average_min is not None else None,
+            "minAngleStdDev": round(stddev, 1) if stddev is not None else None,
+            "averageRom": round(average_rom, 1) if average_rom is not None else None,
+            "bestRep": {"rep": best[0], "minAngle": best[1]} if best else None,
+            "trend": _depth_trend(measured),
+        },
+        "tempo": {
+            "averageMs": round(average_duration) if average_duration is not None else None,
+            "spreadMs": round(max(durations) - min(durations)) if durations else None,
+            "averageEccentricMs": round(_average(eccentric))
+            if eccentric
+            else None,
+            "averageConcentricMs": round(_average(concentric))
+            if concentric
+            else None,
+        },
+        "faults": _summarize_faults(reps, total),
+        "notes": notes,
+    }
+
+
 def generate_insight(workout) -> dict:
     if not settings.gemini_api_key:
         raise HTTPException(503, "Gemini is not configured. Measured statistics remain available.")
-    counts = Counter(f["code"] for rep in workout.reps for f in rep.faults_json)
-    depths = [r.metrics_json["min_angle"] for r in workout.reps if "min_angle" in r.metrics_json]
-    summary = {
-        "exercise": workout.exercise,
-        "source": workout.source,
-        "totalReps": len(workout.reps),
-        "repCountUnit": "individual arm repetitions" if any(
-            "arm_side" in rep.metrics_json for rep in workout.reps
-        ) else "movement cycles",
-        "repsWithDetectedFaults": sum(bool(r.faults_json) for r in workout.reps),
-        "commonFaults": dict(counts),
-        "measuredMetrics": {
-            "averageMinimumJointAngle": round(sum(depths) / len(depths), 1) if depths else None
-        },
-    }
+    summary = _workout_summary(workout)
     try:
         with genai.Client(
             api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=20000)
@@ -153,8 +300,10 @@ def generate_insight(workout) -> dict:
                 config=types.GenerateContentConfig(
                     system_instruction="You are a concise workout coach. Only use the supplied measurements. "
                     "Do not invent measurements, assess health, or claim injury prevention. "
-                    "Missing measurements are unavailable. No detected faults is not proof of perfect form. "
+                    "Missing (null) measurements are unavailable. No detected faults is not proof of perfect form. "
                     "If source is demo, explicitly describe simulated movement, not a real person's workout. "
+                    "Use range.trend to note depth fading or improving across the session, tempo splits to comment "
+                    "on pacing, and each fault's timing (early/middle/late/throughout) to say when cues appeared. "
                     "Give one practical next-session focus; keep each field concise.",
                     response_mime_type="application/json",
                     response_json_schema=Insight.model_json_schema(),
