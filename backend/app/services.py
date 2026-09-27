@@ -342,11 +342,21 @@ def _fault_trends(current_faults, prior_sessions):
     prior_sessions: [{"faults": [{"code", "percent"}, ...]}, ...] most recent first.
     """
     trends = []
-    for fault in current_faults[:3]:
+    candidates = list(current_faults[:3])
+    current_codes = {fault["code"] for fault in current_faults}
+    for session in prior_sessions:
+        for prior_fault in session["faults"]:
+            if prior_fault["code"] not in current_codes and not any(
+                item["code"] == prior_fault["code"] for item in candidates
+            ):
+                candidates.append({**prior_fault, "count": 0, "percent": 0})
+    for fault in candidates[:3]:
         hits = [s for s in prior_sessions if any(f["code"] == fault["code"] for f in s["faults"])]
         prior_percents = [f["percent"] for s in hits for f in s["faults"] if f["code"] == fault["code"]]
         prior_avg = round(sum(prior_percents) / len(prior_percents)) if prior_percents else 0
-        if not hits:
+        if fault["percent"] == 0 and hits:
+            trend = "resolved"
+        elif not hits:
             trend = "new"
         elif fault["percent"] < prior_avg * 0.7:
             trend = "improving"
@@ -366,6 +376,47 @@ def _fault_trends(current_faults, prior_sessions):
     return trends
 
 
+def _history_snapshot(session):
+    summary = _workout_summary(session)
+    totals = summary["totals"]
+    reps = totals["reps"]
+    return {
+        "exercise": session.exercise,
+        "date": session.ended_at.date().isoformat() if session.ended_at else None,
+        "totalReps": reps,
+        "cleanReps": totals["cleanReps"],
+        "cleanPercent": round(totals["cleanReps"] / reps * 100) if reps else None,
+        "weightKg": summary["training"]["weightKg"],
+        "completedSets": summary["training"]["completedSets"],
+        "targetSets": summary["training"]["targetSets"],
+        "targetRepsPerSet": summary["training"]["targetRepsPerSet"],
+        "averageMinAngle": summary["range"]["averageMinAngle"],
+        "averageRom": summary["range"]["averageRom"],
+        "averageDurationMs": summary["tempo"]["averageMs"],
+        "faults": [
+            {"code": item["code"], "label": item["label"], "percent": item["percent"]}
+            for item in summary["faults"][:3]
+        ],
+    }
+
+
+def _session_comparison(current, prior):
+    def delta(key):
+        left, right = current.get(key), prior.get(key)
+        return round(left - right, 1) if left is not None and right is not None else None
+
+    return {
+        "priorDate": prior["date"],
+        "repDelta": delta("totalReps"),
+        "setDelta": delta("completedSets"),
+        "weightKgDelta": delta("weightKg"),
+        "cleanPercentagePointDelta": delta("cleanPercent"),
+        "averageMinAngleDelta": delta("averageMinAngle"),
+        "averageRomDelta": delta("averageRom"),
+        "averageDurationMsDelta": delta("averageDurationMs"),
+    }
+
+
 def insight_history(db, user_id, workout, limit=3):
     """Cross-session context for insight generation: recent sessions, fault trends,
     and the most recent prior next_focus so the coach doesn't repeat itself."""
@@ -377,27 +428,16 @@ def insight_history(db, user_id, workout, limit=3):
                 Workout.status == "completed",
                 Workout.id != workout.id,
                 Workout.source != "demo",
+                Workout.exercise == workout.exercise,
             )
             .order_by(Workout.ended_at.desc())
             .limit(limit)
         )
         .all()
     )
-    recent = []
-    for session in prior:
-        summary = _summarize_faults(session.reps, len(session.reps))
-        recent.append(
-            {
-                "exercise": session.exercise,
-                "date": session.ended_at.date().isoformat() if session.ended_at else None,
-                "totalReps": len(session.reps),
-                "faults": [
-                    {"code": f["code"], "label": f["label"], "percent": f["percent"]}
-                    for f in summary[:3]
-                ],
-            }
-        )
+    recent = [_history_snapshot(session) for session in prior]
     current = _workout_summary(workout)
+    current_snapshot = _history_snapshot(workout)
     previous_focus = None
     for same_exercise in (True, False):
         row = db.scalar(
@@ -419,6 +459,7 @@ def insight_history(db, user_id, workout, limit=3):
     return {
         "recentSessions": recent,
         "faultTrends": _fault_trends(current["faults"], recent),
+        "comparisonToMostRecent": _session_comparison(current_snapshot, recent[0]) if recent else None,
         "previousFocus": previous_focus,
     }
 
@@ -431,8 +472,12 @@ def generate_insight(workout, user=None, history=None) -> dict:
         summary["history"] = history
         history_guidance = (
             "Use history.faultTrends to note whether each top fault is new, recurring, "
-            "improving, or ongoing compared with recent sessions, and mention the trend "
-            "in your coaching. Do not repeat history.previousFocus as the next-session "
+            "improving, resolved, or ongoing compared with recent sessions, and mention the trend "
+            "in your coaching. Use history.comparisonToMostRecent and recentSessions to "
+            "mention specific changes in load, sets, reps, clean-rep rate, range, or tempo "
+            "only when both sessions contain that measurement. A higher load or rep count "
+            "is progression, not proof of better form; angle and tempo changes are observations, "
+            "not automatically improvements. Do not repeat history.previousFocus as the next-session "
             "focus; build on it or choose a different one. "
         )
     else:
@@ -446,8 +491,9 @@ def generate_insight(workout, user=None, history=None) -> dict:
                 model=settings.gemini_model,
                 contents=(
                     "Coach this workout session for the athlete using ONLY the measurements "
-                    "below. Cite the specific rep numbers behind every observation "
-                    "(e.g. 'reps 4-6'). " + history_guidance + "\n\nSession evidence:\n" + summary_json
+                    "below. Cite the specific rep numbers behind current-session form observations "
+                    "(e.g. 'reps 4-6') and cite the prior session date for historical comparisons. "
+                    + history_guidance + "\n\nSession evidence:\n" + summary_json
                 ),
                 config=types.GenerateContentConfig(
                     system_instruction="You are a concise workout coach writing about one specific session. "

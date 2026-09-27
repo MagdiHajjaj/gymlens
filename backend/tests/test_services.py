@@ -341,6 +341,19 @@ def test_workout_summary_fault_labels_are_plain_language():
     assert faults["mystery_code"]["label"] == "mystery_code"  # unknown codes pass through
 
 
+def test_fault_history_marks_a_previous_cue_as_resolved():
+    trends = services._fault_trends([], [{
+        "faults": [{"code": "insufficient_depth", "label": "Shallow depth", "percent": 50}],
+    }])
+    assert trends == [{
+        "label": "Shallow depth",
+        "trend": "resolved",
+        "priorSessionsAffected": 1,
+        "priorAveragePercent": 50,
+        "currentPercent": 0,
+    }]
+
+
 def test_workout_summary_includes_athlete_profile():
     workout = make_workout(reps=[make_rep(1, full_metrics(90))])
     user = SimpleNamespace(fitness_goal="strength", experience_level="intermediate")
@@ -614,7 +627,7 @@ def test_speech_request_abuse_rate_limit_applies_to_cache_hits(client, monkeypat
     assert client.post("/api/coaching/speech", json=phrase).status_code == 429
 
 
-def _session_with_faults(client, fault_code, faulted_reps, total_reps, ended_at):
+def _session_with_faults(client, fault_code, faulted_reps, total_reps, ended_at, weight_kg=None):
     """Create a completed session whose first `faulted_reps` reps carry `fault_code`."""
     from uuid import uuid4
 
@@ -623,6 +636,9 @@ def _session_with_faults(client, fault_code, faulted_reps, total_reps, ended_at)
         "id": session_id,
         "workout_id": session_id,
         "workout_name": "Leg day",
+        "weight_kg": weight_kg,
+        "target_sets": 1,
+        "target_reps": total_reps,
         "exercise": "squat",
         "source": "camera",
         "started_at": (ended_at - timedelta(minutes=2)).isoformat(),
@@ -641,10 +657,17 @@ def _session_with_faults(client, fault_code, faulted_reps, total_reps, ended_at)
             ]
         reps.append(payload)
     assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": reps}).status_code == 200
-    assert (
-        client.patch(f"/api/workouts/{sid}", json={"ended_at": ended_at.isoformat()}).status_code
-        == 200
-    )
+    ranges = [{
+        "set_number": 1,
+        "start_rep": 1,
+        "end_rep": total_reps,
+        "completed_at": reps[-1]["completed_at"],
+        "rest_seconds": 60,
+    }]
+    assert client.patch(
+        f"/api/workouts/{sid}",
+        json={"ended_at": ended_at.isoformat(), "set_ranges": ranges},
+    ).status_code == 200
     return sid
 
 
@@ -677,10 +700,10 @@ def test_insight_history_trends_and_previous_focus(client, monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     now = datetime.now(timezone.utc)
     prior1 = _session_with_faults(
-        client, "insufficient_depth", 1, 4, now - timedelta(days=3)
+        client, "insufficient_depth", 1, 4, now - timedelta(days=3), weight_kg=40
     )
     _session_with_faults(
-        client, "insufficient_depth", 1, 4, now - timedelta(days=2)
+        client, "insufficient_depth", 1, 4, now - timedelta(days=2), weight_kg=45
     )
     prior_focus = {
         "recap": "Prior recap.",
@@ -700,18 +723,31 @@ def test_insight_history_trends_and_previous_focus(client, monkeypatch):
     }
     monkeypatch.setattr(services.genai, "Client", _FakeGemini(calls, current_valid))
     current = _session_with_faults(
-        client, "insufficient_depth", 3, 6, now - timedelta(minutes=1)
+        client, "insufficient_depth", 3, 6, now - timedelta(minutes=1), weight_kg=50
     )
     response = client.post(f"/api/workouts/{current}/insights")
     assert response.status_code == 200, response.text
     payload = json.loads(calls[-1]["contents"].split("Session evidence:\n", 1)[1])
     history = payload["history"]
     assert [s["totalReps"] for s in history["recentSessions"]] == [4, 4]
+    assert history["recentSessions"][0]["weightKg"] == 45
+    assert history["recentSessions"][0]["completedSets"] == 1
+    assert history["comparisonToMostRecent"] == {
+        "priorDate": (now - timedelta(days=2)).date().isoformat(),
+        "repDelta": 2,
+        "setDelta": 0,
+        "weightKgDelta": 5,
+        "cleanPercentagePointDelta": -25,
+        "averageMinAngleDelta": 0,
+        "averageRomDelta": None,
+        "averageDurationMsDelta": 0,
+    }
     trends = {t["label"]: t for t in history["faultTrends"]}
     assert trends["Shallow depth"]["trend"] == "recurring"
     assert trends["Shallow depth"]["priorSessionsAffected"] == 2
     assert history["previousFocus"] == "Sit deeper on the last reps."
     assert "history.previousFocus" in calls[-1]["contents"]
+    assert "history.comparisonToMostRecent" in calls[-1]["contents"]
 
 
 def test_insight_refresh_regenerates_stored_result(client, monkeypatch):
