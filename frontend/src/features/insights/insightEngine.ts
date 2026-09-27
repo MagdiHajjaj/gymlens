@@ -455,12 +455,16 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       ),
     );
   } else {
-    strengths.push(
-      evidenceText(
-        `${stats.cleanReps} of ${stats.totalReps} reps had no supported technique cue, with a longest clean streak of ${stats.longestCleanStreak}.`,
-        `Clean reps: ${stats.cleanReps}/${stats.totalReps}; longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}.`,
-      ),
-    );
+    if (stats.cleanReps > 0) {
+      // A zero-clean session is already reported neutrally in the recap; it is
+      // not something that "went well", so it stays out of the strengths list.
+      strengths.push(
+        evidenceText(
+          `${stats.cleanReps} of ${stats.totalReps} reps had no supported technique cue, with a longest clean streak of ${stats.longestCleanStreak}.`,
+          `Clean reps: ${stats.cleanReps}/${stats.totalReps}; longest clean streak: ${stats.longestCleanStreak} rep${stats.longestCleanStreak === 1 ? '' : 's'}.`,
+        ),
+      );
+    }
     if (stats.bestRep && stats.bestRepMinAngle !== undefined) {
       strengths.push(
         evidenceText(

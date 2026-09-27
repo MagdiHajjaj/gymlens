@@ -347,3 +347,44 @@ describe('why explanations in plain English', () => {
     expect(decay?.why).toContain('averaged 94° at your deepest point');
   });
 });
+
+describe('what went well honesty', () => {
+  const allFaultedSession = (angles: number[]) =>
+    baseSession({
+      total_reps: angles.length,
+      reps: angles.map((angle, index) => ({
+        rep_number: index + 1,
+        completed_at: `2026-01-01T00:00:${String(10 + index * 10).padStart(2, '0')}.000Z`,
+        metrics_json: { min_angle: angle, duration_ms: 2000 },
+        faults_json: [
+          { code: 'insufficient_depth', message: 'Try a little more depth.', severity: 'warning' },
+        ],
+      })),
+    });
+
+  it('keeps a zero-clean stat out of the strengths list', () => {
+    const insight = generateStatisticsInsight(allFaultedSession([95, 96, 97, 96, 95, 96]));
+
+    expect(insight.stats.cleanReps).toBe(0);
+    expect(insight.strengths.join(' ')).not.toMatch(/0 of \d+ reps had no supported technique cue/);
+    // the zero stat is still reported neutrally in the recap
+    expect(insight.recap).toMatch(/0 were clean/);
+    // the genuinely positive consistency finding remains
+    expect(insight.strengths).toHaveLength(1);
+    expect(insight.strengths[0]).toMatch(/stayed consistent/);
+  });
+
+  it('celebrates clean reps when they exist', () => {
+    const insight = generateStatisticsInsight(baseSession());
+
+    expect(insight.stats.cleanReps).toBe(2);
+    expect(insight.strengths.join(' ')).toMatch(/2 of 6 reps had no supported technique cue/);
+  });
+
+  it('leaves strengths empty when nothing went well', () => {
+    const insight = generateStatisticsInsight(allFaultedSession([80, 110, 90, 100, 85, 105]));
+
+    expect(insight.stats.cleanReps).toBe(0);
+    expect(insight.strengths).toEqual([]);
+  });
+});
