@@ -277,6 +277,11 @@ const configs: Record<ExerciseId, ExerciseConfig> = {
         message: 'Keep your upper arm close to your side.',
         angle: 'upper_arm_angle',
       },
+      {
+        kind: 'alignmentExceeds',
+        code: 'excessive_torso_swing',
+        message: "Keep your torso still — don't swing the weight up.",
+      },
     ],
     depthFault: {
       code: 'limited_range',

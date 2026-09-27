@@ -44,8 +44,14 @@ def rate_limit(subject: str, kind: str, maximum: int):
         recent.append(now)
 
 
+# Cloud voice pace: a touch faster than the provider default so short coaching
+# cues land crisply between reps. Part of the disk-cache key so a speed change
+# never serves audio rendered at the old speed.
+SPEECH_SPEED = 1.1
+
+
 def _voice_file(text: str) -> Path:
-    key = hashlib.sha256(f"{settings.elevenlabs_voice_id}:{text}".encode()).hexdigest()
+    key = hashlib.sha256(f"{settings.elevenlabs_voice_id}:{SPEECH_SPEED}:{text}".encode()).hexdigest()
     return VOICE_CACHE / f"{key}.mp3"
 
 
@@ -100,7 +106,11 @@ def speech(text: str, before_provider: Callable[[], None] | None = None) -> byte
             response = httpx.post(
                 f"https://api.elevenlabs.io/v1/text-to-speech/{settings.elevenlabs_voice_id}",
                 headers={"xi-api-key": settings.elevenlabs_api_key, "Accept": "audio/mpeg"},
-                json={"text": text, "model_id": "eleven_flash_v2_5"},
+                json={
+                    "text": text,
+                    "model_id": "eleven_flash_v2_5",
+                    "voice_settings": {"speed": SPEECH_SPEED},
+                },
                 timeout=15,
             )
             response.raise_for_status()

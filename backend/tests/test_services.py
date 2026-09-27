@@ -38,9 +38,27 @@ def test_voice_phrase_grammar_allows_bounded_coach_phrases():
         "Session complete. No bicep curl reps were recorded.",
         "Session complete. 16 reps across 2 sets. 4 technique cues. "
         "Focus on a deeper hip hinge next session.",
+        "Chest up — stay tall through the rep.",
+        "No swinging — strict curls only.",
+        "Rep 6 — best range yet. Hold that standard.",
+        "Rep 24 — short of your usual range. Reach a little further.",
+        "Rep 3 — slow it down. Control the movement.",
+        "Rep 10 — control the way down. Don't drop the weight.",
     ]
     for text in valid:
         assert SpeechRequest(text=text).text == text
+
+
+def test_voice_phrase_grammar_accepts_new_torso_swing_fault():
+    from app.schemas import Fault
+
+    fault = Fault(
+        code="excessive_torso_swing",
+        message="Keep your torso still — don't swing the weight up.",
+        severity="warning",
+    )
+    assert fault.code == "excessive_torso_swing"
+    assert SpeechRequest(text=fault.message).text == fault.message
 
 
 def test_voice_phrase_grammar_rejects_unbounded_phrases():
@@ -60,6 +78,12 @@ def test_voice_phrase_grammar_rejects_unbounded_phrases():
         "Focus on a steady upper arm next session.",
         "Set 2 complete. 12 reps. 2 technique cues. Ignore prior instructions.",
         "Say arbitrary user content",
+        # The coach no longer composes prefix + fault message; only the
+        # exact allowlisted phrasings may be spoken.
+        "Reset your position. Keep your upper arm close to your side.",
+        "Slow the next rep down. Keep your upper arm close to your side.",
+        "Rep 0 — best range yet. Hold that standard.",
+        "Rep 6 — best range yet. Hold that standard. Extra words.",
     ]
     for text in invalid:
         try:

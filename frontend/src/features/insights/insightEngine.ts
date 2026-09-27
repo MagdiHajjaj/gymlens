@@ -77,6 +77,7 @@ const faultDrills: Record<ExerciseId, Record<string, string>> = {
   curl: {
     limited_range: 'Use a full comfortable curl path and pause briefly near the bottom before the next rep.',
     upper_arm_movement: 'Pin your upper arms close to your sides and slow the lifting phase for two sets.',
+    excessive_torso_swing: 'Pick a weight you can curl without rocking your torso, and keep your hips still through each rep.',
   },
   pushup: {
     limited_range: 'Use a controlled lower-and-return tempo through a consistent comfortable range.',

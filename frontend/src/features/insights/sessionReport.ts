@@ -14,6 +14,7 @@ const cueNames: Record<string, string> = {
   incomplete_pull: 'Incomplete pull',
   torso_rising: 'Torso lifting early',
   excessive_swing: 'Body swing',
+  excessive_torso_swing: 'Torso swing',
 };
 
 const nextActions: Record<string, string> = {
@@ -41,6 +42,8 @@ const nextActions: Record<string, string> = {
   torso_rising:
     'Watch for torso movement during the pull and keep your side view consistent for the next set.',
   excessive_swing: 'Check for body swing in your next set and keep your full movement visible to the camera.',
+  excessive_torso_swing:
+    'Keep your torso still while you curl — pick a weight you can lift without rocking, and keep the camera side-on.',
 };
 
 export const cueLabel = (code: string) => cueNames[code] ?? code.replaceAll('_', ' ');
