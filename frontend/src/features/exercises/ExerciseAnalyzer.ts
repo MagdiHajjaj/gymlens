@@ -109,12 +109,16 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Overhead press: primary joint is the elbow. Calibration starts in the rack
   // position (roughly 85-130 degrees), then a rep presses to lockout and returns
-  // to the rack. maximumLean is a proxy for back arch:
+  // to the rack. enter (140) sits above the core's PRESS_RACK_MAX (135): a valid
+  // rack calibration (<=135) can never phantom-enter a cycle on the spot, and
+  // the rep-completion target (value <= enter) stays reachable from any valid
+  // calibration pose -- with enter below 135 a rack held at 130-135 would arm
+  // and then never complete. maximumLean is a proxy for back arch:
   // a braced press keeps the torso near vertical, so inclination past 30 suggests
   // the ribs flaring and back arching.
   press: {
     visibility: 0.6,
-    enter: 120,
+    enter: 140,
     exit: 150,
     depth: 100,
     minimumRange: 30,
@@ -172,14 +176,19 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Tricep dips: primary joint is the elbow, calibrated in the top support
   // position (~168). A full dip reaches ~80; depth 100 flags a shallow dip.
+  // exit 155 (was 160) loosens the return-to-top target to 152: lifters who
+  // finish reps with soft elbows instead of a hard lockout still complete the
+  // cycle. minimumRange 30 keeps the count threshold exactly where it was
+  // (155 - 30 = 125), so the human buffer for a real-but-shallow dip is
+  // unchanged -- only the top-return strictness moved.
   // maximumLean is a proxy for pitching forward: the torso hangs near vertical
   // (~8 degrees), so inclination past 35 suggests leaning over the hands.
   dips: {
     visibility: 0.6,
     enter: 145,
-    exit: 160,
+    exit: 155,
     depth: 100,
-    minimumRange: 35,
+    minimumRange: 30,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
@@ -189,16 +198,21 @@ const defaults: Record<ExerciseId, Thresholds> = {
     minimumHipAlignment: 155,
   },
   // Pull-up: primary joint is the elbow, calibrated in a dead hang (~180). A
-  // full pull reaches ~60; depth 70 flags chin-not-over-bar. maximumLean is a
+  // full pull reaches ~60; depth 70 flags chin-not-over-bar. exit 155 (was 160)
+  // loosens the return-to-hang target to 152 so continuous reps that stop a few
+  // degrees short of a dead hang still complete. minimumRange 55 keeps the
+  // count threshold exactly where it was (155 - 55 = 100): a real-but-slightly-
+  // shallow pull-up (minimum 71-100) still counts with the chin-over-bar cue,
+  // while anything above 100 stays uncounted. maximumLean is a
   // proxy for swinging: a still hang keeps the torso near vertical (~2 degrees),
   // so inclination past 25 suggests kipping/swinging (approximate proxy --
   // true oscillation would need time-series analysis).
   pullup: {
     visibility: 0.6,
     enter: 140,
-    exit: 160,
+    exit: 155,
     depth: 70,
-    minimumRange: 60,
+    minimumRange: 55,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
