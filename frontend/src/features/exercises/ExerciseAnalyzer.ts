@@ -143,15 +143,19 @@ const defaults: Record<ExerciseId, Thresholds> = {
   },
   // Bent-over row: primary joint is the elbow. Calibration is arms hanging
   // extended (~170+) from a ~45-degree hinge. A full pull reaches ~65; depth 100
-  // flags a short pull. minimumHipAlignment is reused as a torso-inclination
-  // floor: the hinge holds ~45 degrees, so inclination dropping below 30 means
-  // the lifter is standing up to muscle the weight (approximate momentum proxy).
+  // flags a short pull. The rep counts while minimum <= exit - minimumRange
+  // (120): a real-but-shallow pull bottoming near 113 still counts with the
+  // incomplete_pull cue instead of silently missing under landmark jitter,
+  // while a quarter pull (bottoming above ~125) still does not count.
+  // minimumHipAlignment is reused as a torso-inclination floor: the hinge holds
+  // ~45 degrees, so inclination dropping below 30 means the lifter is standing
+  // up to muscle the weight (approximate momentum proxy).
   row: {
     visibility: 0.6,
     enter: 140,
     exit: 160,
     depth: 100,
-    minimumRange: 45,
+    minimumRange: 40,
     reversal: 8,
     minimumMs: 800,
     maximumMs: 15000,
