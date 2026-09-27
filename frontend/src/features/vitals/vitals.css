@@ -83,3 +83,26 @@
 .vitals-panel.vitals-compact .vitals-value {
   font-size: 22px;
 }
+
+.mobile-vitals-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.mobile-vitals-cta p {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+  margin: 0;
+}
+
+.mobile-vitals-measuring {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-vitals-measuring .vitals-note {
+  font-size: 13px;
+}
