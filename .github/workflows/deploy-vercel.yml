@@ -1,0 +1,51 @@
+name: Deploy Vercel every 30 minutes
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: vercel-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-if-changed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for commits since the last successful window
+        id: changes
+        uses: actions/github-script@v8
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('deploy', 'true');
+              return;
+            }
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy-vercel.yml',
+              branch: 'main',
+              status: 'success',
+              per_page: 1,
+            });
+            const lastSha = runs.data.workflow_runs[0]?.head_sha;
+            core.info(lastSha ? `Last deployed commit: ${lastSha}` : 'No previous successful deployment window.');
+            core.setOutput('deploy', lastSha === context.sha ? 'false' : 'true');
+
+      - name: Trigger Vercel production deployment
+        if: steps.changes.outputs.deploy == 'true'
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          test -n "$DEPLOY_HOOK_URL" || { echo "VERCEL_DEPLOY_HOOK_URL is not configured"; exit 1; }
+          curl --fail-with-body --silent --show-error --request POST "$DEPLOY_HOOK_URL"
+
+      - name: Nothing new to deploy
+        if: steps.changes.outputs.deploy != 'true'
+        run: echo "main has no commits since the previous successful deployment window."
