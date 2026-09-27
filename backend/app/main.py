@@ -390,7 +390,7 @@ def insights(session_id: UUID, db: Session = Depends(get_db), user: User = Depen
     if workout.insight_row:
         return workout.insight_row.summary_json
     services.rate_limit(user.id, "insights", 3)
-    summary = services.generate_insight(workout)
+    summary = services.generate_insight(workout, user)
     db.add(SessionInsight(session_id=workout.id, summary_json=summary))
     db.commit()
     return summary

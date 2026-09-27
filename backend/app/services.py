@@ -179,6 +179,25 @@ def _fault_timing(rep_numbers, total):
     return "throughout" if len(thirds) > 1 else next(iter(thirds), "throughout")
 
 
+# Plain-language meanings for analyzer fault codes. Mirrors the frontend's
+# cueLabel map so the coach and the tracker describe the same thing.
+FAULT_LABELS = {
+    "insufficient_depth": "Shallow depth",
+    "excessive_forward_lean": "Forward lean",
+    "limited_range": "Limited range of motion",
+    "upper_arm_movement": "Upper arm moving",
+    "hip_alignment": "Hips out of alignment",
+    "excessive_back_rounding": "Back rounding",
+    "insufficient_hinge": "Shallow hinge",
+    "knee_over_toes": "Knees past toes",
+    "excessive_back_arch": "Back arching",
+    "incomplete_extension": "Incomplete extension",
+    "incomplete_pull": "Incomplete pull",
+    "torso_rising": "Torso lifting early",
+    "excessive_swing": "Body swing",
+}
+
+
 def _summarize_faults(reps, total):
     by_code = {}
     for rep in reps:
@@ -196,6 +215,7 @@ def _summarize_faults(reps, total):
         summaries.append(
             {
                 "code": code,
+                "label": FAULT_LABELS.get(code, code),
                 "count": len(rep_numbers),
                 "percent": round(len(rep_numbers) / total * 100) if total else 0,
                 "reps": rep_numbers,
@@ -225,7 +245,7 @@ def _depth_trend(measured):
     }
 
 
-def _workout_summary(workout) -> dict:
+def _workout_summary(workout, user=None) -> dict:
     """The full measured picture of a workout, sent to Gemini for coaching analysis."""
     reps = sorted(workout.reps, key=lambda rep: rep.rep_number)
     total = len(reps)
@@ -262,7 +282,13 @@ def _workout_summary(workout) -> dict:
     average_rom = _average(roms)
     average_duration = _average(durations)
     stddev = _stddev(min_values)
-    return {
+    athlete = {}
+    if user is not None:
+        if getattr(user, "fitness_goal", None):
+            athlete["fitness_goal"] = user.fitness_goal
+        if getattr(user, "experience_level", None):
+            athlete["experience_level"] = user.experience_level
+    summary = {
         "exercise": workout.exercise,
         "source": workout.source,
         "repCountUnit": "individual arm repetitions"
@@ -294,27 +320,39 @@ def _workout_summary(workout) -> dict:
         "faults": _summarize_faults(reps, total),
         "notes": notes,
     }
+    if athlete:
+        summary["athlete"] = athlete
+    return summary
 
 
-def generate_insight(workout) -> dict:
+def generate_insight(workout, user=None) -> dict:
     if not settings.gemini_api_key:
         raise HTTPException(503, "Gemini is not configured. Measured statistics remain available.")
-    summary = _workout_summary(workout)
+    summary = _workout_summary(workout, user)
     try:
         with genai.Client(
             api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=20000)
         ) as client:
             response = client.models.generate_content(
                 model=settings.gemini_model,
-                contents="Summarize only these observed exercise statistics: " + json.dumps(summary),
+                contents=(
+                    "Coach this workout session for the athlete using ONLY the measurements "
+                    "below. Cite the specific rep numbers behind every observation "
+                    "(e.g. 'reps 4-6').\n\nSession evidence:\n" + json.dumps(summary)
+                ),
                 config=types.GenerateContentConfig(
-                    system_instruction="You are a concise workout coach. Only use the supplied measurements. "
-                    "Do not invent measurements, assess health, or claim injury prevention. "
-                    "Missing (null) measurements are unavailable. No detected faults is not proof of perfect form. "
+                    system_instruction="You are a concise workout coach writing about one specific session. "
+                    "Only use the supplied measurements. Do not invent measurements, assess health, "
+                    "or claim injury prevention. Missing (null) measurements are unavailable. "
+                    "No detected faults is not proof of perfect form. "
                     "If source is demo, explicitly describe simulated movement, not a real person's workout. "
                     "Use range.trend to note depth fading or improving across the session, tempo splits to comment "
-                    "on pacing, and each fault's timing (early/middle/late/throughout) to say when cues appeared. "
-                    "Give one practical next-session focus; keep each field concise.",
+                    "on pacing, and each fault's label, reps, and timing (early/middle/late/throughout) to say "
+                    "exactly when cues appeared. Ground every claim in the evidence and cite rep numbers. "
+                    "The next-session focus must target the single most important observed pattern, "
+                    "not generic advice. Vary your phrasing; never pad with generic encouragement. "
+                    "Keep each field concise.",
+                    temperature=0.7,
                     response_mime_type="application/json",
                     response_json_schema=Insight.model_json_schema(),
                 ),
