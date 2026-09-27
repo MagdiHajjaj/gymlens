@@ -286,7 +286,7 @@ export class VoiceCoach {
         window.speechSynthesis.cancel();
       }, 15000);
       this.cancelPlayback = () => finish();
-      utterance.rate = 0.95;
+      utterance.rate = 1.08;
       utterance.onstart = () => {
         if (this.isCurrent(request)) this.report('Speaking · browser voice');
       };

@@ -10,7 +10,7 @@ MetricName = Literal["knee_angle", "elbow_angle", "left_elbow_angle", "right_elb
 FaultCode = Literal[
     "insufficient_depth", "excessive_forward_lean", "upper_arm_movement", "hip_alignment", "limited_range",
     "insufficient_hinge", "excessive_back_rounding", "knee_over_toes", "excessive_back_arch",
-    "incomplete_extension", "torso_rising", "incomplete_pull", "excessive_swing",
+    "incomplete_extension", "torso_rising", "incomplete_pull", "excessive_swing", "excessive_torso_swing",
 ]
 
 
@@ -156,6 +156,27 @@ PHRASES = {
     "Lower a little deeper within your comfortable range.",
     "Keep your body still — don't swing or kip.",
     "Pull all the way up — chin over the bar.",
+    # Alternate phrasings for repeated form cues: the voice coach rotates to
+    # these so the second, third, ... reminder doesn't sound looped.
+    "Chest up — stay tall through the rep.",
+    "Sink a little deeper on the next one.",
+    "Pin your elbow to your side.",
+    "Use the full range — all the way down, all the way up.",
+    "Straight line — shoulders, hips, ankles.",
+    "Flat back — push your hips back.",
+    "Hinge further back on the next rep.",
+    "Knee back — track it over your ankle.",
+    "Ribs down — squeeze your glutes.",
+    "Ribs down — drive through your glutes.",
+    "Full bridge — hips all the way up.",
+    "Stay hinged — no standing up to pull.",
+    "Elbow high — pull it all the way through.",
+    "Stay upright over your hands.",
+    "A touch deeper on the next rep.",
+    "Dead hang — no swinging.",
+    "Chin over the bar on the next one.",
+    "Keep your torso still — don't swing the weight up.",
+    "No swinging — strict curls only.",
 }
 
 SET_FOCUS_PHRASES = {
@@ -198,6 +219,14 @@ REP_COMPLETE_PHRASE = re.compile(
 )
 READY_PROGRESS_PHRASE = re.compile(
     r"Ready\. (?P<reps>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) (?P<unit>rep|reps) so far\."
+)
+# History-based coaching insights: "Rep 6 — best range yet. Hold that standard."
+# These compare the rep against the user's own earlier reps; the numeric rep is
+# bounded like the completion callout.
+REP_INSIGHT_PHRASE = re.compile(
+    r"Rep (?P<rep>[1-9]|[1-9][0-9]{1,2}|[1-4][0-9]{3}|5000) — "
+    r"(?:best range yet\. Hold that standard\.|short of your usual range\. Reach a little further\.|"
+    r"slow it down\. Control the movement\.|control the way down\. Don't drop the weight\.)"
 )
 SET_SUMMARY = re.compile(
     r"Set (?P<set>[1-9]|[1-9][0-9]) complete\. "
@@ -277,6 +306,7 @@ def approved_speech(value: str) -> bool:
         or bool(REST_PHRASE.fullmatch(value))
         or bool(SET_GO_PHRASE.fullmatch(value))
         or bool(REP_COMPLETE_PHRASE.fullmatch(value))
+        or bool(REP_INSIGHT_PHRASE.fullmatch(value))
         or ready_valid
         or bool(EMPTY_SESSION_SUMMARY.fullmatch(value))
         or _summary(value)

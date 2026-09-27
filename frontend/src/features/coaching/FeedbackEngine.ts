@@ -1,5 +1,5 @@
 import type { ExerciseId, ExerciseResult } from '../../types/workout';
-import { PRIORITY, repCountCue, type VoiceCue } from './Phrasebook';
+import { FAULT_PHRASES, PRIORITY, repCountCue, type VoiceCue } from './Phrasebook';
 import { movementCues } from '../exercises/MovementCues';
 
 interface CueContext {
@@ -137,12 +137,14 @@ export class FeedbackEngine {
       this.lastAny = time;
       const repeats = this.faultRepeats.get(fault.code) ?? 0;
       this.faultRepeats.set(fault.code, repeats + 1);
+      // Alternate phrasings keep repeated corrections from sounding looped.
+      // Variants are pre-approved by the speech grammar; unknown codes fall
+      // back to the analyzer's message, which is approved too.
+      const variant = context?.exercise
+        ? FAULT_PHRASES[context.exercise]?.find((entry) => entry.code === fault.code)?.repeatMessage
+        : undefined;
       const message =
-        repeats === 0
-          ? fault.message
-          : repeats % 2 === 1
-            ? `Reset your position. ${fault.message}`
-            : `Slow the next rep down. ${fault.message}`;
+        repeats === 0 || repeats % 2 === 0 ? fault.message : (variant ?? fault.message);
       return {
         text: message,
         kind: 'fault',
@@ -261,6 +263,20 @@ export class FeedbackEngine {
           priority: PRIORITY.rep,
         });
         if (tempo) return tempo;
+      }
+    }
+    const eccentric = finiteNumber(result.repMetrics?.eccentric_ms);
+    const concentric = finiteNumber(result.repMetrics?.concentric_ms);
+    if (eccentric !== undefined && concentric !== undefined && eccentric > 0) {
+      // Lifting much faster than lowering means the weight is being dropped
+      // on the way down instead of controlled — the classic rushed eccentric.
+      if (concentric > eccentric * 2) {
+        const lowering = this.takeInsight('insight:lowering', time, 90_000, {
+          text: `Rep ${repNumber} — control the way down. Don't drop the weight.`,
+          kind: 'rep',
+          priority: PRIORITY.rep,
+        });
+        if (lowering) return lowering;
       }
     }
     return null;

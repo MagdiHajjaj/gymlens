@@ -337,19 +337,62 @@ it('detects supported curl upper-arm movement and push-up hip alignment cues', (
 });
 it('coaching requires persistence and obeys message cooldowns', () => {
   const engine = new FeedbackEngine();
+  const context = { exercise: 'squat' as const, totalReps: 1 };
   const result: ExerciseResult = {
     phase: 'eccentric',
     trackingValid: true,
     calibrated: true,
     repCompleted: false,
     jointAngles: {},
-    faults: [{ code: 'lean', message: 'Stand tall', severity: 'warning' }],
+    faults: [
+      {
+        code: 'excessive_forward_lean',
+        message: 'Keep your chest a little more upright.',
+        severity: 'warning',
+      },
+    ],
     guidance: '',
   };
-  expect(engine.next(result, 0)).toBeNull();
-  expect(engine.next(result, 500)).toBeNull();
-  expect(engine.next(result, 1000)).toBe('Stand tall');
-  expect(engine.next(result, 2000)).toBeNull();
-  expect(engine.next(result, 12000)).toBe('Reset your position. Stand tall');
-  expect(engine.next({ ...result, trackingValid: false }, 24000)).toBeNull();
+  expect(engine.next(result, 0, context)).toBeNull();
+  expect(engine.next(result, 500, context)).toBeNull();
+  expect(engine.next(result, 1000, context)).toBe('Keep your chest a little more upright.');
+  expect(engine.next(result, 2000, context)).toBeNull();
+  // A repeated fault rotates to its alternate phrasing instead of looping.
+  expect(engine.next(result, 12000, context)).toBe('Chest up — stay tall through the rep.');
+  expect(engine.next(result, 23000, context)).toBe('Keep your chest a little more upright.');
+  expect(engine.next({ ...result, trackingValid: false }, 34000, context)).toBeNull();
+});
+it('coaches the lowering phase when the lift is much faster than the descent', () => {
+  const engine = new FeedbackEngine();
+  const context = { exercise: 'curl' as const, totalReps: 6 };
+  const result: ExerciseResult = {
+    phase: 'ready',
+    trackingValid: true,
+    calibrated: true,
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: '',
+    repMetrics: { min_angle: 90, duration_ms: 1600, eccentric_ms: 400, concentric_ms: 1200 },
+  };
+  expect(engine.next(result, 0, context)).toBe(
+    "Rep 6 — control the way down. Don't drop the weight.",
+  );
+});
+it('detects curl torso swing when the torso leans hard mid-rep', () => {
+  const analyzer = new MovementAnalyzer('curl');
+  const frames = fixture('curl');
+  frames.slice(0, 48).forEach((frame) => analyzer.analyze(frame));
+  const modified = structuredClone(frames.slice(48, 65));
+  for (const frame of modified) {
+    frame.landmarks[23].x += 0.45;
+    frame.landmarks[24].x += 0.45;
+  }
+  const results = modified.map((frame) => analyzer.analyze(frame));
+  expect(
+    results.some((result) =>
+      result.faults.some((fault) => fault.code === 'excessive_torso_swing'),
+    ),
+    'curl should report torso swing',
+  ).toBe(true);
 });
