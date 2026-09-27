@@ -1,7 +1,7 @@
 ﻿# Gym Lens
 
 
-**Live demo:** https://gymlens-kappa.vercel.app/
+**Live demo:** https://www.gymlens.fit/
 
 Private, browser-based exercise tracking and voice coaching, rebuilt from `gym-lens-plan.md`.
 
