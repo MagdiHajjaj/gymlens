@@ -10,6 +10,33 @@ interface CueContext {
 const finiteNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
+const median = (values: number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
+
+/**
+ * Predict the exact cue texts the engine will speak for the next completed rep,
+ * so the caller can pre-generate their cloud audio while the rep is in progress.
+ * The rep number is sequential so it is known exactly; the rep's measured angle
+ * is predicted from the just-completed rep (depth is consistent rep to rep, so
+ * the prediction usually matches). A wrong prediction is harmless: the cache key
+ * is the exact text, so a miss just falls back to the normal fetch path — audio
+ * is never wrong, only occasionally not instant.
+ */
+export function predictNextRepCues(
+  result: ExerciseResult,
+  context: { exercise: ExerciseId; nextSetReps: number },
+): string[] {
+  const texts = new Set<string>();
+  const countCue = repCountCue(context.nextSetReps, context.exercise);
+  if (countCue?.text) texts.add(countCue.text);
+  const completion = repCompleteCue(result, context.nextSetReps);
+  if (completion) texts.add(completion);
+  return [...texts];
+}
+
 /**
  * Rep-completion cue grounded in the rep's measured data: the rep number plus the
  * measured minimum joint angle when the analyzer recorded one. Never invents a
@@ -39,6 +66,9 @@ export class FeedbackEngine {
   private movementPhaseSince = 0;
   private lastAny = -Infinity;
   private lastRepTotal = 0;
+  private recordedTotal = 0;
+  private repAngles: number[] = [];
+  private repDurations: number[] = [];
   reset() {
     this.current = '';
     this.since = 0;
@@ -48,6 +78,9 @@ export class FeedbackEngine {
     this.movementPhaseSince = 0;
     this.lastAny = -Infinity;
     this.lastRepTotal = 0;
+    this.recordedTotal = 0;
+    this.repAngles = [];
+    this.repDurations = [];
   }
   next(result: ExerciseResult, time: number, context?: CueContext): string | null {
     return this.nextCue(result, time, context)?.text ?? null;
@@ -117,6 +150,7 @@ export class FeedbackEngine {
     this.current = '';
     if (repCue) {
       this.lastRepTotal = context?.totalReps ?? this.lastRepTotal;
+      if (context) this.recordRep(result, context.totalReps);
       return repCue;
     }
     if (!result.repCompleted && context && result.phase !== 'ready') {
@@ -136,13 +170,88 @@ export class FeedbackEngine {
       }
     } else this.movementPhase = '';
     const repNumber = context && context.totalReps > 0 ? (context.setReps ?? context.totalReps) : completedCount;
-    if (result.repCompleted && context) this.lastRepTotal = context.totalReps;
+    if (result.repCompleted && context) {
+      this.lastRepTotal = context.totalReps;
+      if (context.totalReps > this.recordedTotal) {
+        const insight = this.insightFromHistory(result, repNumber, time);
+        this.recordRep(result, context.totalReps);
+        if (insight) return insight;
+      }
+    }
     return result.repCompleted
       ? { text: repCompleteCue(result, repNumber), kind: 'rep', priority: PRIORITY.rep }
       : announce(
           'ready',
-          { text: readyCue(completedCount), kind: 'setup', priority: PRIORITY.setup },
+          // Idle coaching names the measured session total, not this frame's count.
+          { text: readyCue(context?.totalReps ?? completedCount), kind: 'setup', priority: PRIORITY.setup },
           30000,
         );
+  }
+
+  /**
+   * Record one completed rep's measured data for future comparisons. Guarded by
+   * the session rep total so a rep is never recorded twice.
+   */
+  private recordRep(result: ExerciseResult, totalReps: number) {
+    if (totalReps <= this.recordedTotal) return;
+    this.recordedTotal = totalReps;
+    const angle = finiteNumber(result.repMetrics?.min_angle);
+    const duration = finiteNumber(result.repMetrics?.duration_ms);
+    if (angle !== undefined) this.repAngles.push(angle);
+    if (duration !== undefined) this.repDurations.push(duration);
+  }
+
+  /**
+   * Genuine coaching tips grounded in the user's own measured session data.
+   * Compares this rep against the user's earlier reps (never against invented
+   * ideals): a notably rushed rep, a rep short of their usual range, or a new
+   * best range on a clean rep. Returns null when there is no baseline yet or
+   * nothing notable happened, letting the standard rep cue through instead.
+   * Each insight has its own cooldown so it coaches without nagging.
+   */
+  private insightFromHistory(
+    result: ExerciseResult,
+    repNumber: number,
+    time: number,
+  ): VoiceCue | null {
+    const angle = finiteNumber(result.repMetrics?.min_angle);
+    const duration = finiteNumber(result.repMetrics?.duration_ms);
+    if (this.repAngles.length >= 3 && angle !== undefined) {
+      const bestAngle = Math.min(...this.repAngles);
+      if (angle < bestAngle - 5 && result.faults.length === 0) {
+        const praise = this.takeInsight('insight:best-range', time, 120_000, {
+          text: `Rep ${repNumber} — best range yet. Hold that standard.`,
+          kind: 'rep',
+          priority: PRIORITY.rep,
+        });
+        if (praise) return praise;
+      }
+      if (angle > median(this.repAngles) + 10) {
+        const correction = this.takeInsight('insight:short-range', time, 75_000, {
+          text: `Rep ${repNumber} — short of your usual range. Reach a little further.`,
+          kind: 'rep',
+          priority: PRIORITY.rep,
+        });
+        if (correction) return correction;
+      }
+    }
+    if (this.repDurations.length >= 3 && duration !== undefined) {
+      if (duration < median(this.repDurations) * 0.55) {
+        const tempo = this.takeInsight('insight:tempo', time, 75_000, {
+          text: `Rep ${repNumber} — slow it down. Control the movement.`,
+          kind: 'rep',
+          priority: PRIORITY.rep,
+        });
+        if (tempo) return tempo;
+      }
+    }
+    return null;
+  }
+
+  private takeInsight(key: string, time: number, cooldown: number, cue: VoiceCue): VoiceCue | null {
+    if (time - (this.last.get(key) ?? -Infinity) < cooldown) return null;
+    this.last.set(key, time);
+    this.lastAny = time;
+    return cue;
   }
 }

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VoiceCoach } from '../src/features/coaching/VoiceCoach';
 import { api } from '../src/lib/api';
-import { FeedbackEngine, readyCue, repCompleteCue } from '../src/features/coaching/FeedbackEngine';
+import { FeedbackEngine, predictNextRepCues, readyCue, repCompleteCue } from '../src/features/coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../src/features/coaching/Phrasebook';
 import type { ExerciseId, ExerciseResult } from '../src/types/workout';
 
@@ -329,7 +329,7 @@ it('announces readiness while waiting between reps', () => {
   expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 0 })).toBe('Ready.');
 });
 
-it('grounds the idle cue in the measured rep count', () => {
+it('grounds the idle cue in the measured session total', () => {
   const engine = new FeedbackEngine();
   const idle: ExerciseResult = {
     trackingValid: true,
@@ -339,18 +339,153 @@ it('grounds the idle cue in the measured rep count', () => {
     jointAngles: {},
     faults: [],
     guidance: 'Keep your movement steady and controlled.',
-    completedReps: [
-      { metrics: {}, faults: [] },
-      { metrics: {}, faults: [] },
-    ],
+    completedReps: [],
   };
-  // First call announces the rep-count milestone; the follow-up falls through to the idle cue.
-  engine.next(idle, 0, { exercise: 'squat', totalReps: 2 });
-  expect(engine.next(idle, 60_000, { exercise: 'squat', totalReps: 2 })).toBe('Ready. 2 reps so far.');
+  // No rep completed in this frame — the idle cue must use the session total
+  // from context, not this frame's (empty) rep count.
+  expect(engine.next(idle, 0, { exercise: 'squat', totalReps: 2 })).toBe('Ready. 2 reps so far.');
 });
 
 it('readyCue uses singular and plural rep counts', () => {
   expect(readyCue(0)).toBe('Ready.');
   expect(readyCue(1)).toBe('Ready. 1 rep so far.');
   expect(readyCue(7)).toBe('Ready. 7 reps so far.');
+});
+
+it('prefetches cloud audio into the cache without speaking', async () => {
+  const speech = vi.spyOn(api, 'speech').mockResolvedValue(new Blob());
+  const audio = vi.fn();
+  vi.stubGlobal('Audio', audio);
+  const coach = new VoiceCoach();
+  coach.prefetch('Rep 7 complete.', true);
+  coach.prefetch('Rep 7 complete.', true);
+  await vi.waitFor(() => expect(speech).toHaveBeenCalledTimes(1));
+  expect(speech).toHaveBeenCalledWith('Rep 7 complete.');
+  expect(audio).not.toHaveBeenCalled();
+});
+
+it('prefetch failures are silent and never throw', async () => {
+  vi.spyOn(api, 'speech').mockRejectedValue(new Error('Unavailable'));
+  const coach = new VoiceCoach();
+  expect(() => coach.prefetch('Rep 7 complete.', true)).not.toThrow();
+  await Promise.resolve();
+});
+
+it('a later speak reuses prefetched audio instead of refetching', async () => {
+  const speech = vi.spyOn(api, 'speech').mockResolvedValue(new Blob());
+  vi.stubGlobal('window', { speechSynthesis: { cancel: vi.fn() } });
+  const audio = vi.fn();
+  vi.stubGlobal('Audio', audio);
+  const coach = new VoiceCoach();
+  coach.prefetch('Hello.', true);
+  await vi.waitFor(() => expect(speech).toHaveBeenCalledTimes(1));
+  const pending = coach.speak('Hello.', true);
+  coach.stop();
+  await pending;
+  expect(speech).toHaveBeenCalledTimes(1);
+});
+
+it('predicts the next rep cue texts from the just-completed rep', () => {
+  const completed: ExerciseResult = {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: '',
+    repMetrics: { min_angle: 90, duration_ms: 2100 },
+  };
+  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 5 })).toEqual([
+    '5. Control the return.',
+    'Rep 5 complete. Bottom angle 90 degrees.',
+  ]);
+  expect(predictNextRepCues(completed, { exercise: 'squat', nextSetReps: 7 })).toEqual([
+    'Rep 7 complete. Bottom angle 90 degrees.',
+  ]);
+  const { repMetrics, ...noMetrics } = completed;
+  expect(predictNextRepCues(noMetrics as ExerciseResult, { exercise: 'squat', nextSetReps: 7 })).toEqual([
+    'Rep 7 complete.',
+  ]);
+});
+
+function measuredRep(minAngle: number, durationMs: number): ExerciseResult {
+  return {
+    trackingValid: true,
+    calibrated: true,
+    phase: 'concentric',
+    repCompleted: true,
+    jointAngles: {},
+    faults: [],
+    guidance: 'Keep your movement steady and controlled.',
+    repMetrics: { min_angle: minAngle, duration_ms: durationMs },
+  };
+}
+
+it('praises a new best range on a clean rep instead of parroting the angle', () => {
+  const engine = new FeedbackEngine();
+  for (let rep = 1; rep <= 5; rep += 1) {
+    engine.next(measuredRep(95, 2100), rep * 3000, { exercise: 'squat', totalReps: rep });
+  }
+  expect(engine.next(measuredRep(80, 2100), 18000, { exercise: 'squat', totalReps: 6 })).toBe(
+    'Rep 6 — best range yet. Hold that standard.',
+  );
+});
+
+it('calls out a rep that falls short of the user’s usual range', () => {
+  const engine = new FeedbackEngine();
+  for (let rep = 1; rep <= 5; rep += 1) {
+    engine.next(measuredRep(95, 2100), rep * 3000, { exercise: 'squat', totalReps: rep });
+  }
+  expect(engine.next(measuredRep(112, 2100), 18000, { exercise: 'squat', totalReps: 6 })).toBe(
+    'Rep 6 — short of your usual range. Reach a little further.',
+  );
+});
+
+it('calls out a rushed rep compared to the user’s own pace', () => {
+  const engine = new FeedbackEngine();
+  for (let rep = 1; rep <= 5; rep += 1) {
+    engine.next(measuredRep(95, 2100), rep * 3000, { exercise: 'squat', totalReps: rep });
+  }
+  expect(engine.next(measuredRep(95, 1000), 18000, { exercise: 'squat', totalReps: 6 })).toBe(
+    'Rep 6 — slow it down. Control the movement.',
+  );
+});
+
+it('needs three baseline reps before offering comparative insights', () => {
+  const engine = new FeedbackEngine();
+  engine.next(measuredRep(95, 2100), 0, { exercise: 'squat', totalReps: 6 });
+  engine.next(measuredRep(95, 2100), 3000, { exercise: 'squat', totalReps: 7 });
+  // Only two baselines recorded: the standout rep gets the plain grounded cue.
+  expect(engine.next(measuredRep(80, 2100), 6000, { exercise: 'squat', totalReps: 8 })).toBe(
+    'Rep 8 complete. Bottom angle 80 degrees.',
+  );
+});
+
+it('does not repeat the same insight inside its cooldown', () => {
+  const engine = new FeedbackEngine();
+  for (let rep = 1; rep <= 5; rep += 1) {
+    engine.next(measuredRep(95, 2100), rep * 3000, { exercise: 'squat', totalReps: rep });
+  }
+  expect(engine.next(measuredRep(80, 2100), 18000, { exercise: 'squat', totalReps: 6 })).toBe(
+    'Rep 6 — best range yet. Hold that standard.',
+  );
+  expect(engine.next(measuredRep(79, 2100), 24000, { exercise: 'squat', totalReps: 7 })).toBe(
+    'Rep 7 complete. Bottom angle 79 degrees.',
+  );
+  expect(
+    engine.next(measuredRep(70, 2100), 18000 + 121_000, { exercise: 'squat', totalReps: 8 }),
+  ).toBe('Rep 8 — best range yet. Hold that standard.');
+});
+
+it('reset clears the comparative baseline', () => {
+  const engine = new FeedbackEngine();
+  for (let rep = 1; rep <= 5; rep += 1) {
+    engine.next(measuredRep(95, 2100), rep * 3000, { exercise: 'squat', totalReps: rep });
+  }
+  engine.reset();
+  engine.next(measuredRep(95, 2100), 18000, { exercise: 'squat', totalReps: 1 });
+  expect(engine.next(measuredRep(80, 2100), 21000, { exercise: 'squat', totalReps: 2 })).toBe(
+    '2. Settle into your pace.',
+  );
 });

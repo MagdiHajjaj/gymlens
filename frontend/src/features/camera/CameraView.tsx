@@ -5,7 +5,7 @@ import { PoseStabilizer } from '../pose/PoseStabilizer';
 import { createAnalyzer } from '../exercises/ExerciseRegistry';
 import { drawSkeleton } from './SkeletonOverlay';
 import { DEMO_CLIPS, DEMO_VIDEO_EXTENSIONS } from './demoClips';
-import { FeedbackEngine } from '../coaching/FeedbackEngine';
+import { FeedbackEngine, predictNextRepCues } from '../coaching/FeedbackEngine';
 import { selectedExerciseWarmPhrases } from '../coaching/Phrasebook';
 import { VoiceCoach } from '../coaching/VoiceCoach';
 import { useWorkout } from '../workout/workoutStore';
@@ -289,6 +289,16 @@ export function CameraView({
                   void voice.speak(cue.text, authenticated, {
                     priority: cue.priority,
                   });
+                if (result.repCompleted) {
+                  // Speculatively pre-generate the next rep's most likely cue
+                  // audio while the user starts the next rep, so it plays
+                  // instantly on completion instead of after a cloud round trip.
+                  // A missed prediction only costs a silent cache entry.
+                  predictNextRepCues(result, {
+                    exercise: session.exercise,
+                    nextSetReps: setReps + 1,
+                  }).forEach((text) => voice.prefetch(text, authenticated));
+                }
               } else {
                 warmedVoice = false;
                 feedback.reset();
