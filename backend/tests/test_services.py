@@ -510,7 +510,17 @@ def test_workout_summary_arm_side_rep_unit():
         exercise="curl",
         reps=[make_rep(1, {**full_metrics(60), "arm_side": 2})],
     )
-    assert services._workout_summary(workout)["repCountUnit"] == "individual arm repetitions"
+    assert services._workout_summary(workout)["repCountUnit"] == "paired arm cycles"
+
+
+def test_workout_summary_includes_plain_language_curl_range_guidance():
+    workout = make_workout(exercise="curl", reps=[make_rep(1, full_metrics(62))])
+
+    guidance = services._workout_summary(workout)["range"]["guidance"]
+
+    assert guidance["measurement"] == "elbow bend at the top"
+    assert guidance["referenceDegrees"] == {"min": 45, "max": 70}
+    assert "smaller angle" in guidance["meaning"]
 
 
 def test_rep_schema_accepts_new_tempo_and_rom_metrics(client):

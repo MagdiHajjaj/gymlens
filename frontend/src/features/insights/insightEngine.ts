@@ -1,6 +1,7 @@
 import { exercises } from '../exercises/ExerciseRegistry';
 import { cueLabel } from './sessionReport';
 import { formatRepList } from './repList';
+import { rangeGuidance } from './rangeGuidance';
 import type { GoalId } from '../goals/goals';
 import type { ExerciseId, FormFault, Insight, RepEvent, WorkoutSession } from '../../types/workout';
 
@@ -434,6 +435,13 @@ function progressionCandidate(stats: InsightStats): FocusCandidate | null {
 
 function consistencyCandidate(stats: InsightStats, cleanRepNumbers: number[]): FocusCandidate | null {
   if (stats.totalReps === 0) return null;
+  if (stats.cleanReps === stats.totalReps) {
+    return {
+      action:
+        'Keep the same controlled movement next time, then add one rep only if your range still feels repeatable.',
+      why: `All ${stats.totalReps} recorded reps had no supported technique cue; keep that consistency as you progress.`,
+    };
+  }
   return {
     action: `Your longest clean streak was ${stats.longestCleanStreak} of ${stats.totalReps} recorded reps — extend it next session.`,
     why:
@@ -533,6 +541,7 @@ function selectNextFocus(
 
 function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: GoalId | null) {
   const exercise = exercises[session.exercise];
+  const angleGuide = rangeGuidance(session.exercise);
   const strengths: InsightEvidenceItem[] = [];
   const improvements: InsightEvidenceItem[] = [];
   const topFault = stats.faultFrequencies[0];
@@ -584,10 +593,15 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
       );
     }
     if (stats.bestRep && stats.bestRepMinAngle !== undefined) {
+      const reachedReference = angleGuide?.inTarget(stats.bestRepMinAngle);
       strengths.push(
         evidenceText(
-          `Rep ${stats.bestRep} was your deepest clean rep at ${stats.bestRepMinAngle}° minimum joint angle.`,
-          `Rep ${stats.bestRep} hit ${stats.bestRepMinAngle}° at your deepest point — the smallest angle we measured, meaning your deepest range.`,
+          angleGuide
+            ? `Rep ${stats.bestRep} reached ${stats.bestRepMinAngle}° at ${angleGuide.label.toLowerCase()}${reachedReference ? `, inside the ${angleGuide.target} tracker reference` : ''}.`
+            : `Rep ${stats.bestRep} was your deepest clean rep at ${stats.bestRepMinAngle}° minimum joint angle.`,
+          angleGuide
+            ? `For this movement, ${angleGuide.explanation}`
+            : `Rep ${stats.bestRep} hit ${stats.bestRepMinAngle}° at your deepest point — the smallest angle we measured, meaning your deepest range.`,
         ),
       );
     }
@@ -648,7 +662,7 @@ function buildEvidence(session: WorkoutSession, stats: InsightStats, goalId?: Go
 
   return {
     strengths: strengths.slice(0, 5),
-    improvements: dedupedImprovements.length ? dedupedImprovements : [nextFocus],
+    improvements: dedupedImprovements,
     next_focus: nextFocus,
   };
 }
@@ -664,7 +678,9 @@ function recap(session: WorkoutSession, stats: InsightStats) {
     stats.cleanReps === 0
       ? 'none were clean by supported cues'
       : `${stats.cleanReps} of ${stats.totalReps} were clean by supported cues`;
-  const cueText = `${faultCount} technique cue${faultCount === 1 ? '' : 's'} observed`;
+  const cueText = faultCount
+    ? `${faultCount} technique cue${faultCount === 1 ? '' : 's'} observed`
+    : 'no supported technique cues recorded';
   const angleText =
     stats.measuredReps > 0 && stats.measuredReps >= stats.totalReps
       ? `Joint angles were measured on all ${stats.totalReps} reps`
@@ -675,7 +691,7 @@ function recap(session: WorkoutSession, stats: InsightStats) {
   const topCueText = topFault
     ? `The most common cue was ${topFault.label} on ${topFault.count} of ${stats.totalReps} reps (${topFault.percent}%).`
     : 'No supported technique cues were detected; that is not proof of perfect form.';
-  return `${demoPrefix}${stats.totalReps} ${exercise} reps recorded; ${cleanText}, and ${cueText}. ${angleText}. ${topCueText}`;
+  return `${demoPrefix}${stats.totalReps} ${exercise} reps recorded; ${cleanText}, with ${cueText}. ${angleText}. ${topCueText}`;
 }
 
 export function generateStatisticsInsight(

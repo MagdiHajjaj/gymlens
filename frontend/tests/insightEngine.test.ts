@@ -251,6 +251,27 @@ describe('goal-oriented insights', () => {
     expect(insight.evidence.next_focus.why).toContain('Clean on 1–2');
   });
 
+  it('does not tell a fully clean curl session that its clean streak is a weakness', () => {
+    const session = baseSession({
+      exercise: 'curl',
+      total_reps: 4,
+      reps: [62, 63, 64, 63].map((min_angle, index) => ({
+        rep_number: index + 1,
+        completed_at: `2026-01-01T00:00:${10 + index}.000Z`,
+        metrics_json: { min_angle, duration_ms: 2000 },
+        faults_json: [],
+      })),
+    });
+    const insight = generateStatisticsInsight(session, 'consistency');
+
+    expect(insight.next_focus).toContain('same controlled movement');
+    expect(insight.next_focus).not.toContain('extend it');
+    expect(insight.strengths.join(' ')).toContain('inside the 45–70° tracker reference');
+    expect(insight.evidence.strengths.map((item) => item.why).join(' ')).toContain(
+      'smaller angle means more elbow bend',
+    );
+  });
+
   it('weight_loss goal cites measured volume without diet or outcome claims', () => {
     const insight = generateStatisticsInsight(baseSession(), 'weight_loss');
 

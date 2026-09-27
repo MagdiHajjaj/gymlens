@@ -200,6 +200,18 @@ FAULT_LABELS = {
     "excessive_swing": "Body swing",
 }
 
+# Camera references used to translate raw joint angles into useful coaching.
+# They describe what this tracker can recognize; they are not medical or
+# universal technique targets.
+RANGE_GUIDANCE = {
+    "curl": {
+        "measurement": "elbow bend at the top",
+        "referenceDegrees": {"min": 45, "max": 70},
+        "meaning": "a smaller angle means more elbow bend",
+        "note": "Use this comfortable tracker range as a camera reference, not a requirement to force the movement.",
+    }
+}
+
 
 def _summarize_faults(reps, total):
     by_code = {}
@@ -294,9 +306,7 @@ def _workout_summary(workout, user=None) -> dict:
     summary = {
         "exercise": workout.exercise,
         "source": workout.source,
-        "repCountUnit": "individual arm repetitions"
-        if any("arm_side" in rep.metrics_json for rep in reps)
-        else "movement cycles",
+        "repCountUnit": "paired arm cycles" if workout.exercise == "curl" else "movement cycles",
         "totals": {
             "reps": total,
             "measuredReps": len(measured),
@@ -316,6 +326,7 @@ def _workout_summary(workout, user=None) -> dict:
             "averageRom": round(average_rom, 1) if average_rom is not None else None,
             "bestRep": {"rep": best[0], "minAngle": best[1]} if best else None,
             "trend": _depth_trend(measured),
+            "guidance": RANGE_GUIDANCE.get(workout.exercise),
         },
         "tempo": {
             "averageMs": round(average_duration) if average_duration is not None else None,
@@ -500,6 +511,13 @@ def generate_insight(workout, user=None, history=None) -> dict:
                     "Only use the supplied measurements. Do not invent measurements, assess health, "
                     "or claim injury prevention. Missing (null) measurements are unavailable. "
                     "No detected faults is not proof of perfect form. "
+                    "Translate raw angles into plain language using range.guidance when it is supplied. "
+                    "Explain what the angle means and whether it falls within the tracker reference. "
+                    "Never call a reference range universally optimal, and do not tell the athlete to force it. "
+                    "When every rep has no supported cue, do not present extending the clean streak as a weakness; "
+                    "suggest maintaining the same control before a small progression instead. Do not repeat the "
+                    "same recommendation in improvements and next_focus. Leave improvements empty when the evidence "
+                    "does not support a separate improvement. "
                     "If source is demo, explicitly describe simulated movement, not a real person's workout. "
                     "Use range.trend to note depth fading or improving across the session, tempo splits to comment "
                     "on pacing, and each fault's label, reps, and timing (early/middle/late/throughout) to say "

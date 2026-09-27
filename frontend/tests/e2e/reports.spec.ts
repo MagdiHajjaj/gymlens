@@ -194,6 +194,18 @@ test('bilateral curl reports retain the combined rep count', async ({ page }) =>
   await seed(page, [{ ...recordedSession, exercise: 'curl', reps: recordedSession.reps.map(rep => ({...rep, metrics_json: {...rep.metrics_json, arm_side: 2}})) }]);
   await page.goto('/session/grounded-report');
   await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toContainText('Both arms together');
-  await expect(page.locator('.session-key-stats')).toContainText('Simultaneous curls count as one rep');
+  await expect(page.locator('.session-key-stats')).toContainText('One rep is a completed cycle from both arms');
   await expect(page.locator('.session-key-stats dd').first()).toHaveText('6');
+});
+
+test('legacy curl reports explain missing arm labels without showing a false imbalance', async ({ page }) => {
+  await seed(page, [{ ...recordedSession, exercise: 'curl' }]);
+  await page.goto('/session/grounded-report');
+  await expect(page.locator('.session-key-stats')).toContainText(
+    'Arm-by-arm detail was not recorded for this session',
+  );
+  await expect(page.getByText('Elbow bend at the top:')).toBeVisible();
+  await expect(page.getByText('45–70°', { exact: false })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Recorded reps by arm' })).toHaveCount(0);
+  await expect(page.getByText('Arm not recorded')).toHaveCount(0);
 });

@@ -23,6 +23,7 @@ import {
 } from '../features/insights/sessionReport';
 import { formatRepList } from '../features/insights/repList';
 import { generateStatisticsInsight } from '../features/insights/insightEngine';
+import { rangeGuidance } from '../features/insights/rangeGuidance';
 import { useWorkout } from '../features/workout/workoutStore';
 import { useFitnessGoal } from '../features/goals/goals';
 import { api } from '../lib/api';
@@ -101,10 +102,16 @@ export function ExerciseReport({
   }, [autoFetchInsight, authenticated, session.id, session.local, session.status]);
 
   const report = buildSessionReport(session);
+  const angleGuide = rangeGuidance(session.exercise);
+  const knownArmReps = report.arms
+    ? report.arms.left + report.arms.right + report.arms.both
+    : 0;
+  const showArmBreakdown = Boolean(report.arms && knownArmReps > 0);
   const observedInsight = generateStatisticsInsight(session, goal?.id);
   // "What went well" only renders when there is something genuinely positive
   // to say — a zero-clean session reports that fact in the recap instead.
   const strengths = insight?.strengths || observedInsight.strengths;
+  const improvements = insight?.improvements || observedInsight.improvements;
   const joint = primaryJoint(session.exercise);
   const chart = report.reps.map((rep) => ({
     rep: rep.rep_number,
@@ -156,7 +163,9 @@ export function ExerciseReport({
           <dd>{report.total}</dd>
           <p>
             {report.arms
-              ? 'Simultaneous curls count as one rep; single-arm curls count individually.'
+              ? showArmBreakdown
+                ? 'One rep is a completed cycle from both arms, whether you curl together or alternate.'
+                : 'Arm-by-arm detail was not recorded for this session.'
               : 'Completed movements counted by the tracker.'}
           </p>
         </div>
@@ -195,7 +204,14 @@ export function ExerciseReport({
         )}
       </p>
 
-      {report.arms && (
+      {angleGuide && (
+        <p className="report-note report-range-guide">
+          <strong>{angleGuide.label}:</strong> aim for about {angleGuide.target} within your comfortable
+          range. {angleGuide.explanation}
+        </p>
+      )}
+
+      {report.arms && showArmBreakdown && (
         <section className="panel report-arm-counts" aria-label="Recorded reps by arm">
           <div>
             <span>Left arm</span>
@@ -251,20 +267,24 @@ export function ExerciseReport({
               </ul>
             </>
           )}
-          <h3 className="reflect-neg">Room to grow</h3>
-          <ul>
-            {(insight?.improvements || observedInsight.improvements).map((text, i) => (
-              <li key={i}>
-                {text}
-                {!insight && observedInsight.evidence.improvements[i]?.why && (
-                  <span className="coach-why">
-                    {' '}
-                    Why: {observedInsight.evidence.improvements[i]?.why}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {improvements.length > 0 && (
+            <>
+              <h3 className="reflect-neg">Try next</h3>
+              <ul>
+                {improvements.map((text, i) => (
+                  <li key={i}>
+                    {text}
+                    {!insight && observedInsight.evidence.improvements[i]?.why && (
+                      <span className="coach-why">
+                        {' '}
+                        Why: {observedInsight.evidence.improvements[i]?.why}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="next-focus">
             <span className="eyebrow">NEXT SESSION&rsquo;S FOCUS</span>
             <p>{insight?.next_focus || observedInsight.next_focus}</p>
@@ -392,7 +412,7 @@ export function ExerciseReport({
                     labelFormatter={(value) => `Rep ${value}`}
                     formatter={(value) => [`${value}°`, joint]}
                   />
-                  {report.arms ? (
+                  {showArmBreakdown ? (
                     <>
                       <Legend />
                       <Line
@@ -411,7 +431,7 @@ export function ExerciseReport({
                         dot
                         isAnimationActive={false}
                       />
-                      {report.arms.both > 0 && (
+                      {(report.arms?.both ?? 0) > 0 && (
                         <Line
                           dataKey="both"
                           name="Both arms (average)"
@@ -421,7 +441,7 @@ export function ExerciseReport({
                           isAnimationActive={false}
                         />
                       )}
-                      {report.arms.unknown > 0 && (
+                      {(report.arms?.unknown ?? 0) > 0 && (
                         <Line
                           dataKey="unknown"
                           name="Arm not recorded"
@@ -494,7 +514,7 @@ export function ExerciseReport({
                 <thead>
                   <tr>
                     <th>Rep</th>
-                    {report.arms && <th>Arm</th>}
+                    {showArmBreakdown && <th>Arm</th>}
                     <th>Lowest {joint} angle</th>
                     <th>Tracked time</th>
                     <th>Recorded cues</th>
@@ -504,7 +524,7 @@ export function ExerciseReport({
                   {report.reps.map((rep) => (
                     <tr key={rep.rep_number}>
                       <td>{rep.rep_number}</td>
-                      {report.arms && (
+                      {showArmBreakdown && (
                         <td>
                           {rep.metrics_json.arm_side === 0
                             ? 'Left'
