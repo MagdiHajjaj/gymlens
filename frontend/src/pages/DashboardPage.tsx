@@ -1,6 +1,3 @@
-import { useState } from 'react';
-import { MovementChips } from '../components/MovementChips';
-import { workoutSplits } from '../features/exercises/workoutSplits';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
@@ -16,45 +13,17 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { ExerciseArt } from '../components/ExerciseArt';
-import {
-  exercises,
-  type ExerciseMovement,
-} from '../features/exercises/ExerciseRegistry';
-import { useWorkout } from '../features/workout/workoutStore';
+import { exercises } from '../features/exercises/ExerciseRegistry';
 import { useSessions } from '../lib/useSessions';
 import { duration } from '../lib/sessionBuffer';
-import type { ExerciseId } from '../types/workout';
 import { groupWorkouts } from '../lib/workoutGroups';
-
-export function badgeNumber(index: number): string {
-  return String(index + 1).padStart(2, '0');
-}
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // Keep the deterministic e2e demo flag when entering demo mode from here.
   const synthetic = searchParams.get('synthetic') === '1' ? '&synthetic=1' : '';
-  const selectedIds = useWorkout((s) => s.selectedIds);
-  const toggleExercise = useWorkout((s) => s.toggleExercise);
   const { sessions, error } = useSessions();
-  const [movementFilter, setMovementFilter] = useState<ExerciseMovement | null>(null);
-  const exerciseIds = Object.keys(exercises) as ExerciseId[];
-  const visibleExercises = exerciseIds.filter(
-    (id) => movementFilter === null || exercises[id].movement === movementFilter,
-  );
-  // Split chips only filter the visible exercises; they never change the selection.
-  const applyMovementChip = (movement: ExerciseMovement | null) => {
-    setMovementFilter(movement);
-  };
-  const selectedNames = selectedIds.map((id) => exercises[id].name);
-  const barTitle =
-    selectedIds.length === 1
-      ? selectedNames[0]
-      : movementFilter !== null &&
-          selectedIds.every((id) => exercises[id].movement === movementFilter)
-        ? `${workoutSplits[movementFilter]} day`
-        : `${selectedIds.length} selected`;
   const completed = sessions.filter((s) => s.status === 'completed' && s.source !== 'demo');
   const completedWorkouts = groupWorkouts(completed);
   const total = completed.reduce((sum, s) => sum + s.total_reps, 0);
@@ -166,68 +135,6 @@ export function DashboardPage() {
           </div>
           <MoveUpRight size={15} aria-hidden />
         </Link>
-      </section>
-      <section>
-        <div className="section-heading">
-          <div>
-            <h2>Find your movement</h2>
-            <p>{Object.keys(exercises).length} movements. Thoughtful feedback for each.</p>
-          </div>
-          <span className="tag outlined">SIDE-VIEW TRAINING</span>
-        </div>
-        <div className="history-filters">
-          <p role="status">
-            {visibleExercises.length} {visibleExercises.length === 1 ? 'exercise' : 'exercises'}
-          </p>
-          {movementFilter !== null && (
-            <Button size="small" variant="ghost" onClick={() => setMovementFilter(null)}>
-              Clear filters
-            </Button>
-          )}
-        </div>
-        <MovementChips value={movementFilter} onChange={applyMovementChip} />
-        <div className="exercise-grid">
-          {visibleExercises.map((id) => {
-            const exercise = exercises[id];
-            const isSelected = selectedIds.includes(id);
-            return (
-              <button
-                key={id}
-                className={`exercise-card ${isSelected ? 'selected' : ''}`}
-                onClick={() => toggleExercise(id)}
-                aria-pressed={isSelected}
-              >
-                <div className={`exercise-image ${exercise.color}`}>
-                  <span className="exercise-category">{exercise.category}</span>
-                  <span className={`selection-dot ${isSelected ? 'checked' : ''}`}>
-                    {isSelected && <Check size={12} />}
-                  </span>
-                  <ExerciseArt exercise={id} />
-                  <span className="exercise-number">{badgeNumber(Object.keys(exercises).indexOf(id))}</span>
-                </div>
-                <div className="exercise-info">
-                  <div>
-                    <h3>{exercise.name}</h3>
-                    <p>{exercise.muscles}</p>
-                  </div>
-                </div>
-                <div className="exercise-checks">
-                  <span /> {exercise.checks}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <div className="selection-bar">
-          <span>
-            <strong>{barTitle}</strong>
-            {selectedIds.length > 1 && <> — {selectedNames.join(', ')}</>}{' '}
-            <span className="selection-separator">·</span> Find your space. We’ll handle the counting.
-          </span>
-          <Button size="small" onClick={() => navigate('/workout')}>
-            Let’s go <ArrowRight size={15} />
-          </Button>
-        </div>
       </section>
       <div className="dashboard-bottom">
         <section className="recent-section">

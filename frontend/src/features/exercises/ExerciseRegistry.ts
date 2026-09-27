@@ -131,3 +131,8 @@ export const createAnalyzer = (id: ExerciseId, preCalibrated = false) =>
 /** Exercise ids in a movement pattern, in registry order. */
 export const exercisesForMovement = (movement: ExerciseMovement): ExerciseId[] =>
   (Object.keys(exercises) as ExerciseId[]).filter((id) => exercises[id].movement === movement);
+
+/** Zero-padded display number for an exercise by its registry index. */
+export function badgeNumber(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}

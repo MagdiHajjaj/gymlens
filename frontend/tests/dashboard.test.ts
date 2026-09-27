@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { badgeNumber } from '../src/pages/DashboardPage';
+import { badgeNumber } from '../src/features/exercises/ExerciseRegistry';
 
 describe('badgeNumber', () => {
   it('pads single-digit exercise numbers without breaking double digits', () => {
