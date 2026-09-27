@@ -180,6 +180,22 @@ export function Shell({ children }: { children: ReactNode }) {
           </span>
         </footer>
       </div>
+      <nav className="bottom-tabs" aria-label="Main navigation">
+        <NavLink to="/" end aria-label="Overview">
+          <LayoutDashboard size={22} />
+        </NavLink>
+        <NavLink to="/workout" aria-label="Workout">
+          <Dumbbell size={22} />
+        </NavLink>
+        <NavLink to="/history" aria-label="History">
+          <History size={22} />
+        </NavLink>
+        {identity.authenticated && (
+          <NavLink to="/profile" aria-label="Profile">
+            <UserRound size={22} />
+          </NavLink>
+        )}
+      </nav>
       {settings && (
         <div className="modal-backdrop" onClick={() => setSettings(false)}>
           <section

@@ -178,6 +178,10 @@ nav a.active:after {
   margin-top: auto;
   padding-top: 35px;
 }
+/* Floating bottom nav pill — mobile only, shown in the <=650px media query. */
+.bottom-tabs {
+  display: none;
+}
 .privacy-card {
   padding: 20px 17px;
   background: #f0f3e9;
@@ -2561,16 +2565,45 @@ td strong {
   .brand-mark svg {
     width: 20px;
   }
-  nav {
-    flex-direction: row;
-    margin: 0;
-    gap: 7px;
+  .sidebar nav {
+    display: none;
   }
-  nav a {
-    padding: 10px;
+  .bottom-tabs {
+    display: flex;
+    position: fixed;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 60;
+    align-items: center;
+    gap: 2px;
+    background: rgba(252, 253, 247, 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px;
+    box-shadow: 0 10px 30px rgba(38, 60, 49, 0.18);
   }
-  nav a svg {
-    width: 19px;
+  .bottom-tabs a {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    padding: 0;
+    gap: 0;
+    color: #7d897e;
+  }
+  .bottom-tabs a:hover {
+    background: #f0f2eb;
+  }
+  .bottom-tabs a.active {
+    background: #2c3f2e;
+    color: #f2f6ea;
+  }
+  .bottom-tabs a.active:after {
+    display: none;
   }
   .sidebar-bottom {
     display: none;
@@ -2578,6 +2611,7 @@ td strong {
   .main-shell {
     margin: 0;
     width: 100%;
+    padding-bottom: 104px;
   }
   .topbar {
     height: 52px;
