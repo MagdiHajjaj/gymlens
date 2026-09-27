@@ -108,3 +108,26 @@ it('hides scheduling UI for guests', () => {
   // The day marker itself is harmless without the section.
   expect(container.querySelectorAll('.cal-sched')).toHaveLength(1);
 });
+
+// Session bars: one mini bar per recorded session on a day, capped at 3.
+const groupsOn = (dateKey: string, n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    id: `g-${dateKey}-${i}`,
+    name: '',
+    sessions: [{ id: `s-${dateKey}-${i}`, exercise: 'squat' }],
+    startedAt: `${dateKey}T10:00:00`,
+    totalReps: 10,
+    durationSeconds: 60,
+  })) as never as Parameters<typeof WorkoutCalendar>[0]['workouts'];
+
+it('shows one bar per session on the day cell', () => {
+  const { container } = renderCalendar({ workouts: groupsOn(todayKey(), 2) });
+  expect(container.querySelectorAll('.cal-day.has-workout .cal-bar')).toHaveLength(2);
+  expect(container.querySelector('.cal-more')).toBeNull();
+});
+
+it('caps the bars at 3 with a +N overflow label', () => {
+  const { container } = renderCalendar({ workouts: groupsOn(todayKey(), 5) });
+  expect(container.querySelectorAll('.cal-day.has-workout .cal-bar')).toHaveLength(3);
+  expect(container.querySelector('.cal-more')?.textContent).toBe('+2');
+});
