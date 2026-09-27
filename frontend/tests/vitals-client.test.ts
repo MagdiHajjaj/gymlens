@@ -1,12 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { VitalsClient } from '../src/features/vitals/vitalsClient';
+import { VitalsClient, type VitalsReading } from '../src/features/vitals/vitalsClient';
 
 class MockWebSocket {
   static OPEN = 1;
   static CONNECTING = 0;
   url: string;
   readyState = MockWebSocket.CONNECTING;
-  sent: any[] = [];
+  sent: unknown[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
@@ -15,7 +15,7 @@ class MockWebSocket {
     this.url = url;
     MockWebSocket.instances.push(this);
   }
-  send(data: any) {
+  send(data: unknown) {
     this.sent.push(data);
   }
   close() {
@@ -40,7 +40,8 @@ describe('VitalsClient', () => {
   beforeEach(() => {
     realWebSocket = globalThis.WebSocket;
     MockWebSocket.instances = [];
-    (globalThis as any).WebSocket = MockWebSocket;
+    (globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket =
+      MockWebSocket as unknown as typeof WebSocket;
     vi.useFakeTimers();
   });
 
@@ -82,7 +83,7 @@ describe('VitalsClient', () => {
   });
 
   it('delivers vitals readings to the callback', async () => {
-    const readings: any[] = [];
+    const readings: VitalsReading[] = [];
     const client = new VitalsClient('ws://test:8787', { onReading: (r) => readings.push(r) });
     const promise = client.start();
     const ws = MockWebSocket.instances[0];
@@ -126,7 +127,7 @@ describe('VitalsClient', () => {
   });
 
   it('malformed server messages are ignored', async () => {
-    const readings: any[] = [];
+    const readings: VitalsReading[] = [];
     const client = new VitalsClient('ws://test:8787', { onReading: (r) => readings.push(r) });
     const promise = client.start();
     const ws = MockWebSocket.instances[0];
