@@ -73,21 +73,24 @@ export function HistoryPage() {
           const local = workout.sessions.some((session) => session.local !== false);
           const session = workout.sessions[0];
           const exerciseNames = workout.sessions.map((row) => exercises[row.exercise].name);
+          const workoutName = workout.name || exerciseNames.join(' · ');
+          const workoutAria = /workout$/i.test(workoutName) ? workoutName : `${workoutName} workout`;
           return (
             <article
               className="panel history-session-card"
               key={workout.id}
-              aria-label={`${exerciseNames.join(', ')} workout`}
+              aria-label={workoutAria}
             >
               <div className="history-session-heading">
                 <div>
-                  <h2>{exerciseNames.join(' · ')}</h2>
+                  <h2>{workoutName}</h2>
                   <p>
                     {new Date(workout.startedAt).toLocaleString([], {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     })}
                   </p>
+                  <p className="small-muted">{exerciseNames.join(' · ')}</p>
                 </div>
                 <span className={`tag ${session.source === 'demo' ? 'demo-tag' : ''}`}>
                   {session.source === 'demo'

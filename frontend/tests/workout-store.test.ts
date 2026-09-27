@@ -26,7 +26,7 @@ beforeEach(() => {
     rest: null,
     currentSetStartRep: 1,
   });
-  usePlan.setState({ plan: [], completedExerciseIds: [] });
+  usePlan.setState({ plan: [], completedExerciseIds: [], workoutId: null, workoutName: '' });
 });
 
 it('starts rest only after closing a nonempty real rep range', () => {
@@ -115,6 +115,30 @@ it('keeps the global rep target when the exercise has no plan item', () => {
 
   expect(useWorkout.getState().session?.exercise).toBe('squat');
   expect(useWorkout.getState().targetReps).toBe(15);
+});
+
+it('saves the plan name and group id on each planned exercise session', () => {
+  usePlan.getState().setPlan(['squat', 'pushup']);
+  usePlan.getState().setWorkoutName('Saturday strength');
+  const workoutId = usePlan.getState().workoutId;
+
+  useWorkout.getState().begin('camera');
+
+  expect(useWorkout.getState().session).toMatchObject({
+    workout_id: workoutId,
+    workout_name: 'Saturday strength',
+  });
+});
+
+it('does not attach a session to a stale plan that excludes the exercise', () => {
+  usePlan.getState().setPlan(['pushup']);
+  usePlan.getState().setWorkoutName('Push day');
+
+  useWorkout.getState().begin('camera');
+  const session = useWorkout.getState().session;
+
+  expect(session?.workout_id).toBe(session?.id);
+  expect(session?.workout_name).toBe('Squat workout');
 });
 
 it('stamps tracking_started_at when calibration completes, not before', () => {

@@ -95,6 +95,7 @@ export const api = {
       body: JSON.stringify({
         id: session.id,
         workout_id: session.workout_id,
+        workout_name: session.workout_name,
         exercise: session.exercise,
         source: session.source,
         started_at: session.started_at,

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { ExerciseId } from '../../types/workout';
+import { exercises } from '../exercises/ExerciseRegistry';
+import { exerciseSplits, workoutSplits } from '../exercises/workoutSplits';
 
 export interface PlanItem {
   exerciseId: ExerciseId;
@@ -41,6 +43,7 @@ export const defaultWeightFor = (exerciseId: ExerciseId): number => DEFAULT_WEIG
 interface PlanStore {
   plan: PlanItem[];
   workoutId: string | null;
+  workoutName: string;
   /** Exercises marked finished in the current plan, in completion order. */
   completedExerciseIds: ExerciseId[];
   /** (Re)builds the plan for the given exercises, keeping any edits already made.
@@ -48,6 +51,7 @@ interface PlanStore {
    *  re-entering the plan step never undoes a custom order; a different exercise
    *  list is a fresh plan and resets completion. */
   setPlan: (exerciseIds: ExerciseId[]) => void;
+  setWorkoutName: (name: string) => void;
   updatePlanItem: (exerciseId: ExerciseId, patch: { weightKg?: number; sets?: number; reps?: number }) => void;
   /** Moves the row at fromIndex to toIndex, shifting the rows between. No-op for
    *  out-of-range indices. Powers drag-and-drop reordering and keyboard reorder. */
@@ -62,6 +66,7 @@ interface PlanStore {
 export const usePlan = create<PlanStore>((set, get) => ({
   plan: [],
   workoutId: null,
+  workoutName: '',
   completedExerciseIds: [],
   setPlan: (exerciseIds) =>
     set((state) => {
@@ -75,6 +80,13 @@ export const usePlan = create<PlanStore>((set, get) => ({
       const orderedIds = sameExercises
         ? state.plan.map((item) => item.exerciseId)
         : exerciseIds;
+      const splits = new Set(exerciseIds.map((exerciseId) => exerciseSplits[exerciseId]));
+      const defaultName =
+        exerciseIds.length === 1
+          ? `${exercises[exerciseIds[0]].name} workout`
+          : splits.size === 1
+            ? `${workoutSplits[exerciseSplits[exerciseIds[0]]]} workout`
+            : 'Full body workout';
       return {
         plan: orderedIds.map((exerciseId) => {
           const existing = state.plan.find((item) => item.exerciseId === exerciseId);
@@ -82,9 +94,12 @@ export const usePlan = create<PlanStore>((set, get) => ({
             existing ?? { exerciseId, weightKg: DEFAULT_WEIGHT_KG[exerciseId], sets: DEFAULT_SETS, reps: DEFAULT_REPS }
           );
         }),
-        ...(sameExercises ? {} : { completedExerciseIds: [], workoutId: crypto.randomUUID() }),
+        ...(sameExercises
+          ? {}
+          : { completedExerciseIds: [], workoutId: crypto.randomUUID(), workoutName: defaultName }),
       };
     }),
+  setWorkoutName: (workoutName) => set({ workoutName: workoutName.slice(0, 80) }),
   updatePlanItem: (exerciseId, patch) =>
     set((state) => ({
       plan: state.plan.map((item) =>
@@ -120,7 +135,7 @@ export const usePlan = create<PlanStore>((set, get) => ({
       plan.splice(toIndex, 0, moved);
       return { plan };
     }),
-  clearPlan: () => set({ plan: [], completedExerciseIds: [], workoutId: null }),
+  clearPlan: () => set({ plan: [], completedExerciseIds: [], workoutId: null, workoutName: '' }),
   completeExercise: (exerciseId) =>
     set((state) =>
       state.completedExerciseIds.includes(exerciseId)

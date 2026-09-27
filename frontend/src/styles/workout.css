@@ -513,6 +513,35 @@
   line-height: 1.6;
   color: #5d6d62;
 }
+.plan-name-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  color: #263c31;
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-name-field input {
+  min-height: 46px;
+  width: 100%;
+  border: 1px solid #bac6b3;
+  border-radius: 8px;
+  background: white;
+  padding: 10px 12px;
+  color: #263c31;
+  font: inherit;
+  font-size: 15px;
+}
+.plan-name-field input:focus {
+  outline: 3px solid #b8d99e;
+  outline-offset: 1px;
+  border-color: #41623c;
+}
+.plan-name-field span {
+  color: #6c756e;
+  font-size: 12px;
+  font-weight: 400;
+}
 .plan-rows {
   list-style: none;
   padding: 0;

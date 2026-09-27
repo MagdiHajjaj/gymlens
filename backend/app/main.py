@@ -103,6 +103,7 @@ def serialize(workout, detail=True):
     result = {
         "id": workout.id,
         "workout_id": workout.workout_id,
+        "workout_name": workout.workout_name,
         "exercise": workout.exercise,
         "source": workout.source,
         "started_at": utc(workout.started_at),
@@ -208,6 +209,7 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
         if (
             existing.exercise != payload.exercise
             or existing.workout_id != str(payload.workout_id)
+            or existing.workout_name != payload.workout_name
             or existing.source != payload.source
             or utc(existing.started_at) != payload.started_at
         ):
@@ -218,6 +220,7 @@ def create(payload: WorkoutCreate, db: Session = Depends(get_db), user: User = D
     workout = Workout(
         id=str(payload.id),
         workout_id=str(payload.workout_id),
+        workout_name=payload.workout_name,
         user_id=user.id,
         exercise=payload.exercise,
         source=payload.source,

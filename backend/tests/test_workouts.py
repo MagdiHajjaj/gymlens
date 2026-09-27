@@ -6,7 +6,7 @@ import pytest
 def create(client):
     start = datetime.now(timezone.utc) - timedelta(minutes=2)
     session_id = str(uuid4())
-    payload = {"id": session_id, "workout_id": session_id, "exercise": "squat", "source": "camera", "started_at": start.isoformat()}
+    payload = {"id": session_id, "workout_id": session_id, "workout_name": "Leg day", "exercise": "squat", "source": "camera", "started_at": start.isoformat()}
     response = client.post("/api/workouts", json=payload)
     assert response.status_code == 201, response.text
     return payload
@@ -52,6 +52,7 @@ def test_complete_workout_idempotency_and_persistence(client):
     assert finish.status_code == 200, finish.text
     assert finish.json()["total_reps"] == 1
     assert finish.json()["workout_id"] == workout["workout_id"]
+    assert finish.json()["workout_name"] == "Leg day"
     assert finish.json()["status"] == "completed"
     detail = client.get(f"/api/workouts/{sid}").json()
     assert len(detail["reps"]) == 1

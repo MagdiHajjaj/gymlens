@@ -2,6 +2,7 @@ import type { WorkoutHistoryEntry } from '../types/workout';
 
 export interface WorkoutGroup {
   id: string;
+  name: string;
   sessions: WorkoutHistoryEntry[];
   startedAt: string;
   endedAt?: string;
@@ -23,6 +24,7 @@ export function groupWorkouts(sessions: WorkoutHistoryEntry[]): WorkoutGroup[] {
       const endedAt = ended.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
       return {
         id,
+        name: ordered.find((row) => row.workout_name?.trim())?.workout_name?.trim() ?? '',
         sessions: ordered,
         startedAt,
         endedAt,

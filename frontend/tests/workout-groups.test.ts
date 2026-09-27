@@ -15,14 +15,15 @@ const row = (id: string, exercise: WorkoutHistoryEntry['exercise'], start: strin
 
 describe('workout history groups', () => {
   it('combines planned exercises into one workout with aggregate totals', () => {
-    const groups = groupWorkouts([
-      row('session-2', 'row', '2026-01-01T10:05:00Z', '2026-01-01T10:10:00Z', 8),
-      row('session-1', 'curl', '2026-01-01T10:00:00Z', '2026-01-01T10:04:00Z', 10),
-    ]);
+    const second = row('session-2', 'row', '2026-01-01T10:05:00Z', '2026-01-01T10:10:00Z', 8);
+    const first = row('session-1', 'curl', '2026-01-01T10:00:00Z', '2026-01-01T10:04:00Z', 10);
+    first.workout_name = second.workout_name = 'Pull power';
+    const groups = groupWorkouts([second, first]);
     expect(groups).toHaveLength(1);
     expect(groups[0].sessions.map((session) => session.exercise)).toEqual(['curl', 'row']);
     expect(groups[0].totalReps).toBe(18);
     expect(groups[0].durationSeconds).toBe(600);
+    expect(groups[0].name).toBe('Pull power');
   });
 
   it('keeps legacy sessions as separate workouts', () => {

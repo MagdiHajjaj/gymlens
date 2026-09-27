@@ -185,6 +185,8 @@ export function PlanStep({
   onBack: () => void;
 }) {
   const plan = usePlan((state) => state.plan);
+  const workoutName = usePlan((state) => state.workoutName);
+  const setWorkoutName = usePlan((state) => state.setWorkoutName);
   const reorderPlan = usePlan((state) => state.reorderPlan);
   const listRef = useRef<HTMLUListElement>(null);
   const rowRefs = useRef(new Map<ExerciseId, HTMLLIElement>());
@@ -410,6 +412,18 @@ export function PlanStep({
         Set a target weight, sets and reps for each exercise. Drag the handle to reorder —
         exercises run top to bottom. You can adjust between sets.
       </p>
+      <label className="plan-name-field">
+        Workout name
+        <input
+          type="text"
+          value={workoutName}
+          maxLength={80}
+          required
+          placeholder="e.g. Pull day"
+          onChange={(event) => setWorkoutName(event.target.value)}
+        />
+        <span>This is how the complete workout will appear in History.</span>
+      </label>
       <ul className="plan-rows" aria-label="Session plan" ref={listRef}>
         {plan.map((item, index) => (
           <PlanRow
@@ -426,7 +440,7 @@ export function PlanStep({
         <Button variant="ghost" onClick={onBack}>
           <ArrowLeft size={16} /> Back
         </Button>
-        <Button className="setup-primary" onClick={onContinue}>
+        <Button className="setup-primary" disabled={!workoutName.trim()} onClick={onContinue}>
           Continue <ArrowRight size={17} />
         </Button>
       </div>

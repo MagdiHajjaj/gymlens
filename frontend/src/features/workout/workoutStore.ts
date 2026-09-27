@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ExerciseId, ExerciseResult, WorkoutSession, WorkoutSetRange } from '../../types/workout';
 import { usePlan } from './planStore';
+import { exercises } from '../exercises/ExerciseRegistry';
 
 type RestPreset = 30 | 60 | 90;
 interface WorkoutRest {
@@ -80,12 +81,16 @@ export const useWorkout = create<Store>((set, get) => ({
     lastMetric = 0;
     const selectedId = get().selected;
     // A planned exercise brings its own rep target; otherwise the global target stands.
-    const planItem = usePlan.getState().plan.find((item) => item.exerciseId === selectedId);
+    const planState = usePlan.getState();
+    const planItem = planState.plan.find((item) => item.exerciseId === selectedId);
     const sessionId = crypto.randomUUID();
     set({
       session: {
         id: sessionId,
-        workout_id: usePlan.getState().workoutId ?? sessionId,
+        workout_id: planItem ? (planState.workoutId ?? sessionId) : sessionId,
+        workout_name: planItem
+          ? planState.workoutName.trim() || `${exercises[selectedId].name} workout`
+          : `${exercises[selectedId].name} workout`,
         exercise: selectedId,
         source,
         started_at: new Date().toISOString(),

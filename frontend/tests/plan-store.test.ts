@@ -10,7 +10,17 @@ import {
 } from '../src/features/workout/planStore';
 
 beforeEach(() => {
-  usePlan.setState({ plan: [], completedExerciseIds: [] });
+  usePlan.setState({ plan: [], completedExerciseIds: [], workoutId: null, workoutName: '' });
+});
+
+it('suggests an editable workout name from the selected exercises', () => {
+  usePlan.getState().setPlan(['curl', 'row']);
+  expect(usePlan.getState().workoutName).toBe('Pull workout');
+  usePlan.getState().setWorkoutName('Saturday arms');
+  expect(usePlan.getState().workoutName).toBe('Saturday arms');
+
+  usePlan.getState().setPlan(['curl', 'squat']);
+  expect(usePlan.getState().workoutName).toBe('Full body workout');
 });
 
 it('builds plan rows with sensible defaults per exercise', () => {
@@ -70,6 +80,7 @@ it('ignores patches for exercises not in the plan and clears cleanly', () => {
   usePlan.getState().clearPlan();
   expect(usePlan.getState().plan).toEqual([]);
   expect(usePlan.getState().completedExerciseIds).toEqual([]);
+  expect(usePlan.getState().workoutName).toBe('');
 });
 
 it('marks exercises complete idempotently', () => {
