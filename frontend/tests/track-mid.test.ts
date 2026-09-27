@@ -191,8 +191,11 @@ describe.each(batteries)('$id synthetic adversarial tracking', (b) => {
     const outside = run(b.id, framesFor(b.pose, fullRep(b.top, cutoff + 2)));
     const outsideReps = completed(outside.results);
     expect(outsideReps).toHaveLength(0);
-    // A rejected rep is a clean reject: no depth cue attached to a rep that never counted.
-    expect(outside.results.flatMap((r) => r.faults)).toHaveLength(0);
+    // A rejected rep is not silent: the failed cycle carries the exercise's own
+    // depth cue so the user knows why it didn't count (#39 core fix).
+    const outsideFaults = outside.results.flatMap((r) => r.faults);
+    expect(outsideFaults).toHaveLength(1);
+    expect(outsideFaults[0].code).toBe(b.depthCode);
   });
 
   it('rejects a full-ROM rep that is faster than minimumMs', () => {
