@@ -11,6 +11,9 @@ from typing import Callable
 import httpx
 from fastapi import HTTPException
 from google import genai
+from sqlalchemy import select
+
+from app.models import SessionInsight, Workout
 from google.genai import types
 
 from app.core.config import settings
@@ -325,10 +328,109 @@ def _workout_summary(workout, user=None) -> dict:
     return summary
 
 
-def generate_insight(workout, user=None) -> dict:
+def _fault_trends(current_faults, prior_sessions):
+    """Label each of the current session's top faults as new, recurring, improving, or ongoing.
+
+    current_faults: [{"code", "label", "count", "percent"}, ...] sorted by count desc.
+    prior_sessions: [{"faults": [{"code", "percent"}, ...]}, ...] most recent first.
+    """
+    trends = []
+    for fault in current_faults[:3]:
+        hits = [s for s in prior_sessions if any(f["code"] == fault["code"] for f in s["faults"])]
+        prior_percents = [f["percent"] for s in hits for f in s["faults"] if f["code"] == fault["code"]]
+        prior_avg = round(sum(prior_percents) / len(prior_percents)) if prior_percents else 0
+        if not hits:
+            trend = "new"
+        elif fault["percent"] < prior_avg * 0.7:
+            trend = "improving"
+        elif len(hits) >= 2:
+            trend = "recurring"
+        else:
+            trend = "ongoing"
+        trends.append(
+            {
+                "label": fault["label"],
+                "trend": trend,
+                "priorSessionsAffected": len(hits),
+                "priorAveragePercent": prior_avg,
+                "currentPercent": fault["percent"],
+            }
+        )
+    return trends
+
+
+def insight_history(db, user_id, workout, limit=3):
+    """Cross-session context for insight generation: recent sessions, fault trends,
+    and the most recent prior next_focus so the coach doesn't repeat itself."""
+    prior = (
+        db.scalars(
+            select(Workout)
+            .where(
+                Workout.user_id == user_id,
+                Workout.status == "completed",
+                Workout.id != workout.id,
+                Workout.source != "demo",
+            )
+            .order_by(Workout.ended_at.desc())
+            .limit(limit)
+        )
+        .all()
+    )
+    recent = []
+    for session in prior:
+        summary = _summarize_faults(session.reps, len(session.reps))
+        recent.append(
+            {
+                "exercise": session.exercise,
+                "date": session.ended_at.date().isoformat() if session.ended_at else None,
+                "totalReps": len(session.reps),
+                "faults": [
+                    {"code": f["code"], "label": f["label"], "percent": f["percent"]}
+                    for f in summary[:3]
+                ],
+            }
+        )
+    current = _workout_summary(workout)
+    previous_focus = None
+    for same_exercise in (True, False):
+        row = db.scalar(
+            select(SessionInsight)
+            .join(Workout, SessionInsight.session_id == Workout.id)
+            .where(
+                Workout.user_id == user_id,
+                Workout.id != workout.id,
+                Workout.status == "completed",
+                Workout.source != "demo",
+                *([Workout.exercise == workout.exercise] if same_exercise else []),
+            )
+            .order_by(Workout.ended_at.desc())
+        )
+        if row and row.summary_json:
+            previous_focus = row.summary_json.get("next_focus")
+            if previous_focus:
+                break
+    return {
+        "recentSessions": recent,
+        "faultTrends": _fault_trends(current["faults"], recent),
+        "previousFocus": previous_focus,
+    }
+
+
+def generate_insight(workout, user=None, history=None) -> dict:
     if not settings.gemini_api_key:
         raise HTTPException(503, "Gemini is not configured. Measured statistics remain available.")
     summary = _workout_summary(workout, user)
+    if history:
+        summary["history"] = history
+        history_guidance = (
+            "Use history.faultTrends to note whether each top fault is new, recurring, "
+            "improving, or ongoing compared with recent sessions, and mention the trend "
+            "in your coaching. Do not repeat history.previousFocus as the next-session "
+            "focus; build on it or choose a different one. "
+        )
+    else:
+        history_guidance = ""
+    summary_json = json.dumps(summary)
     try:
         with genai.Client(
             api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=20000)
@@ -338,7 +440,7 @@ def generate_insight(workout, user=None) -> dict:
                 contents=(
                     "Coach this workout session for the athlete using ONLY the measurements "
                     "below. Cite the specific rep numbers behind every observation "
-                    "(e.g. 'reps 4-6').\n\nSession evidence:\n" + json.dumps(summary)
+                    "(e.g. 'reps 4-6'). " + history_guidance + "\n\nSession evidence:\n" + summary_json
                 ),
                 config=types.GenerateContentConfig(
                     system_instruction="You are a concise workout coach writing about one specific session. "

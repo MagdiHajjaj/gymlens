@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import Event
 from types import SimpleNamespace
 import json
@@ -588,3 +588,138 @@ def test_speech_request_abuse_rate_limit_applies_to_cache_hits(client, monkeypat
     for _ in range(60):
         assert client.post("/api/coaching/speech", json=phrase).status_code == 200
     assert client.post("/api/coaching/speech", json=phrase).status_code == 429
+
+
+def _session_with_faults(client, fault_code, faulted_reps, total_reps, ended_at):
+    """Create a completed session whose first `faulted_reps` reps carry `fault_code`."""
+    from uuid import uuid4
+
+    session_id = str(uuid4())
+    payload = {
+        "id": session_id,
+        "workout_id": session_id,
+        "workout_name": "Leg day",
+        "exercise": "squat",
+        "source": "camera",
+        "started_at": (ended_at - timedelta(minutes=2)).isoformat(),
+    }
+    assert client.post("/api/workouts", json=payload).status_code == 201
+    sid = session_id
+    reps = []
+    for number in range(1, total_reps + 1):
+        payload = rep(number)
+        payload["completed_at"] = (
+            ended_at - timedelta(seconds=(total_reps - number) * 5 + 5)
+        ).isoformat()
+        if number <= faulted_reps:
+            payload["faults_json"] = [
+                {"code": fault_code, "message": "m", "severity": "warning"}
+            ]
+        reps.append(payload)
+    assert client.post(f"/api/workouts/{sid}/reps/batch", json={"reps": reps}).status_code == 200
+    assert (
+        client.patch(f"/api/workouts/{sid}", json={"ended_at": ended_at.isoformat()}).status_code
+        == 200
+    )
+    return sid
+
+
+class _FakeGemini:
+    def __init__(self, calls, valid):
+        self._calls = calls
+        self._valid = valid
+
+    def __call__(self, **kwargs):
+        outer = self
+
+        class Client:
+            def __init__(self, **kw):
+                self.models = self
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                pass
+
+            def generate_content(self, **kwargs):
+                outer._calls.append(kwargs)
+                return SimpleNamespace(text=json.dumps(outer._valid))
+
+        return Client(**kwargs)
+
+
+def test_insight_history_trends_and_previous_focus(client, monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    now = datetime.now(timezone.utc)
+    prior1 = _session_with_faults(
+        client, "insufficient_depth", 1, 4, now - timedelta(days=3)
+    )
+    _session_with_faults(
+        client, "insufficient_depth", 1, 4, now - timedelta(days=2)
+    )
+    prior_focus = {
+        "recap": "Prior recap.",
+        "strengths": [],
+        "improvements": [],
+        "next_focus": "Sit deeper on the last reps.",
+    }
+    calls = []
+    monkeypatch.setattr(services.genai, "Client", _FakeGemini(calls, prior_focus))
+    assert client.post(f"/api/workouts/{prior1}/insights").status_code == 200
+
+    current_valid = {
+        "recap": "Current recap.",
+        "strengths": [],
+        "improvements": [],
+        "next_focus": "Keep the chest tall.",
+    }
+    monkeypatch.setattr(services.genai, "Client", _FakeGemini(calls, current_valid))
+    current = _session_with_faults(
+        client, "insufficient_depth", 3, 6, now - timedelta(minutes=1)
+    )
+    response = client.post(f"/api/workouts/{current}/insights")
+    assert response.status_code == 200, response.text
+    payload = json.loads(calls[-1]["contents"].split("Session evidence:\n", 1)[1])
+    history = payload["history"]
+    assert [s["totalReps"] for s in history["recentSessions"]] == [4, 4]
+    trends = {t["label"]: t for t in history["faultTrends"]}
+    assert trends["Shallow depth"]["trend"] == "recurring"
+    assert trends["Shallow depth"]["priorSessionsAffected"] == 2
+    assert history["previousFocus"] == "Sit deeper on the last reps."
+    assert "history.previousFocus" in calls[-1]["contents"]
+
+
+def test_insight_refresh_regenerates_stored_result(client, monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "test-key")
+    sid = completed_session(client)
+    calls = []
+    first = {"recap": "First.", "strengths": [], "improvements": [], "next_focus": "A."}
+    monkeypatch.setattr(services.genai, "Client", _FakeGemini(calls, first))
+    assert client.post(f"/api/workouts/{sid}/insights").json()["recap"] == "First."
+    assert client.post(f"/api/workouts/{sid}/insights").json()["recap"] == "First."
+    assert len(calls) == 1
+
+    second = {"recap": "Second.", "strengths": [], "improvements": [], "next_focus": "B."}
+    monkeypatch.setattr(services.genai, "Client", _FakeGemini(calls, second))
+    response = client.post(f"/api/workouts/{sid}/insights?refresh=true")
+    assert response.status_code == 200, response.text
+    assert response.json()["recap"] == "Second."
+    assert len(calls) == 2
+    assert client.get(f"/api/workouts/{sid}").json()["insight"]["recap"] == "Second."
+    assert client.post(f"/api/workouts/{sid}/insights").json()["recap"] == "Second."
+    assert len(calls) == 2
+
+
+def test_fault_trends_labels_new_improving_and_ongoing():
+    current = [
+        {"code": "a", "label": "A", "count": 3, "percent": 50},
+        {"code": "b", "label": "B", "count": 2, "percent": 10},
+        {"code": "c", "label": "C", "count": 1, "percent": 20},
+    ]
+    prior = [
+        {"faults": [{"code": "b", "percent": 40}, {"code": "c", "percent": 20}]},
+        {"faults": [{"code": "b", "percent": 50}]},
+    ]
+    trends = {t["label"]: t["trend"] for t in services._fault_trends(current, prior)}
+    assert trends == {"A": "new", "B": "improving", "C": "ongoing"}

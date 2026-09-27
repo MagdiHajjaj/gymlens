@@ -383,14 +383,18 @@ def coaching(payload: SpeechRequest, request: Request, subject: str | None = Dep
 
 
 @app.post("/api/workouts/{session_id}/insights")
-def insights(session_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def insights(session_id: UUID, refresh: bool = False, db: Session = Depends(get_db), user: User = Depends(current_user)):
     workout = owned(session_id, db, user)
     if workout.status != "completed":
         raise HTTPException(409, "Finish the session before requesting insights")
-    if workout.insight_row:
+    if workout.insight_row and not refresh:
         return workout.insight_row.summary_json
     services.rate_limit(user.id, "insights", 3)
-    summary = services.generate_insight(workout, user)
+    if workout.insight_row:
+        db.delete(workout.insight_row)
+        db.flush()
+    history = services.insight_history(db, user.id, workout)
+    summary = services.generate_insight(workout, user, history)
     db.add(SessionInsight(session_id=workout.id, summary_json=summary))
     db.commit()
     return summary
