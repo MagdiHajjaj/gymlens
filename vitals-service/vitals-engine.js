@@ -45,6 +45,15 @@ function rgbaToRgb(rgba, width, height) {
   return rgb;
 }
 
+// cardioMetrics = [15 PULSE_RATE, 16 ARTERIAL_PRESSURE_TRACE, 17 HRV].
+// 16 is an encrypted-model metric: requesting it forces a remote model
+// download that requires a device identity from the OS secret service
+// (D-Bus). Headless servers have no D-Bus, so SmartSpectra fails to
+// configure entirely ("device_id is required for remote model download").
+// We only ever use pulse rate, so drop 16 and keep the rest.
+const ARTERIAL_PRESSURE_TRACE = 16;
+const requestedCardioMetrics = cardioMetrics.filter((m) => m !== ARTERIAL_PRESSURE_TRACE);
+
 export class VitalsEngine {
   constructor({ apiKey, onVitals, onValidation, onError }) {
     if (!apiKey) throw new Error('PRESAGE_API_KEY is required');
@@ -62,7 +71,7 @@ export class VitalsEngine {
     if (this.running) return;
     const sdk = new SmartSpectraSDK({
       apiKey: this.apiKey,
-      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      requestedMetrics: [...breathingMetrics, ...requestedCardioMetrics],
     });
     sdk.on('metrics', (buf) => {
       try {

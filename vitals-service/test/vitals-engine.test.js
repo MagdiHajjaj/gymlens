@@ -32,6 +32,16 @@ test('start/stop lifecycle', async () => {
   assert.ok(engine.sdk === null);
 });
 
+test('requestedMetrics excludes the encrypted arterial-pressure metric (16)', async () => {
+  const engine = new VitalsEngine({ apiKey: 'test-key' });
+  engine.start();
+  const metrics = engine.sdk.opts.requestedMetrics;
+  assert.ok(!metrics.includes(16), 'must not request ARTERIAL_PRESSURE_TRACE (16)');
+  assert.ok(metrics.includes(15), 'must keep PULSE_RATE (15)');
+  for (const m of [0, 1, 2]) assert.ok(metrics.includes(m), 'must keep breathing metrics');
+  await engine.stop();
+});
+
 test('pushJpeg decodes and forwards frames; invalid JPEG is dropped', () => {
   const engine = new VitalsEngine({ apiKey: 'test-key' });
   engine.start();
