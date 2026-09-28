@@ -9,7 +9,7 @@
 
   [![Live App](https://img.shields.io/badge/Live_App-gymlens.fit-285b3f?style=for-the-badge&logo=vercel&logoColor=white)](https://www.gymlens.fit/)
   [![Devpost](https://img.shields.io/badge/Devpost-Project-003E54?style=for-the-badge&logo=devpost&logoColor=white)](https://devpost.com/software/gymlens-rplve4)
-  [![Winner](https://img.shields.io/badge/Winner-General_Challenge_--_Second_Place-d4a72c?style=for-the-badge)](https://devpost.com/software/gymlens-rplve4)
+  [![Winner](https://img.shields.io/badge/Winner-General_Challenge_--_Second_Place-d4a72c?style=for-the-badge)](https://tracker.hackthehill.com/winners)
 
   ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111)
   ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -19,7 +19,7 @@
 </div>
 
 > [!IMPORTANT]
-> 🏆 **GymLens won Second Place in the General Challenge main track.** Read the story, stack, and judging submission on [Devpost](https://devpost.com/software/gymlens-rplve4).
+> 🏆 **GymLens won Second Place in the General Challenge main track.** See the [official Hack the Hill winners](https://tracker.hackthehill.com/winners), then read our story, stack, and judging submission on [Devpost](https://devpost.com/software/gymlens-rplve4).
 
 ## ✨ What is GymLens?
 
@@ -284,5 +284,7 @@ We also want to add:
 🌐 **Live:** [https://www.gymlens.fit/](https://www.gymlens.fit/)
 
 🚀 **Devpost:** [https://devpost.com/software/gymlens-rplve4](https://devpost.com/software/gymlens-rplve4)
+
+🏆 **Hack the Hill winners:** [https://tracker.hackthehill.com/winners](https://tracker.hackthehill.com/winners)
 
 ⭐ If GymLens helps or inspires you, consider starring the repository.
